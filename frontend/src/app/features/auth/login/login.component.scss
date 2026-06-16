@@ -30,6 +30,14 @@ h2 {
   font-weight: 700;
 }
 
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  .btn { margin-top: 0.5rem; }
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -40,6 +48,7 @@ h2 {
 .error-msg {
   color: var(--rainbow-red);
   font-size: 0.85rem;
+  margin-top: -0.25rem;
 }
 
 .full-width { width: 100%; }

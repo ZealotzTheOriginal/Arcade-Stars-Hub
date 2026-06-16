@@ -1,6 +1,7 @@
 """WebSocket message handler — routes events from connected clients."""
 import json
 import time
+import uuid
 import asyncio
 from fastapi import WebSocket
 
@@ -55,6 +56,9 @@ def get_active_rooms() -> list[dict]:
             "last_activity": r.get("last_activity", 0),
         }
         for r in _rooms.values()
+        # Only expose rooms with at least one active WS connection.
+        # Prevents invite-created rooms from appearing before either player joins.
+        if manager.players_in_room(r["room_id"])
     ]
 
 
@@ -125,6 +129,7 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.SEND_INVITE: _handle_send_invite,
         ClientEvent.RESPOND_INVITE: _handle_respond_invite,
         ClientEvent.REGISTER_PRESENCE: _handle_register_presence,
+        ClientEvent.ABANDON_GAME: _handle_abandon,
     }
     handler = handlers.get(event)
     if handler:
@@ -148,13 +153,19 @@ async def _handle_join(ws: WebSocket, uid: str, data: dict):
         uids_in_room = [p["uid"] for p in room["players"]]
 
         if uid in uids_in_room and room["status"] in ("playing", "finished"):
-            # Reconnect: restore WebSocket and send current state
+            # Reconnect: restore WebSocket and notify others before sending state
             manager.add(room_id, uid, ws)
+            player_info = next((p for p in room["players"] if p["uid"] == uid), {})
+            await manager.broadcast(room_id, ServerEvent.PLAYER_RECONNECTED, {
+                "uid": uid,
+                "display_name": player_info.get("display_name", "Jugador"),
+            }, exclude_uid=uid)
             await manager.send(ws, ServerEvent.ROOM_STATE, _safe_room(room))
             if room["status"] == "playing":
                 await manager.send(ws, ServerEvent.GAME_STARTED, {
                     "players": room["players"],
                     "game_state": _public_state(room["game_state"]),
+                    "reconnected": True,
                 })
             else:
                 game = get_game(room["game_id"])
@@ -205,11 +216,16 @@ async def _handle_leave(ws: WebSocket, uid: str, data: dict):
         # Remove from players
         for room_id, room in list(_rooms.items()):
             if uid in [p["uid"] for p in room["players"]]:
+                player_info = next((p for p in room["players"] if p["uid"] == uid), {})
                 manager.remove(room_id, uid)
-                await manager.broadcast(room_id, ServerEvent.PLAYER_LEFT, {"uid": uid})
                 if room["status"] == "playing":
-                    pass  # keep slot; _auto_close_if_empty will expedite cleanup
+                    # Keep slot for reconnect; notify others it's a temporary disconnect
+                    await manager.broadcast(room_id, ServerEvent.PLAYER_DISCONNECTED, {
+                        "uid": uid,
+                        "display_name": player_info.get("display_name", "Jugador"),
+                    })
                 else:
+                    await manager.broadcast(room_id, ServerEvent.PLAYER_LEFT, {"uid": uid})
                     room["players"] = [p for p in room["players"] if p["uid"] != uid]
                     if not room["players"] or all(p.get("is_ai") for p in room["players"]):
                         _rooms.pop(room_id, None)
@@ -377,9 +393,8 @@ async def _handle_rematch(ws: WebSocket, uid: str, data: dict):
 
 async def _handle_send_invite(ws: WebSocket, uid: str, data: dict):
     to_uid = data.get("to_uid")
-    room_id = data.get("room_id")
     game_id = data.get("game_id")
-    if not to_uid or not room_id:
+    if not to_uid or not game_id:
         return
 
     info = _presence.get(uid, {})
@@ -387,7 +402,6 @@ async def _handle_send_invite(ws: WebSocket, uid: str, data: dict):
         "from_uid": uid,
         "from_name": info.get("display_name", "Alguien"),
         "from_avatar": info.get("avatar", "⭐"),
-        "room_id": room_id,
         "game_id": game_id,
     })
 
@@ -395,17 +409,33 @@ async def _handle_send_invite(ws: WebSocket, uid: str, data: dict):
 async def _handle_respond_invite(ws: WebSocket, uid: str, data: dict):
     to_uid = data.get("to_uid")
     accepted = data.get("accepted", False)
-    room_id = data.get("room_id")
+    game_id = data.get("game_id")
     if not to_uid:
         return
 
-    info = _presence.get(uid, {})
-    await manager.send_direct(to_uid, ServerEvent.INVITE_RESPONSE, {
-        "from_uid": uid,
-        "from_name": info.get("display_name", "Alguien"),
-        "accepted": accepted,
-        "room_id": room_id,
-    })
+    accepter_info = _presence.get(uid, {})
+
+    if not accepted:
+        await manager.send_direct(to_uid, ServerEvent.INVITE_RESPONSE, {
+            "from_uid": uid,
+            "from_name": accepter_info.get("display_name", "Alguien"),
+            "accepted": False,
+        })
+        return
+
+    # Create room with just the inviter as host; accepter joins via join_room after animation
+    room_id = str(uuid.uuid4())[:8].upper()
+    inviter_info = _presence.get(to_uid, {})
+    host_player = {
+        "uid": to_uid,
+        "display_name": inviter_info.get("display_name", "Player"),
+        "avatar": inviter_info.get("avatar", "⭐"),
+    }
+    create_room(room_id, game_id, to_uid, host_player)
+
+    payload = {"room_id": room_id, "game_id": game_id}
+    await manager.send_direct(to_uid, ServerEvent.INVITE_ACCEPTED, payload)
+    await manager.send_direct(uid, ServerEvent.INVITE_ACCEPTED, payload)
 
 
 async def _handle_register_presence(ws: WebSocket, uid: str, data: dict):
@@ -413,6 +443,23 @@ async def _handle_register_presence(ws: WebSocket, uid: str, data: dict):
     avatar = data.get("avatar", "⭐")
     register_presence(uid, display_name, avatar)
     manager.register_direct(uid, ws)
+
+
+async def _handle_abandon(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "playing":
+        return
+    if uid not in [p["uid"] for p in room["players"]]:
+        return
+
+    player_info = next((p for p in room["players"] if p["uid"] == uid), {})
+    await manager.broadcast(room_id, ServerEvent.GAME_ABANDONED, {
+        "uid": uid,
+        "display_name": player_info.get("display_name", "Jugador"),
+    })
+    # Room is deleted immediately — no points awarded to anyone
+    _rooms.pop(room_id, None)
 
 
 # ── Internal helpers ──────────────────────────────────────

@@ -50,9 +50,14 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   gameOverData = signal<any>(null);
   rematchVotes = signal<string[]>([]);
   isSpectator = signal(false);
+  disconnectedUids = signal<Set<string>>(new Set());
+  toast = signal<string | null>(null);
+  abandonedData = signal<{ uid: string; display_name: string } | null>(null);
+  showAbandonConfirm = signal(false);
 
   private subs: Subscription[] = [];
   private timerSub?: Subscription;
+  private toastTimer?: ReturnType<typeof setTimeout>;
 
   async ngOnInit() {
     this.roomId = this.route.snapshot.paramMap.get('roomId') ?? '';
@@ -80,6 +85,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.ws.send('leave_room', {});
     this.subs.forEach((s) => s.unsubscribe());
     this.timerSub?.unsubscribe();
+    clearTimeout(this.toastTimer);
     // WS stays alive — managed at app level for invites
   }
 
@@ -118,10 +124,15 @@ export class GameRoomComponent implements OnInit, OnDestroy {
       case 'game_started':
         this.players.set(msg.data.players ?? []);
         this.gameState.set(msg.data.game_state);
+        if (msg.data.reconnected) {
+          this.showToast('Reconectado a la partida');
+          this.disconnectedUids.set(new Set());
+        } else {
+          this.startTimer();
+        }
         this.roomStatus.set('playing');
         this.gameOverData.set(null);
         this.rematchVotes.set([]);
-        this.startTimer();
         break;
 
       case 'move_made':
@@ -162,6 +173,26 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
       case 'ai_thinking':
         this.aiThinking.set(true);
+        break;
+
+      case 'player_disconnected':
+        this.disconnectedUids.update((s) => new Set([...s, msg.data.uid]));
+        this.showToast(`${msg.data.display_name} se desconectó`);
+        break;
+
+      case 'player_reconnected':
+        this.disconnectedUids.update((s) => {
+          const ns = new Set(s);
+          ns.delete(msg.data.uid);
+          return ns;
+        });
+        this.showToast(`${msg.data.display_name} se reconectó`);
+        break;
+
+      case 'game_abandoned':
+        this.abandonedData.set({ uid: msg.data.uid, display_name: msg.data.display_name });
+        this.roomStatus.set('finished');
+        this.stopTimer();
         break;
 
       case 'room_closed':
@@ -239,7 +270,26 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.timerSub?.unsubscribe();
   }
 
+  abandonGame() {
+    this.showAbandonConfirm.set(true);
+  }
+
+  confirmAbandon() {
+    this.showAbandonConfirm.set(false);
+    this.ws.send('abandon_game', { room_id: this.roomId });
+  }
+
+  cancelAbandon() {
+    this.showAbandonConfirm.set(false);
+  }
+
   copyRoomId() {
     navigator.clipboard.writeText(this.roomId).catch(() => {});
+  }
+
+  private showToast(msg: string) {
+    clearTimeout(this.toastTimer);
+    this.toast.set(msg);
+    this.toastTimer = setTimeout(() => this.toast.set(null), 3000);
   }
 }

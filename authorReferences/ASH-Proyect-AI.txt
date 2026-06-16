@@ -1,0 +1,162 @@
+====================================================
+  ARCADE STARS HUB — Resumen de Implementación
+====================================================
+
+STACK
+-----
+- Frontend: Angular 17 (standalone components, signals, effect())
+- Backend:  FastAPI + WebSockets + asyncio
+- BD:       Firebase Firestore + Firebase Auth
+- IA:       DeepSeek API (fallback) + algoritmos propios (principal)
+- Deploy:   Render (frontend estático + backend como servicio web)
+
+
+ARQUITECTURA GENERAL
+--------------------
+- WS gestionado a nivel raíz (App component), NO por sala.
+  Reason: las notificaciones globales (invitaciones, etc.) deben
+  funcionar en cualquier página.
+- El backend mantiene dos diccionarios en memoria:
+    _rooms:    {room_id: dict}    — estado de cada sala
+    _presence: {uid: dict}        — usuarios registrados como online
+- ConnectionManager tiene dos planos:
+    _rooms:  {room_id: {uid: WebSocket}}  — conexiones por sala
+    _direct: {uid: WebSocket}             — canal directo por usuario
+- Ciclo de sala: waiting → playing → finished → deleted
+
+
+FUNCIONALIDADES IMPLEMENTADAS
+------------------------------
+
+1. AUTENTICACIÓN
+   - Firebase Auth (email + contraseña)
+   - Rutas protegidas por guard Angular
+   - Token verificado en backend con Firebase Admin SDK
+
+2. JUEGOS BASE (3 juegos)
+   - Conecta Cuatro  (multijugador + IA)
+   - Tres en Raya    (multijugador + IA)
+   - Buscaminas      (multijugador por turnos + IA)
+   - Sistema de puntos: se guardan por juego en Firestore
+   - HUD con chat en tiempo real vía WS
+
+3. IA POR JUEGO
+   - Tres en Raya:   Minimax completo (tablero 3x3, búsqueda total)
+   - Conecta Cuatro: Minimax + poda alpha-beta, profundidad 4,
+                     heurística de ventanas deslizantes + preferencia centro
+   - Buscaminas:     CSP (propagación de restricciones) para celdas seguras,
+                     fallback a celda aleatoria no minada
+   - Flujo: get_best_move() primero; si devuelve None → DeepSeek LLM
+   - Badge "IA disponible" en los juegos que la tienen
+
+4. SISTEMA DE SALAS
+   - Crear sala → código aleatorio de 8 chars
+   - Unirse por código (input en home)
+   - Salas públicas listadas en home, poll cada 15s
+   - Spectating: entrar a sala en curso, chat como [Espectador],
+                 sin interacción con el juego
+   - Room timeout: sala inactiva 10 min → evento room_closed → redirect a home
+
+5. REMATCH
+   - Botón post-game-over para jugadores humanos
+   - Todos los humanos deben votar (progreso visible en UI)
+   - Al completarse: sala vuelve a "waiting", game_state reseteado,
+     nadie se desconecta
+
+6. PRESENCIA ONLINE + AMIGOS + INVITACIONES
+   - Sidebar en home: lista de usuarios online (excepto yo)
+   - Botón ➕ añade amigo (guarda en Firestore)
+   - Botón ✉️ abre picker de juego → crea sala → envía invite_received
+     vía WS directo al destinatario
+   - Toast de invitación con countdown 15s (Accept / Reject)
+   - Presencia se re-registra en cada reconexión WS
+
+7. PERFIL DE USUARIO
+   - Pestaña Estadísticas: puntos, nivel, partidas por juego
+   - Pestaña Juegos: stats por juego (victorias, derrotas, puntos)
+   - Pestaña Amigos: carga lazy, muestra tarjetas con avatar, nombre,
+     nivel, total_points, mejor juego y sus puntos
+     (los UIDs de Firestore se resuelven a perfiles completos vía
+     GET /api/users/friends)
+   - Leaderboard global en sidebar de home
+
+
+BUGS ENCONTRADOS Y SOLUCIONADOS
+---------------------------------
+
+1. RUTA FastAPI capturada por parámetro dinámico
+   Problema:  GET /{game_id} declarado antes que GET /rooms
+              → "/rooms" se interpretaba como game_id="rooms"
+   Solución:  Declarar rutas literales primero (/rooms, /rooms/{room_id})
+              y /{game_id} al final.
+
+2. SPA 404 al recargar en Render
+   Problema:  Render sirve archivos estáticos; rutas Angular como
+              /profile no existen como archivos → 404.
+   Solución:  frontend/public/_redirects con "/* /index.html 200"
+              (Render da prioridad a este archivo sobre render.yaml routes).
+
+3. Amigos mostraban UID en bruto
+   Problema:  profile().friends era string[] de UIDs de Firestore.
+   Solución:  Nuevo endpoint GET /api/users/friends que resuelve
+              UIDs → perfiles completos (nombre, nivel, etc.).
+
+4. Salas fantasma ("ghost rooms")
+   Problema:  Sala en estado "playing" con ambos jugadores desconectados
+              nunca pasaba a "finished" (no había más moves), quedaba
+              en memoria indefinidamente.
+   Solución:
+     a) _auto_close_if_empty(): llamado al final de cada leave_room.
+        - waiting/finished + sin conexiones → borrada inmediatamente.
+        - playing + sin conexiones → last_activity adelantado para
+          que el cleanup la cierre en ~60s (ventana de gracia).
+     b) cleanup_stale_rooms(): también cierra salas "playing" con
+        cero conexiones activas tras 2 min de gracia.
+
+5. Carga lenta de salas en home
+   Problema:  Promise.allSettled([rooms, users]) esperaba ambas
+              respuestas; getOnlineUsers requiere auth token (más lento).
+   Solución:  Dos .then() independientes: salas se muestran en cuanto
+              llegan; usuarios online se actualizan por separado.
+              Añadido indicador "Cargando salas..." (loadingRooms signal).
+
+6. Fix Buscaminas: explosión de mina
+   Problema:  Al explotar una mina, el winner se asignaba al jugador
+              que pisó la mina en lugar del contrario.
+   Solución:  winner = next_turn (el OTRO jugador gana), +50 pts.
+
+7. WS gestionado por sala (bug de ciclo de vida)
+   Problema:  GameRoom hacía ws.disconnect() en ngOnDestroy, cortando
+              el WS global al salir de la sala → invitaciones dejaban
+              de funcionar.
+   Solución:  WS gestionado solo en App component. GameRoom solo envía
+              "leave_room" en ngOnDestroy, nunca desconecta.
+
+
+ENDPOINTS RELEVANTES (Backend)
+--------------------------------
+GET  /api/games                   → lista de juegos
+GET  /api/games/rooms             → salas públicas activas
+POST /api/games/rooms             → crear sala
+GET  /api/games/rooms/{room_id}   → info de sala
+GET  /api/games/{game_id}         → info de juego
+GET  /api/users/me                → perfil propio
+GET  /api/users/online            → usuarios online (requiere auth)
+GET  /api/users/friends           → amigos con perfiles completos
+POST /api/users/friends           → añadir amigo
+GET  /api/users/leaderboard       → ranking global
+WS   /ws/{room_id}?token=...      → conexión de juego/presencia
+
+
+EVENTOS WS RELEVANTES
+-----------------------
+Cliente → Servidor:
+  register_presence, leave_room, make_move, send_chat,
+  request_rematch, spectate_room, send_invite, respond_invite
+
+Servidor → Cliente:
+  room_state, player_joined, player_left, game_started,
+  move_made, game_over, chat_message, ai_thinking, pong,
+  room_closed, rematch_vote, game_reset,
+  invite_received, invite_response,
+  spectator_joined, spectator_left

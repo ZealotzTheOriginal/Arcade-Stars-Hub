@@ -1,6 +1,6 @@
 <div class="home-layout">
   <!-- Sidebar / nav -->
-  <aside class="sidebar card">
+  <aside class="sidebar card" [class.mobile-hidden]="activePanel() !== 'sidebar'">
     <div class="sidebar-logo">
       <span>⭐</span>
       <span class="logo-text">ARCADE</span>
@@ -17,7 +17,7 @@
     }
 
     <nav class="nav">
-      <a class="nav-item active">🎮 Juegos</a>
+      <a class="nav-item active" (click)="activePanel.set('main')">🎮 Juegos</a>
       <a class="nav-item" routerLink="/profile">👤 Perfil</a>
       <a class="nav-item" (click)="logout()">🚪 Salir</a>
     </nav>
@@ -29,25 +29,43 @@
         <p class="empty-hint">Nadie más en línea</p>
       }
       @for (u of onlineUsers(); track u.uid) {
-        <div class="online-user">
-          <span class="online-dot"></span>
+        <div class="online-user" [class.online-user--me]="u.is_me">
+          <span class="online-dot" [style.animation-delay]="dotDelay(u.uid)"></span>
           <span class="ou-avatar">{{ u.avatar }}</span>
-          <span class="ou-name">{{ u.display_name }}</span>
-          <div class="ou-actions">
-            <button class="icon-btn" title="Añadir amigo" (click)="addFriend(u.uid)">➕</button>
-            <button class="icon-btn" title="Invitar a partida" (click)="startInvite(u.uid)">✉️</button>
-          </div>
+          <span class="ou-name">
+            {{ u.display_name }}
+            @if (u.is_me) { <span class="ou-me">(Tú)</span> }
+          </span>
+          @if (!u.is_me) {
+            <div class="ou-actions">
+              <button class="icon-btn" title="Añadir amigo" (click)="addFriend(u.uid)">➕</button>
+              <button class="icon-btn" title="Invitar a partida" (click)="startInvite(u.uid)">✉️</button>
+            </div>
+          }
         </div>
       }
     </div>
   </aside>
 
   <!-- Main content -->
-  <main class="main-content">
+  <main class="main-content" [class.mobile-hidden]="activePanel() !== 'main'">
     <header class="page-header">
       <h1>Juegos Disponibles</h1>
       <p class="subtitle">Selecciona un juego para jugar</p>
     </header>
+
+    <!-- Reconnect banner -->
+    @if (reconnectableRoom()) {
+      <div class="reconnect-banner">
+        <span class="reconnect-icon">🎮</span>
+        <div class="reconnect-text">
+          <strong>Tienes una partida en curso</strong>
+          <span>Sala {{ reconnectableRoom().room_id }}</span>
+        </div>
+        <button class="btn btn--primary btn--sm" (click)="joinActiveRoom(reconnectableRoom())">Reconectar</button>
+        <button class="reconnect-dismiss" (click)="reconnectableRoom.set(null)">✕</button>
+      </div>
+    }
 
     <!-- Join room by code -->
     <div class="join-room card">
@@ -56,7 +74,7 @@
         <input
           class="input join-input"
           type="text"
-          placeholder="Ej: AB12CD34"
+          placeholder="TU CODIGO AQUI..."
           maxlength="8"
           [(ngModel)]="joinCode"
           (keyup.enter)="joinRoom()"
@@ -107,6 +125,8 @@
               <div class="room-actions">
                 @if (room.status === 'waiting') {
                   <button class="btn btn--primary btn--sm" (click)="joinActiveRoom(room)">Unirse</button>
+                } @else if (isMyRoom(room)) {
+                  <button class="btn btn--primary btn--sm" (click)="joinActiveRoom(room)">Reconectar</button>
                 } @else {
                   <button class="btn btn--ghost btn--sm" (click)="spectateRoom(room)">Espectar</button>
                 }
@@ -150,7 +170,7 @@
   </main>
 
   <!-- Leaderboard -->
-  <aside class="leaderboard card">
+  <aside class="leaderboard card" [class.mobile-hidden]="activePanel() !== 'leaderboard'">
     <h2>🏆 Ranking Global</h2>
     <div class="lb-list">
       @for (entry of leaderboard(); track entry.uid; let i = $index) {
@@ -164,6 +184,22 @@
     </div>
   </aside>
 </div>
+
+<!-- Mobile bottom tab bar -->
+<nav class="mobile-tabs">
+  <button class="mobile-tab" [class.active]="activePanel() === 'sidebar'" (click)="activePanel.set('sidebar')">
+    <span class="tab-icon">🟢</span>
+    <span>En línea</span>
+  </button>
+  <button class="mobile-tab" [class.active]="activePanel() === 'main'" (click)="activePanel.set('main')">
+    <span class="tab-icon">🎮</span>
+    <span>Juegos</span>
+  </button>
+  <button class="mobile-tab" [class.active]="activePanel() === 'leaderboard'" (click)="activePanel.set('leaderboard')">
+    <span class="tab-icon">🏆</span>
+    <span>Ranking</span>
+  </button>
+</nav>
 
 <!-- Invite game picker overlay -->
 @if (invitingUser()) {

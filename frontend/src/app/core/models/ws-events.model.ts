@@ -15,7 +15,11 @@ export type ServerEvent =
   | 'invite_received'
   | 'invite_response'
   | 'spectator_joined'
-  | 'spectator_left';
+  | 'spectator_left'
+  | 'player_disconnected'
+  | 'player_reconnected'
+  | 'game_abandoned'
+  | 'invite_accepted';
 
 export interface WSMessage {
   event: ServerEvent;
@@ -34,6 +38,10 @@ export interface InviteData {
   from_uid: string;
   from_name: string;
   from_avatar: string;
+  game_id: string;
+}
+
+export interface InviteAcceptedData {
   room_id: string;
   game_id: string;
 }

@@ -28,8 +28,22 @@
     .copy-hint { margin-left: 0.5rem; cursor: pointer; opacity: 0.6; &:hover { opacity: 1; } }
   }
 
+  .spectator-badge {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    background: rgba(0, 180, 180, 0.15);
+    color: var(--rainbow-teal);
+  }
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
   .ai-badge {
-    margin-left: auto;
     font-size: 0.8rem;
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
@@ -38,20 +52,41 @@
     animation: pulse 1s ease-in-out infinite;
   }
 
-  .spectator-badge {
-    font-size: 0.8rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    background: rgba(0, 180, 180, 0.15);
-    color: var(--rainbow-teal);
-  }
-
   .spectators-count {
-    margin-left: auto;
     font-size: 0.8rem;
     color: var(--text-muted);
     padding: 0.25rem 0.5rem;
   }
+
+  .room-toast {
+    font-size: 0.78rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    animation: toast-in 0.2s ease;
+  }
+}
+
+.abandon-btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  background: rgba(255, 0, 0, 0.1);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  color: #ff8080;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  &:hover {
+    background: rgba(255, 0, 0, 0.2);
+    border-color: rgba(255, 80, 80, 0.6);
+  }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .room-main {
@@ -120,11 +155,18 @@
   border-radius: 8px;
   border: 1px solid var(--text-muted);
   font-size: 0.9rem;
+  transition: opacity 0.2s, border-color 0.2s;
   .avatar { font-size: 1.5rem; }
+
+  &.disconnected {
+    opacity: 0.45;
+    border-color: rgba(255, 80, 80, 0.3);
+  }
 }
 
 .tag { font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 4px; background: rgba(255, 255, 255, 0.06); }
 .tag--ai { background: rgba(70, 67, 255, 0.2); color: #a0a0ff; }
+.tag--dc { background: rgba(255, 80, 80, 0.15); color: #ff8080; }
 
 /* Game over banner */
 .game-over-banner {
@@ -150,6 +192,43 @@
 
   .rematch-area { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
   .rematch-waiting { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+  .abandon-msg { font-size: 0.85rem; color: var(--text-muted); margin: 0; text-align: center; }
+}
+
+/* Abandon confirm dialog */
+.abandon-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.15s ease;
+}
+
+.abandon-dialog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 2rem 1.5rem;
+  max-width: 340px;
+  text-align: center;
+
+  .abandon-dialog-icon { font-size: 2.25rem; }
+  h3 { font-size: 1.1rem; font-weight: 700; }
+  p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+}
+
+.abandon-dialog-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+  width: 100%;
+
+  .btn { flex: 1; }
 }
 
 @keyframes pulse {

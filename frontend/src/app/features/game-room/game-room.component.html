@@ -10,12 +10,20 @@
     @if (isSpectator()) {
       <div class="spectator-badge">👁️ Espectando</div>
     }
-    @if (aiThinking()) {
-      <div class="ai-badge">🤖 IA pensando...</div>
-    }
-    @if (spectators().length > 0) {
-      <div class="spectators-count">👁️ {{ spectators().length }}</div>
-    }
+    <div class="header-right">
+      @if (roomStatus() === 'playing' && !isSpectator()) {
+        <button class="abandon-btn" (click)="abandonGame()">🚩 Abandonar</button>
+      }
+      @if (aiThinking()) {
+        <div class="ai-badge">🤖 IA pensando...</div>
+      }
+      @if (spectators().length > 0) {
+        <div class="spectators-count">👁️ {{ spectators().length }}</div>
+      }
+      @if (toast()) {
+        <div class="room-toast">{{ toast() }}</div>
+      }
+    </div>
   </header>
 
   <!-- HUD -->
@@ -50,10 +58,11 @@
           }
           <div class="players-waiting">
             @for (p of players(); track p.uid) {
-              <div class="waiting-player">
+              <div class="waiting-player" [class.disconnected]="disconnectedUids().has(p.uid)">
                 <span class="avatar">{{ p.avatar }}</span>
                 <span>{{ p.display_name }}</span>
                 @if (p.is_ai) { <span class="tag tag--ai">IA</span> }
+                @if (disconnectedUids().has(p.uid)) { <span class="tag tag--dc">desconectado</span> }
               </div>
             }
           </div>
@@ -85,6 +94,15 @@
             </app-minesweeper>
           }
         }
+      }
+
+      <!-- Abandoned overlay -->
+      @if (abandonedData()) {
+        <div class="game-over-banner">
+          <span class="result loss">🚩 Partida abandonada</span>
+          <p class="abandon-msg">{{ abandonedData()!.display_name }} abandonó la partida. Nadie recibe puntos.</p>
+          <a class="btn btn--ghost" routerLink="/home">Volver al inicio</a>
+        </div>
       }
 
       <!-- Game over overlay -->
@@ -127,3 +145,17 @@
     </div>
   </div>
 </div>
+
+@if (showAbandonConfirm()) {
+  <div class="abandon-overlay" (click)="cancelAbandon()">
+    <div class="abandon-dialog card rainbow-border" (click)="$event.stopPropagation()">
+      <span class="abandon-dialog-icon">🚩</span>
+      <h3>Abandonar partida</h3>
+      <p>Ningún jugador recibirá puntos por esta partida si la abandonas.</p>
+      <div class="abandon-dialog-actions">
+        <button class="btn btn--ghost" (click)="cancelAbandon()">Cancelar</button>
+        <button class="btn btn--danger" (click)="confirmAbandon()">Abandonar</button>
+      </div>
+    </div>
+  </div>
+}
