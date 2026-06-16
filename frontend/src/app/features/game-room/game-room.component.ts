@@ -60,17 +60,11 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     await this.ws.connect();
 
     this.subs.push(
-      this.ws.messages$.subscribe((msg) => this.handleMessage(msg))
+      this.ws.messages$.subscribe((msg) => this.handleMessage(msg)),
+      this.ws.reconnected$.subscribe(() => this._joinRoom()),
     );
 
-    this.ws.send('join_room', {
-      room_id: this.roomId,
-      game_id: this.gameId,
-      player_info: {
-        display_name: this.myProfile?.display_name ?? 'Player',
-        avatar: this.myProfile?.avatar ?? '⭐',
-      },
-    });
+    this._joinRoom();
   }
 
   ngOnDestroy() {
@@ -128,6 +122,17 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         this.aiThinking.set(true);
         break;
     }
+  }
+
+  private _joinRoom() {
+    this.ws.send('join_room', {
+      room_id: this.roomId,
+      game_id: this.gameId,
+      player_info: {
+        display_name: this.myProfile?.display_name ?? 'Player',
+        avatar: this.myProfile?.avatar ?? '⭐',
+      },
+    });
   }
 
   makeMove(move: any) {

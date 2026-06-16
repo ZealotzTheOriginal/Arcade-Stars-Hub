@@ -45,6 +45,7 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.MAKE_MOVE: _handle_move,
         ClientEvent.CHAT_MESSAGE: _handle_chat,
         ClientEvent.ADD_AI_PLAYER: _handle_add_ai,
+        ClientEvent.PING: _handle_ping,
     }
     handler = handlers.get(event)
     if handler:
@@ -67,8 +68,16 @@ async def _handle_join(ws: WebSocket, uid: str, data: dict):
             return
         room = create_room(room_id, game_id, uid, {"uid": uid, **player_info})
     else:
-        # Add player if not already in room
         uids_in_room = [p["uid"] for p in room["players"]]
+        if uid in uids_in_room and room["status"] == "playing":
+            # Reconnect mid-game: restore WebSocket and send current state
+            manager.add(room_id, uid, ws)
+            await manager.send(ws, ServerEvent.ROOM_STATE, _safe_room(room))
+            await manager.send(ws, ServerEvent.GAME_STARTED, {
+                "players": room["players"],
+                "game_state": _public_state(room["game_state"]),
+            })
+            return
         if uid not in uids_in_room:
             room["players"].append({"uid": uid, **player_info})
 
@@ -86,10 +95,14 @@ async def _handle_leave(ws: WebSocket, uid: str, data: dict):
     for room_id, room in list(_rooms.items()):
         if uid in [p["uid"] for p in room["players"]]:
             manager.remove(room_id, uid)
-            room["players"] = [p for p in room["players"] if p["uid"] != uid]
             await manager.broadcast(room_id, ServerEvent.PLAYER_LEFT, {"uid": uid})
-            if not room["players"]:
-                del _rooms[room_id]
+            if room["status"] == "playing":
+                # Keep player in room so they can reconnect
+                pass
+            else:
+                room["players"] = [p for p in room["players"] if p["uid"] != uid]
+                if not room["players"]:
+                    del _rooms[room_id]
             break
 
 
@@ -135,6 +148,10 @@ async def _handle_chat(ws: WebSocket, uid: str, data: dict):
             "display_name": sender,
             "message": message,
         })
+
+
+async def _handle_ping(ws: WebSocket, uid: str, data: dict):
+    await manager.send(ws, ServerEvent.PONG, {})
 
 
 async def _handle_add_ai(ws: WebSocket, uid: str, data: dict):

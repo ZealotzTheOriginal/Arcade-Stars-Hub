@@ -11,6 +11,7 @@ class ClientEvent(str, Enum):
     CHAT_MESSAGE = "chat_message"
     REQUEST_AI_MOVE = "request_ai_move"
     ADD_AI_PLAYER = "add_ai_player"
+    PING = "ping"
 
 
 # ── Outgoing event types (server → client) ──────────────
@@ -24,6 +25,7 @@ class ServerEvent(str, Enum):
     CHAT_MESSAGE = "chat_message"
     AI_THINKING = "ai_thinking"
     ERROR = "error"
+    PONG = "pong"
 
 
 class WSMessage(BaseModel):

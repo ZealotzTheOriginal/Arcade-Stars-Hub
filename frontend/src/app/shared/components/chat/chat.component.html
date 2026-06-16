@@ -2,14 +2,22 @@
   <h3 class="chat-title">💬 Chat</h3>
 
   <div class="msg-list" #msgList>
-    @for (msg of messages; track $index) {
-      <div class="msg">
-        <span class="msg-author">{{ msg.display_name }}</span>
-        <span class="msg-text">{{ msg.message }}</span>
-      </div>
-    }
     @if (messages.length === 0) {
       <p class="empty">Sin mensajes aún</p>
+    }
+
+    @for (msg of messages; track $index; let i = $index) {
+      <div
+        class="msg-wrap"
+        [class.mine]="isMine(msg)"
+        [class.first]="isFirstInGroup(i)">
+
+        @if (isFirstInGroup(i) && !isMine(msg)) {
+          <span class="msg-author">{{ msg.display_name }}</span>
+        }
+
+        <div class="bubble">{{ msg.message }}</div>
+      </div>
     }
   </div>
 
@@ -20,6 +28,6 @@
       (keydown)="onKey($event)"
       placeholder="Escribe un mensaje..."
       maxlength="300" />
-    <button class="btn btn--ghost" (click)="send()">Enviar</button>
+    <button class="btn btn--ghost send-btn" (click)="send()">↑</button>
   </div>
 </div>

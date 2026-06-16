@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, Input, OnChanges, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WsService } from '../../../core/services/ws.service';
@@ -11,10 +11,12 @@ import { ChatMessage } from '../../../core/models/ws-events.model';
   templateUrl: './chat.component.html',
   styleUrls: ['./chat.component.scss'],
 })
-export class ChatComponent implements AfterViewChecked {
+export class ChatComponent implements AfterViewChecked, OnChanges {
   @Input() messages: ChatMessage[] = [];
   @Input() roomId: string = '';
   @Input() displayName: string = '';
+  @Input() myUid: string = '';
+
   @ViewChild('msgList') private msgList!: ElementRef;
 
   text = '';
@@ -31,6 +33,15 @@ export class ChatComponent implements AfterViewChecked {
 
   ngOnChanges() {
     this.shouldScroll = true;
+  }
+
+  isFirstInGroup(index: number): boolean {
+    if (index === 0) return true;
+    return this.messages[index].uid !== this.messages[index - 1].uid;
+  }
+
+  isMine(msg: ChatMessage): boolean {
+    return msg.uid === this.myUid;
   }
 
   send() {

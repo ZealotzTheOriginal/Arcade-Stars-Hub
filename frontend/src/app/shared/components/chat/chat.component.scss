@@ -2,56 +2,115 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .chat-title {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-muted);
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* ── Message list ── */
 .msg-list {
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding-right: 4px;
+  padding: 0.25rem 0.25rem 0.25rem 0;
+  gap: 0;
+
+  &::-webkit-scrollbar { width: 3px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
 }
 
-.msg {
+/* ── Message wrapper ── */
+.msg-wrap {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  align-items: flex-start;
+  margin-top: 0.18rem;
+  max-width: 100%;
 
-  .msg-author {
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: var(--rainbow-teal);
+  &.first {
+    margin-top: 0.75rem;
+
+    &:first-child {
+      margin-top: 0;
+    }
   }
 
-  .msg-text {
-    font-size: 0.82rem;
-    color: var(--text-primary);
-    word-break: break-word;
-    background: rgba(255, 255, 255, 0.04);
-    padding: 0.3rem 0.5rem;
-    border-radius: 6px;
+  &.mine {
+    align-items: flex-end;
   }
 }
 
+/* ── Sender label ── */
+.msg-author {
+  font-size: 0.67rem;
+  font-weight: 600;
+  color: var(--rainbow-teal);
+  margin-bottom: 0.2rem;
+  padding: 0 0.5rem;
+  opacity: 0.9;
+}
+
+/* ── Bubble ── */
+.bubble {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  word-break: break-word;
+  max-width: 88%;
+  padding: 0.4rem 0.65rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+
+  /* Other player: top-left corner flat on first bubble */
+  .first:not(.mine) & {
+    border-top-left-radius: 3px;
+  }
+
+  /* Mine: right-aligned, purple tint, bottom-right flat */
+  .mine & {
+    background: rgba(110, 70, 220, 0.35);
+    border-bottom-right-radius: 3px;
+  }
+
+  /* Mine first: top-right also squared */
+  .first.mine & {
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+  }
+}
+
+/* ── Empty state ── */
 .empty {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
   text-align: center;
-  padding: 1rem;
+  padding: 1.5rem 0;
+  opacity: 0.6;
 }
 
+/* ── Input ── */
 .chat-input {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
 
-  .input { flex: 1; }
-  .btn { padding: 0.5rem 0.75rem; font-size: 0.8rem; }
+  .input {
+    flex: 1;
+    font-size: 0.82rem;
+    padding: 0.45rem 0.65rem;
+  }
+}
+
+.send-btn {
+  padding: 0.4rem 0.7rem;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
