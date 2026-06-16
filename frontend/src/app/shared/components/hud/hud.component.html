@@ -1,0 +1,38 @@
+<div class="hud">
+  <!-- Players -->
+  <div class="hud-players">
+    @for (player of players; track player.uid; let i = $index) {
+      <div class="hud-player" [class.active]="player.uid === currentTurn">
+        <span class="avatar">{{ player.avatar }}</span>
+        <div class="player-details">
+          <span class="player-name">{{ player.display_name }}</span>
+          <span class="player-pts">{{ scores[player.uid] || 0 }} pts</span>
+        </div>
+        @if (player.uid === currentTurn && status === 'playing') {
+          <span class="turn-indicator">▶</span>
+        }
+        @if (player.is_ai) {
+          <span class="ai-badge">IA</span>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Stats -->
+  <div class="hud-stats">
+    <div class="stat">
+      <span class="stat-label">Tiempo</span>
+      <span class="stat-value">{{ formattedTime }}</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Nivel</span>
+      <span class="stat-value">{{ level }}</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Estado</span>
+      <span class="stat-value status-badge" [class]="'status-' + status">
+        {{ status === 'waiting' ? 'Esperando' : status === 'playing' ? 'En juego' : 'Terminado' }}
+      </span>
+    </div>
+  </div>
+</div>

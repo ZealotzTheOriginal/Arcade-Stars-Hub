@@ -1,0 +1,103 @@
+<div class="home-layout">
+  <!-- Sidebar / nav -->
+  <aside class="sidebar card">
+    <div class="sidebar-logo">
+      <span>⭐</span>
+      <span class="logo-text">ARCADE</span>
+    </div>
+
+    @if (profile(); as p) {
+      <div class="user-info">
+        <div class="avatar">{{ p.avatar }}</div>
+        <div>
+          <p class="user-name">{{ p.display_name }}</p>
+          <p class="user-level">Nivel {{ p.level }} · {{ p.total_points }} pts</p>
+        </div>
+      </div>
+    }
+
+    <nav class="nav">
+      <a class="nav-item active">🎮 Juegos</a>
+      <a class="nav-item" routerLink="/profile">👤 Perfil</a>
+      <a class="nav-item" (click)="logout()">🚪 Salir</a>
+    </nav>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main-content">
+    <header class="page-header">
+      <h1>Juegos Disponibles</h1>
+      <p class="subtitle">Selecciona un juego para jugar</p>
+    </header>
+
+    <!-- Join room by code -->
+    <div class="join-room card">
+      <p class="join-label">¿Tienes un código de sala?</p>
+      <div class="join-row">
+        <input
+          class="input join-input"
+          type="text"
+          placeholder="Ej: AB12CD34"
+          maxlength="8"
+          [(ngModel)]="joinCode"
+          (keyup.enter)="joinRoom()"
+        />
+        <button
+          class="btn btn--secondary"
+          (click)="joinRoom()"
+          [disabled]="joiningRoom() || !joinCode.trim()">
+          {{ joiningRoom() ? '...' : 'Unirse' }}
+        </button>
+      </div>
+      @if (joinError()) {
+        <p class="join-error">{{ joinError() }}</p>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="loading">Cargando juegos...</div>
+    } @else if (error()) {
+      <div class="error-banner">⚠️ {{ error() }}</div>
+    } @else {
+      <div class="games-grid">
+        @for (game of games(); track game.id) {
+          <div class="game-card card">
+            <div class="game-thumb">{{ game.thumbnail }}</div>
+            <div class="game-info">
+              <h3>{{ game.name }}</h3>
+              <p class="game-desc">{{ game.description }}</p>
+              <div class="game-tags">
+                <span class="tag">{{ game.category }}</span>
+                <span class="tag">{{ game.max_players }} jugadores</span>
+                @if (game.has_ai) {
+                  <span class="tag tag--ai">IA disponible</span>
+                }
+              </div>
+            </div>
+            <button
+              class="btn btn--primary"
+              (click)="playGame(game)"
+              [disabled]="creatingRoom() === game.id">
+              {{ creatingRoom() === game.id ? 'Creando sala...' : 'Jugar' }}
+            </button>
+          </div>
+        }
+      </div>
+    }
+  </main>
+
+  <!-- Leaderboard -->
+  <aside class="leaderboard card">
+    <h2>🏆 Ranking Global</h2>
+    <div class="lb-list">
+      @for (entry of leaderboard(); track entry.uid; let i = $index) {
+        <div class="lb-row" [class.top3]="i < 3">
+          <span class="lb-rank">{{ entry.rank }}</span>
+          <span class="lb-avatar">{{ entry.avatar }}</span>
+          <span class="lb-name">{{ entry.display_name }}</span>
+          <span class="lb-pts">{{ entry.points }}</span>
+        </div>
+      }
+    </div>
+  </aside>
+</div>

@@ -1,0 +1,25 @@
+<div class="chat">
+  <h3 class="chat-title">💬 Chat</h3>
+
+  <div class="msg-list" #msgList>
+    @for (msg of messages; track $index) {
+      <div class="msg">
+        <span class="msg-author">{{ msg.display_name }}</span>
+        <span class="msg-text">{{ msg.message }}</span>
+      </div>
+    }
+    @if (messages.length === 0) {
+      <p class="empty">Sin mensajes aún</p>
+    }
+  </div>
+
+  <div class="chat-input">
+    <input
+      class="input"
+      [(ngModel)]="text"
+      (keydown)="onKey($event)"
+      placeholder="Escribe un mensaje..."
+      maxlength="300" />
+    <button class="btn btn--ghost" (click)="send()">Enviar</button>
+  </div>
+</div>

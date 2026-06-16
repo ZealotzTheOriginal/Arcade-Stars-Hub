@@ -1,0 +1,116 @@
+<div class="profile-layout">
+  <header class="profile-header card">
+    @if (profile(); as p) {
+      <div class="user-hero">
+        <div class="avatar-big">{{ p.avatar }}</div>
+        <div class="user-meta">
+          <h1>{{ p.display_name }}</h1>
+          <p class="user-email">{{ p.email }}</p>
+          <div class="user-badges">
+            <span class="badge">Nivel {{ p.level }}</span>
+            <span class="badge badge--gold">⭐ {{ p.total_points }} pts</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <a class="btn btn--ghost" routerLink="/home">← Inicio</a>
+          <button class="btn btn--danger" (click)="logout()">Salir</button>
+        </div>
+      </div>
+    }
+  </header>
+
+  <div class="profile-body">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab" [class.active]="activeTab() === 'stats'" (click)="setTab('stats')">📊 Estadísticas</button>
+      <button class="tab" [class.active]="activeTab() === 'games'" (click)="setTab('games')">🎮 Juegos</button>
+      <button class="tab" [class.active]="activeTab() === 'friends'" (click)="setTab('friends')">👥 Amigos</button>
+    </div>
+
+    <!-- Content -->
+    <div class="tab-content card">
+
+      <!-- Stats -->
+      @if (activeTab() === 'stats') {
+        <section class="stats-section">
+          <h2>Editar Perfil</h2>
+          <div class="edit-name">
+            <input class="input" [(ngModel)]="editName" placeholder="Nombre de usuario" />
+            <button class="btn btn--primary" (click)="saveName()" [disabled]="saving()">
+              {{ saving() ? 'Guardando...' : 'Guardar' }}
+            </button>
+          </div>
+
+          <h3>Selecciona tu avatar</h3>
+          <div class="avatar-grid">
+            @for (av of avatars; track av) {
+              <button
+                class="avatar-btn"
+                [class.selected]="profile()?.avatar === av"
+                (click)="selectAvatar(av)">
+                {{ av }}
+              </button>
+            }
+          </div>
+
+          <h3>Ranking Global</h3>
+          <div class="lb-table">
+            @for (entry of leaderboard(); track entry.uid; let i = $index) {
+              <div class="lb-row" [class.me]="entry.uid === profile()?.uid">
+                <span class="rank">{{ i + 1 }}</span>
+                <span class="av">{{ entry.avatar }}</span>
+                <span class="name">{{ entry.display_name }}</span>
+                <span class="lvl">Nv.{{ entry.level }}</span>
+                <span class="pts">{{ entry.points }} pts</span>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- Games -->
+      @if (activeTab() === 'games') {
+        <section class="games-section">
+          <h2>Mis Juegos</h2>
+          @if (gameStatsList().length === 0) {
+            <p class="empty">Aún no has jugado ninguna partida.</p>
+          } @else {
+            <div class="game-stats-grid">
+              @for (g of gameStatsList(); track g.id) {
+                <div class="game-stat-card">
+                  <h3>{{ g.name }}</h3>
+                  <div class="stat-row"><span>Partidas</span><strong>{{ g.played }}</strong></div>
+                  <div class="stat-row"><span>Victorias</span><strong class="green">{{ g.won }}</strong></div>
+                  <div class="stat-row"><span>Puntos</span><strong class="gold">{{ g.points }}</strong></div>
+                  <div class="stat-row">
+                    <span>Winrate</span>
+                    <strong>{{ g.played > 0 ? ((g.won / g.played) * 100).toFixed(0) : 0 }}%</strong>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </section>
+      }
+
+      <!-- Friends -->
+      @if (activeTab() === 'friends') {
+        <section class="friends-section">
+          <h2>Amigos</h2>
+          @if ((profile()?.friends?.length ?? 0) === 0) {
+            <p class="empty">Aún no tienes amigos añadidos.</p>
+          } @else {
+            <div class="friends-list">
+              @for (uid of profile()?.friends ?? []; track uid) {
+                <div class="friend-item">
+                  <span>{{ uid }}</span>
+                </div>
+              }
+            </div>
+          }
+        </section>
+      }
+
+    </div>
+  </div>
+</div>

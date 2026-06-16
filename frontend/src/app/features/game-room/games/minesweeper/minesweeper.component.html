@@ -1,0 +1,38 @@
+<div class="ms-wrapper">
+  @if (!gameState) {
+    <p class="waiting">Esperando que el juego comience...</p>
+  } @else {
+    <p class="turn-info">
+      @if (gameState.game_over) {
+        Juego terminado
+      } @else if (isMyTurn) {
+        ¡Tu turno! Haz clic para revelar · Clic derecho para marcar
+      } @else {
+        Turno del oponente...
+      }
+    </p>
+
+    <div class="board" [style.grid-template-columns]="'repeat(' + cols + ', 32px)'">
+      @for (r of rowRange; track r) {
+        @for (c of colRange; track c) {
+          <div
+            [class]="cellClass(r, c)"
+            (click)="reveal(r, c)"
+            (contextmenu)="flag($event, r, c)">
+            {{ cellLabel(r, c) }}
+          </div>
+        }
+      }
+    </div>
+
+    @if (gameState.game_over) {
+      <div class="result-banner">
+        @if (gameState.winner === myUid) {
+          <span>🏆 ¡Ganaste!</span>
+        } @else {
+          <span>💣 Mejor suerte la próxima</span>
+        }
+      </div>
+    }
+  }
+</div>

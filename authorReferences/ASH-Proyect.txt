@@ -1,0 +1,75 @@
+La idea de la pagina es hacer un Hub para montar videojuegos, la estructura de carpetas debe ser modular para poder agregar
+diferentes juegos a lo largo del proyecto, se usara Angular para el Frontend y FastAPI para el backend, la base de datos sera
+en Firebase Firestore. 
+
+El proyecto debe poder iniciarse desde un archivo .bat
+
+La estructura de carpetas es la siguiente: 
+- ArcadeStarsHub/
+    - frontend/
+    - backend/
+    - .env
+    - .gitignore
+    - README.md
+    - deploy.bat
+
+
+La autenticación sera con Firebase Auth usando Email y Password.
+    
+Los colores que se usaran son:
+ - 0A0C10 (Fondo Global)
+ - 15151D (Fondo de componentes)
+ - 3D4553 (Letras de poca visibilidad o iconos)
+ - FFFFFF (Letras principales)
+
+Y a lo largo de la pagina se usaran colores arcoiris discretamente para trazos, decoraciones y efectos especiales.
+ Los colores son:
+ Si se usa en trazos o margenes sera de maximo 2 pixeles de grosor
+ Si se usa como luces de fondo con Blur sera de maximo 10px, el color puede variar
+ - FF0000 (Rojo)
+ - FFC700 (Amarillo)
+ - 45F6D7 (Turquesa)
+ - 4643FF (Azul)
+ - FF00D6 (Rosa)
+
+Se implementara un HUD para mostrar informacion del juego que se este jugando, como el puntaje, nivel, tiempo, etc.
+
+La idea  es que el sistema funcione con Web Sockets para poder jugar con otros jugadores en tiempo real, tambien se ha de implementar
+una IA que en este caso usara la API de DeepSeek para poder jugar contra la IA. 
+
+Los juegos seran de todo tipo, pero deben ser juegos que se puedan jugar con el teclado y el mouse.
+
+Juegos que se planean implementar para la primera version:
+- Conecta Cuatro (Multiplayer y contra IA)
+- Buscaminas (Multiplayer por Turnos)
+- Tres en Raya (Multiplayer y contra IA)
+
+En el HUD se mostraran las siguientes estadisticas por defecto:
+- Puntos
+- Nivel
+- Tiempo
+- Jugador 1 (Nombre y avatar)
+- Jugador 2 (Nombre y avatar)
+
+En el HUD tambien se mostrara un chat para poder comunicarse con los jugadores.
+Sin embargo si el juego no tiene puntos como el Tres en Raya o Conecta Cuatro, se sumaran puntos cuando se gane la partida.
+En el caso de Buscaminas, se sumaran puntos al despejar casillas y al ganar.
+
+Los puntos se almacenan en la cuenta del usuario, y se debe almacenar de que juego se sacaron dichos puntos, para hacer un tabla
+de clasificacion global y por juego.
+
+Las paginas seran:
+- Login
+- Registro
+- Recuperar Contraseña
+- Pagina Principal (En esta pagina se mostrara una lista de juegos disponibles, y el jugador podra seleccionar uno para jugar, esta lista debe ser dinamica y 
+    mostrara la informacion del juego como su nombre, descripcion, categoria, puntaje maximo, etc)
+- Sala de Juego (Donde se alberga el juego)
+- Perfil del Usuario (En esta pagina se mostrara la informacion del usuario, y el jugador podra ver sus estadisticas, juegos, amigos, etc)
+    - Estadisticas (En esta pagina se mostrara la informacion del usuario, como sus puntos, nivel, juegos jugados, tiempo jugado, etc)
+    - Juegos (En esta pagina se mostrara la informacion de los juegos que ha jugado el usuario, como sus estadisticas, 
+        puntos, etc)
+    - Amigos (En esta pagina se mostrara la informacion de los amigos del usuario)
+
+Cualquier declaracion aqui no es absoluta si hay una mejora que permita escalar y mejorar el proyecto, se debe implementar en lugar
+de lo señalado en este documento.

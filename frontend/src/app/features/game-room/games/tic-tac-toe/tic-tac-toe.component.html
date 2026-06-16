@@ -1,0 +1,29 @@
+<div class="ttt-wrapper">
+  @if (!gameState) {
+    <p class="waiting">Esperando que el juego comience...</p>
+  } @else {
+    <div class="board">
+      @for (row of size; track row) {
+        <div class="row">
+          @for (col of size; track col) {
+            <div [class]="cellClass(row, col)" (click)="play(row, col)">
+              <span class="symbol">{{ cellSymbol(row, col) }}</span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    @if (isTerminal()) {
+      <div class="result-banner">
+        @if (gameState.draw) {
+          <span>🤝 ¡Empate!</span>
+        } @else if (gameState.winner === myUid) {
+          <span>🎉 ¡Ganaste!</span>
+        } @else {
+          <span>😔 Perdiste</span>
+        }
+      </div>
+    }
+  }
+</div>

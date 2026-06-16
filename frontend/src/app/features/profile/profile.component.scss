@@ -1,0 +1,183 @@
+.profile-layout {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Header */
+.profile-header { padding: 1.5rem; }
+
+.user-hero {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+
+  .avatar-big { font-size: 4rem; }
+
+  .user-meta {
+    flex: 1;
+    h1 { font-size: 1.5rem; font-weight: 800; }
+    .user-email { font-size: 0.8rem; color: var(--text-muted); }
+  }
+
+  .user-badges {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+    flex-wrap: wrap;
+  }
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+
+  &--gold {
+    background: rgba(255, 199, 0, 0.15);
+    color: var(--rainbow-yellow);
+  }
+}
+
+/* Profile body */
+.profile-body { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--text-muted);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition);
+
+  &.active, &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    border-color: var(--text-primary);
+  }
+}
+
+.tab-content { padding: 1.5rem; }
+
+/* Stats */
+.stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  h2 { font-size: 1.1rem; font-weight: 700; }
+  h3 { font-size: 0.9rem; color: var(--text-muted); }
+}
+
+.edit-name {
+  display: flex;
+  gap: 0.75rem;
+  .input { max-width: 280px; }
+}
+
+.avatar-grid {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.avatar-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid transparent;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all var(--transition);
+
+  &:hover { border-color: var(--text-muted); }
+  &.selected { border-color: var(--rainbow-teal); background: rgba(69, 246, 215, 0.08); }
+}
+
+.lb-table { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.lb-row {
+  display: grid;
+  grid-template-columns: 32px 32px 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  transition: background var(--transition);
+
+  &:hover { background: rgba(255, 255, 255, 0.04); }
+
+  &.me {
+    background: rgba(69, 246, 215, 0.06);
+    border: 1px solid rgba(69, 246, 215, 0.2);
+  }
+
+  .rank { color: var(--text-muted); font-weight: 700; text-align: center; }
+  .av { text-align: center; }
+  .lvl { color: var(--text-muted); font-size: 0.75rem; }
+  .pts { color: var(--rainbow-yellow); font-weight: 700; }
+}
+
+/* Games */
+.games-section { display: flex; flex-direction: column; gap: 1rem; h2 { font-size: 1.1rem; font-weight: 700; } }
+
+.game-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.game-stat-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--text-muted);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  h3 { font-size: 0.9rem; font-weight: 700; }
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  span { color: var(--text-muted); }
+  .green { color: var(--rainbow-teal); }
+  .gold { color: var(--rainbow-yellow); }
+}
+
+/* Friends */
+.friends-section { display: flex; flex-direction: column; gap: 1rem; h2 { font-size: 1.1rem; font-weight: 700; } }
+.friends-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.friend-item {
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.empty { color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0; }

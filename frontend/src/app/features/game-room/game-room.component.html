@@ -1,0 +1,103 @@
+<div class="room-layout">
+
+  <!-- Header -->
+  <header class="room-header">
+    <a routerLink="/home" class="back-btn">← Salir</a>
+    <div class="room-id">
+      Sala: <strong>{{ roomId }}</strong>
+      <span class="copy-hint" (click)="copyRoomId()">📋</span>
+    </div>
+    @if (aiThinking()) {
+      <div class="ai-badge">🤖 IA pensando...</div>
+    }
+  </header>
+
+  <!-- HUD -->
+  <app-hud
+    [players]="players()"
+    [scores]="scores"
+    [currentTurn]="gameState()?.current_turn ?? ''"
+    [level]="currentLevel"
+    [elapsedSeconds]="elapsedSeconds()"
+    [status]="roomStatus()">
+  </app-hud>
+
+  <!-- Main area -->
+  <div class="room-main">
+
+    <!-- Game canvas -->
+    <div class="game-area card">
+
+      <!-- Waiting lobby -->
+      @if (roomStatus() === 'waiting') {
+        <div class="lobby">
+          <h2>Esperando jugadores...</h2>
+          <p class="room-code">Código de sala: <strong class="highlight">{{ roomId }}</strong></p>
+          <p class="hint">Comparte este código con un amigo o añade la IA</p>
+          <div class="lobby-actions">
+            <button class="btn btn--ghost" (click)="addAI()">🤖 Añadir IA (DeepSeek)</button>
+          </div>
+          <div class="players-waiting">
+            @for (p of players(); track p.uid) {
+              <div class="waiting-player">
+                <span class="avatar">{{ p.avatar }}</span>
+                <span>{{ p.display_name }}</span>
+                @if (p.is_ai) { <span class="tag tag--ai">IA</span> }
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Game -->
+      @if (roomStatus() !== 'waiting') {
+        @switch (gameId) {
+          @case ('connect_four') {
+            <app-connect-four
+              [gameState]="gameState()"
+              [myUid]="myUid"
+              (moveMade)="makeMove($event)">
+            </app-connect-four>
+          }
+          @case ('tic_tac_toe') {
+            <app-tic-tac-toe
+              [gameState]="gameState()"
+              [myUid]="myUid"
+              (moveMade)="makeMove($event)">
+            </app-tic-tac-toe>
+          }
+          @case ('minesweeper') {
+            <app-minesweeper
+              [gameState]="gameState()"
+              [myUid]="myUid"
+              (moveMade)="makeMove($event)">
+            </app-minesweeper>
+          }
+        }
+      }
+
+      <!-- Game over overlay -->
+      @if (gameOverData()) {
+        <div class="game-over-banner">
+          @if (gameOverData().winner === myUid) {
+            <span class="result win">🎉 ¡Victoria!</span>
+          } @else if (!gameOverData().winner) {
+            <span class="result draw">🤝 Empate</span>
+          } @else {
+            <span class="result loss">💀 Derrota</span>
+          }
+          <a class="btn btn--primary" routerLink="/home">Volver al inicio</a>
+        </div>
+      }
+    </div>
+
+    <!-- Chat panel -->
+    <div class="chat-panel card">
+      <app-chat
+        [messages]="chatMessages()"
+        [roomId]="roomId"
+        [displayName]="myProfile?.display_name ?? 'Player'">
+      </app-chat>
+    </div>
+  </div>
+</div>

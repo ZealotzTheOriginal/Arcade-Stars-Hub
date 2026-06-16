@@ -1,0 +1,35 @@
+<div class="auth-layout">
+  <div class="auth-card card rainbow-border">
+    <div class="auth-logo">
+      <span class="logo-icon">⭐</span>
+      <h1>Arcade Stars Hub</h1>
+    </div>
+
+    <h2>Iniciar Sesión</h2>
+
+    <form (ngSubmit)="onSubmit()" #f="ngForm">
+      <div class="field">
+        <label>Email</label>
+        <input class="input" type="email" [(ngModel)]="email" name="email" placeholder="tu@email.com" required />
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input class="input" type="password" [(ngModel)]="password" name="password" placeholder="••••••••" required />
+      </div>
+
+      @if (error()) {
+        <p class="error-msg">{{ error() }}</p>
+      }
+
+      <button class="btn btn--primary full-width" type="submit" [disabled]="loading()">
+        {{ loading() ? 'Entrando...' : 'Entrar' }}
+      </button>
+    </form>
+
+    <div class="auth-links">
+      <a routerLink="/recover">¿Olvidaste tu contraseña?</a>
+      <span>·</span>
+      <a routerLink="/register">Crear cuenta</a>
+    </div>
+  </div>
+</div>
