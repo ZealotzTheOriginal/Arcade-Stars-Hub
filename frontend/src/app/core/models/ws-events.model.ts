@@ -8,7 +8,14 @@ export type ServerEvent =
   | 'chat_message'
   | 'ai_thinking'
   | 'error'
-  | 'pong';
+  | 'pong'
+  | 'room_closed'
+  | 'rematch_vote'
+  | 'game_reset'
+  | 'invite_received'
+  | 'invite_response'
+  | 'spectator_joined'
+  | 'spectator_left';
 
 export interface WSMessage {
   event: ServerEvent;
@@ -19,5 +26,14 @@ export interface ChatMessage {
   uid: string;
   display_name: string;
   message: string;
+  is_spectator?: boolean;
   timestamp?: number;
+}
+
+export interface InviteData {
+  from_uid: string;
+  from_name: string;
+  from_avatar: string;
+  room_id: string;
+  game_id: string;
 }

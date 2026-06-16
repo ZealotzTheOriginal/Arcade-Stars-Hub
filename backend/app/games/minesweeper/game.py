@@ -53,12 +53,28 @@ class MinesweeperGame(BaseGame):
         hit_mine = board[row][col] == -1
         newly_revealed = 0
 
+        players = state["players"]
+        idx = players.index(uid)
+        next_turn = players[(idx + 1) % len(players)]
+
         if hit_mine:
+            # Hitting a mine immediately ends the game: the OTHER player wins
             revealed[row][col] = True
-            # turn passes, no points
-        else:
-            newly_revealed = self._flood_reveal(board, revealed, row, col)
-            scores[uid] = scores.get(uid, 0) + newly_revealed * POINTS_PER_CELL
+            winner = next_turn
+            scores[winner] = scores.get(winner, 0) + POINTS_WIN_BONUS
+            return {
+                **state,
+                "board": board,
+                "revealed": revealed,
+                "flagged": flagged,
+                "scores": scores,
+                "current_turn": uid,
+                "winner": winner,
+                "game_over": True,
+            }
+
+        newly_revealed = self._flood_reveal(board, revealed, row, col)
+        scores[uid] = scores.get(uid, 0) + newly_revealed * POINTS_PER_CELL
 
         # Check win: all non-mine cells revealed
         total_safe = ROWS * COLS - MINES
@@ -68,14 +84,9 @@ class MinesweeperGame(BaseGame):
         game_over = False
 
         if total_revealed >= total_safe:
-            # Find player with most points
             winner = max(scores, key=lambda u: scores[u])
             scores[winner] = scores.get(winner, 0) + POINTS_WIN_BONUS
             game_over = True
-
-        players = state["players"]
-        idx = players.index(uid)
-        next_turn = players[(idx + 1) % len(players)]
 
         return {
             **state,
@@ -103,6 +114,52 @@ class MinesweeperGame(BaseGame):
         revealed = state["revealed"]
         return [{"row": r, "col": c, "action": "reveal"}
                 for r in range(ROWS) for c in range(COLS) if not revealed[r][c]]
+
+    def get_best_move(self, state: dict) -> Any:
+        import random as _r
+        board = state.get("board")
+        revealed = state["revealed"]
+        flagged = state.get("flagged", [[False] * COLS for _ in range(ROWS)])
+
+        if board is None:
+            return {"row": ROWS // 2, "col": COLS // 2, "action": "reveal"}
+
+        known_safe: set = set()
+        known_mines: set = set()
+
+        for r in range(ROWS):
+            for c in range(COLS):
+                if not revealed[r][c] or board[r][c] <= 0:
+                    continue
+                number = board[r][c]
+                neighbors = [
+                    (r + dr, c + dc)
+                    for dr in range(-1, 2) for dc in range(-1, 2)
+                    if (dr, dc) != (0, 0) and 0 <= r + dr < ROWS and 0 <= c + dc < COLS
+                ]
+                flagged_n = sum(1 for nr, nc in neighbors if flagged[nr][nc])
+                unknown = [(nr, nc) for nr, nc in neighbors
+                           if not revealed[nr][nc] and not flagged[nr][nc]]
+                remaining = number - flagged_n
+                if remaining == 0:
+                    known_safe.update(unknown)
+                elif remaining == len(unknown) and unknown:
+                    known_mines.update(unknown)
+
+        safe_choices = list(known_safe - known_mines)
+        if safe_choices:
+            row, col = safe_choices[0]
+            return {"row": row, "col": col, "action": "reveal"}
+
+        candidates = [
+            (r, c) for r in range(ROWS) for c in range(COLS)
+            if not revealed[r][c] and not flagged[r][c] and (r, c) not in known_mines
+        ]
+        if candidates:
+            row, col = _r.choice(candidates)
+            return {"row": row, "col": col, "action": "reveal"}
+
+        return None
 
     def board_to_prompt(self, state: dict) -> str:
         board = state["board"]

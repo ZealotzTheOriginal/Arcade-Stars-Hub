@@ -7,8 +7,14 @@
       Sala: <strong>{{ roomId }}</strong>
       <span class="copy-hint" (click)="copyRoomId()">📋</span>
     </div>
+    @if (isSpectator()) {
+      <div class="spectator-badge">👁️ Espectando</div>
+    }
     @if (aiThinking()) {
       <div class="ai-badge">🤖 IA pensando...</div>
+    }
+    @if (spectators().length > 0) {
+      <div class="spectators-count">👁️ {{ spectators().length }}</div>
     }
   </header>
 
@@ -31,12 +37,17 @@
       <!-- Waiting lobby -->
       @if (roomStatus() === 'waiting') {
         <div class="lobby">
-          <h2>Esperando jugadores...</h2>
-          <p class="room-code">Código de sala: <strong class="highlight">{{ roomId }}</strong></p>
-          <p class="hint">Comparte este código con un amigo o añade la IA</p>
-          <div class="lobby-actions">
-            <button class="btn btn--ghost" (click)="addAI()">🤖 Añadir IA (DeepSeek)</button>
-          </div>
+          @if (isSpectator()) {
+            <h2>Esperando que empiece la partida...</h2>
+            <p class="hint">Estás como espectador</p>
+          } @else {
+            <h2>Esperando jugadores...</h2>
+            <p class="room-code">Código de sala: <strong class="highlight">{{ roomId }}</strong></p>
+            <p class="hint">Comparte este código con un amigo o añade la IA</p>
+            <div class="lobby-actions">
+              <button class="btn btn--ghost" (click)="addAI()">🤖 Añadir IA (DeepSeek)</button>
+            </div>
+          }
           <div class="players-waiting">
             @for (p of players(); track p.uid) {
               <div class="waiting-player">
@@ -55,21 +66,21 @@
           @case ('connect_four') {
             <app-connect-four
               [gameState]="gameState()"
-              [myUid]="myUid"
+              [myUid]="isSpectator() ? '' : myUid"
               (moveMade)="makeMove($event)">
             </app-connect-four>
           }
           @case ('tic_tac_toe') {
             <app-tic-tac-toe
               [gameState]="gameState()"
-              [myUid]="myUid"
+              [myUid]="isSpectator() ? '' : myUid"
               (moveMade)="makeMove($event)">
             </app-tic-tac-toe>
           }
           @case ('minesweeper') {
             <app-minesweeper
               [gameState]="gameState()"
-              [myUid]="myUid"
+              [myUid]="isSpectator() ? '' : myUid"
               (moveMade)="makeMove($event)">
             </app-minesweeper>
           }
@@ -86,7 +97,21 @@
           } @else {
             <span class="result loss">💀 Derrota</span>
           }
-          <a class="btn btn--primary" routerLink="/home">Volver al inicio</a>
+
+          <!-- Rematch (only for players, not spectators) -->
+          @if (!isSpectator()) {
+            <div class="rematch-area">
+              @if (!hasVotedRematch()) {
+                <button class="btn btn--primary" (click)="requestRematch()">🔁 Revancha</button>
+              } @else {
+                <p class="rematch-waiting">
+                  Esperando revancha... ({{ rematchVotes().length }}/{{ humanPlayers().length }})
+                </p>
+              }
+            </div>
+          }
+
+          <a class="btn btn--ghost" routerLink="/home">Volver al inicio</a>
         </div>
       }
     </div>
@@ -97,7 +122,7 @@
         [messages]="chatMessages()"
         [roomId]="roomId"
         [myUid]="myUid"
-        [displayName]="myProfile?.display_name ?? 'Player'">
+        [displayName]="(isSpectator() ? '[Esp] ' : '') + (myProfile?.display_name ?? 'Player')">
       </app-chat>
     </div>
   </div>

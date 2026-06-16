@@ -14,10 +14,15 @@ containing your chosen move in the format specified. No explanation, no markdown
 
 
 async def get_ai_move(game: BaseGame, state: dict) -> dict:
-    """Ask DeepSeek to pick a move. Falls back to random on any failure."""
+    """Use game-specific algorithm first; fall back to DeepSeek LLM, then random."""
     valid_moves = game.get_valid_moves(state, AI_UID)
     if not valid_moves:
         raise ValueError("No valid moves for AI")
+
+    # Prefer deterministic game algorithm (minimax / CSP)
+    best = game.get_best_move(state)
+    if best is not None:
+        return best
 
     board_text = game.board_to_prompt(state)
     user_msg = f"{board_text}\n\nYou are player O (piece 2). Pick your best move from the valid options: {json.dumps(valid_moves)}"

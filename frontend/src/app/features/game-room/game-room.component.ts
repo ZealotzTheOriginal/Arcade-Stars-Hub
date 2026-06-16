@@ -41,12 +41,15 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   myProfile: any = null;
 
   players = signal<PlayerInfo[]>([]);
+  spectators = signal<any[]>([]);
   gameState = signal<any>(null);
   roomStatus = signal<string>('waiting');
   chatMessages = signal<ChatMessage[]>([]);
   aiThinking = signal(false);
   elapsedSeconds = signal(0);
   gameOverData = signal<any>(null);
+  rematchVotes = signal<string[]>([]);
+  isSpectator = signal(false);
 
   private subs: Subscription[] = [];
   private timerSub?: Subscription;
@@ -54,6 +57,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   async ngOnInit() {
     this.roomId = this.route.snapshot.paramMap.get('roomId') ?? '';
     this.gameId = this.route.snapshot.queryParamMap.get('game') ?? '';
+    const spectateParam = this.route.snapshot.queryParamMap.get('spectate');
     this.myUid = this.auth.currentUser()?.uid ?? '';
     this.myProfile = await this.api.getMe();
 
@@ -61,24 +65,34 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
     this.subs.push(
       this.ws.messages$.subscribe((msg) => this.handleMessage(msg)),
-      this.ws.reconnected$.subscribe(() => this._joinRoom()),
+      this.ws.reconnected$.subscribe(() => this._joinOrSpectate()),
     );
 
-    this._joinRoom();
+    if (spectateParam === '1') {
+      this.isSpectator.set(true);
+      this._spectate();
+    } else {
+      this._joinRoom();
+    }
   }
 
   ngOnDestroy() {
     this.ws.send('leave_room', {});
     this.subs.forEach((s) => s.unsubscribe());
     this.timerSub?.unsubscribe();
-    this.ws.disconnect();
+    // WS stays alive — managed at app level for invites
   }
 
   private handleMessage(msg: any) {
     switch (msg.event) {
       case 'room_state':
         this.players.set(msg.data.players ?? []);
+        this.spectators.set(msg.data.spectators ?? []);
         this.roomStatus.set(msg.data.status ?? 'waiting');
+        // Detect if we joined as spectator (not in players list)
+        if (!this.isSpectator() && !msg.data.players?.find((p: any) => p.uid === this.myUid)) {
+          this.isSpectator.set(true);
+        }
         break;
 
       case 'player_joined':
@@ -91,10 +105,22 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         this.players.update((ps) => ps.filter((p) => p.uid !== msg.data.uid));
         break;
 
+      case 'spectator_joined':
+        if (!this.spectators().find((s: any) => s.uid === msg.data.uid)) {
+          this.spectators.update((ss) => [...ss, msg.data.spectator]);
+        }
+        break;
+
+      case 'spectator_left':
+        this.spectators.update((ss) => ss.filter((s: any) => s.uid !== msg.data.uid));
+        break;
+
       case 'game_started':
         this.players.set(msg.data.players ?? []);
         this.gameState.set(msg.data.game_state);
         this.roomStatus.set('playing');
+        this.gameOverData.set(null);
+        this.rematchVotes.set([]);
         this.startTimer();
         break;
 
@@ -107,6 +133,21 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         this.gameState.set(msg.data.game_state);
         this.roomStatus.set('finished');
         this.gameOverData.set(msg.data);
+        this.rematchVotes.set(msg.data.rematch_votes ?? []);
+        this.stopTimer();
+        break;
+
+      case 'rematch_vote':
+        this.rematchVotes.set(msg.data.votes ?? []);
+        break;
+
+      case 'game_reset':
+        this.gameOverData.set(null);
+        this.gameState.set(null);
+        this.roomStatus.set('waiting');
+        this.rematchVotes.set([]);
+        this.players.set(msg.data.players ?? []);
+        this.elapsedSeconds.set(0);
         this.stopTimer();
         break;
 
@@ -115,11 +156,16 @@ export class GameRoomComponent implements OnInit, OnDestroy {
           uid: msg.data.uid,
           display_name: msg.data.display_name,
           message: msg.data.message,
+          is_spectator: msg.data.is_spectator,
         }]);
         break;
 
       case 'ai_thinking':
         this.aiThinking.set(true);
+        break;
+
+      case 'room_closed':
+        this.router.navigate(['/home']);
         break;
     }
   }
@@ -135,7 +181,26 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     });
   }
 
+  private _spectate() {
+    this.ws.send('spectate_room', {
+      room_id: this.roomId,
+      spectator_info: {
+        display_name: this.myProfile?.display_name ?? 'Espectador',
+        avatar: this.myProfile?.avatar ?? '👁️',
+      },
+    });
+  }
+
+  private _joinOrSpectate() {
+    if (this.isSpectator()) {
+      this._spectate();
+    } else {
+      this._joinRoom();
+    }
+  }
+
   makeMove(move: any) {
+    if (this.isSpectator()) return;
     this.ws.send('make_move', { room_id: this.roomId, move });
   }
 
@@ -143,11 +208,21 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.ws.send('add_ai_player', { room_id: this.roomId });
   }
 
+  requestRematch() {
+    this.ws.send('request_rematch', { room_id: this.roomId });
+  }
+
+  hasVotedRematch(): boolean {
+    return this.rematchVotes().includes(this.myUid);
+  }
+
+  humanPlayers(): PlayerInfo[] {
+    return this.players().filter((p: any) => !p.is_ai);
+  }
+
   get scores(): Record<string, number> {
     const state = this.gameState();
-    if (!state) return {};
-    if (state.scores) return state.scores;
-    return {};
+    return state?.scores ?? {};
   }
 
   get currentLevel(): number {
@@ -160,11 +235,11 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     });
   }
 
-  copyRoomId() {
-    navigator.clipboard.writeText(this.roomId).catch(() => {});
-  }
-
   private stopTimer() {
     this.timerSub?.unsubscribe();
+  }
+
+  copyRoomId() {
+    navigator.clipboard.writeText(this.roomId).catch(() => {});
   }
 }

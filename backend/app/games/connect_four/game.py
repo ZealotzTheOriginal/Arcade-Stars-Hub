@@ -70,6 +70,118 @@ class ConnectFourGame(BaseGame):
         board = state["board"]
         return [c for c in range(COLS) if board[0][c] == 0]
 
+    def get_best_move(self, state: dict) -> Any:
+        _AI_UID = "AI_PLAYER"
+        players = state["players"]
+        if _AI_UID not in players:
+            return None
+        ai_piece = players.index(_AI_UID) + 1
+        human_piece = 3 - ai_piece
+        board = [row[:] for row in state["board"]]
+        col_order = sorted(range(COLS), key=lambda c: abs(c - COLS // 2))
+
+        # Immediate win
+        for col in col_order:
+            row = self._drop_row(board, col)
+            if row == -1:
+                continue
+            board[row][col] = ai_piece
+            wins = self._check_win(board, row, col, ai_piece)
+            board[row][col] = 0
+            if wins:
+                return col
+
+        # Block opponent win
+        for col in col_order:
+            row = self._drop_row(board, col)
+            if row == -1:
+                continue
+            board[row][col] = human_piece
+            wins = self._check_win(board, row, col, human_piece)
+            board[row][col] = 0
+            if wins:
+                return col
+
+        # Alpha-beta search
+        best_score, best_col = float("-inf"), col_order[0]
+        for col in col_order:
+            row = self._drop_row(board, col)
+            if row == -1:
+                continue
+            board[row][col] = ai_piece
+            score = self._alphabeta(board, 4, float("-inf"), float("inf"), False, ai_piece, human_piece)
+            board[row][col] = 0
+            if score > best_score:
+                best_score, best_col = score, col
+        return best_col
+
+    def _alphabeta(self, board, depth, alpha, beta, is_max, ai_piece, human_piece):
+        valid = [c for c in range(COLS) if board[0][c] == 0]
+        if not valid:
+            return 0
+        if depth == 0:
+            return self._score_board(board, ai_piece, human_piece)
+
+        if is_max:
+            value = float("-inf")
+            for col in sorted(valid, key=lambda c: abs(c - COLS // 2)):
+                row = self._drop_row(board, col)
+                board[row][col] = ai_piece
+                if self._check_win(board, row, col, ai_piece):
+                    board[row][col] = 0
+                    return 1_000_000 + depth
+                value = max(value, self._alphabeta(board, depth - 1, alpha, beta, False, ai_piece, human_piece))
+                board[row][col] = 0
+                alpha = max(alpha, value)
+                if alpha >= beta:
+                    break
+            return value
+        else:
+            value = float("inf")
+            for col in sorted(valid, key=lambda c: abs(c - COLS // 2)):
+                row = self._drop_row(board, col)
+                board[row][col] = human_piece
+                if self._check_win(board, row, col, human_piece):
+                    board[row][col] = 0
+                    return -(1_000_000 + depth)
+                value = min(value, self._alphabeta(board, depth - 1, alpha, beta, True, ai_piece, human_piece))
+                board[row][col] = 0
+                beta = min(beta, value)
+                if alpha >= beta:
+                    break
+            return value
+
+    def _score_board(self, board, ai_piece, human_piece):
+        score = board[ROWS // 2 + 1][COLS // 2] == ai_piece and 6 or 0
+        center = [board[r][COLS // 2] for r in range(ROWS)]
+        score += center.count(ai_piece) * 3
+
+        def _window_score(window):
+            ai_c = window.count(ai_piece)
+            empty = window.count(0)
+            hu_c = window.count(human_piece)
+            if ai_c == 3 and empty == 1:
+                return 5
+            if ai_c == 2 and empty == 2:
+                return 2
+            if hu_c == 3 and empty == 1:
+                return -4
+            return 0
+
+        for r in range(ROWS):
+            for c in range(COLS - 3):
+                score += _window_score([board[r][c + i] for i in range(4)])
+        for r in range(ROWS - 3):
+            for c in range(COLS):
+                score += _window_score([board[r + i][c] for i in range(4)])
+        for r in range(ROWS - 3):
+            for c in range(COLS - 3):
+                score += _window_score([board[r + i][c + i] for i in range(4)])
+        for r in range(3, ROWS):
+            for c in range(COLS - 3):
+                score += _window_score([board[r - i][c + i] for i in range(4)])
+        return score
+
     def board_to_prompt(self, state: dict) -> str:
         board = state["board"]
         symbols = {0: ".", 1: "X", 2: "O"}

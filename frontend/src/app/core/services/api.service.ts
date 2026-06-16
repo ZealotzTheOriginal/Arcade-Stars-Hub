@@ -62,6 +62,18 @@ export class ApiService {
     );
   }
 
+  async listActiveRooms(): Promise<any[]> {
+    return firstValueFrom(this.http.get<any[]>(`${environment.apiUrl}/games/rooms`));
+  }
+
+  async getOnlineUsers(): Promise<any[]> {
+    return firstValueFrom(
+      this.http.get<any[]>(`${environment.apiUrl}/users/online`, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
   // ── Leaderboard ────────────────────────────────────────
   async getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
     return firstValueFrom(this.http.get<LeaderboardEntry[]>(`${environment.apiUrl}/leaderboard/`));

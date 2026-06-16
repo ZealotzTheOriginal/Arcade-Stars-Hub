@@ -12,6 +12,11 @@ class ClientEvent(str, Enum):
     REQUEST_AI_MOVE = "request_ai_move"
     ADD_AI_PLAYER = "add_ai_player"
     PING = "ping"
+    SPECTATE_ROOM = "spectate_room"
+    REQUEST_REMATCH = "request_rematch"
+    SEND_INVITE = "send_invite"
+    RESPOND_INVITE = "respond_invite"
+    REGISTER_PRESENCE = "register_presence"
 
 
 # ── Outgoing event types (server → client) ──────────────
@@ -26,6 +31,13 @@ class ServerEvent(str, Enum):
     AI_THINKING = "ai_thinking"
     ERROR = "error"
     PONG = "pong"
+    ROOM_CLOSED = "room_closed"
+    REMATCH_VOTE = "rematch_vote"
+    GAME_RESET = "game_reset"
+    INVITE_RECEIVED = "invite_received"
+    INVITE_RESPONSE = "invite_response"
+    SPECTATOR_JOINED = "spectator_joined"
+    SPECTATOR_LEFT = "spectator_left"
 
 
 class WSMessage(BaseModel):

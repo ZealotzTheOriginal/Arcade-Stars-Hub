@@ -32,3 +32,7 @@ class BaseGame(ABC):
     def board_to_prompt(self, state: dict) -> str:
         """Optional: human-readable board for DeepSeek prompts."""
         return str(state)
+
+    def get_best_move(self, state: dict) -> Any:
+        """Override to provide deterministic AI logic. None = use DeepSeek."""
+        return None

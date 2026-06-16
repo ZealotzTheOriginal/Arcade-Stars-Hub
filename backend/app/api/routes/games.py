@@ -2,7 +2,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_user
 from app.games.registry import list_games, get_definition
-from app.websocket.handler import get_room, create_room
+from app.websocket.handler import get_room, create_room, get_active_rooms
 
 router = APIRouter(prefix="/games", tags=["games"])
 
@@ -12,12 +12,10 @@ async def list_available_games():
     return list_games()
 
 
-@router.get("/{game_id}")
-async def get_game_info(game_id: str):
-    try:
-        return get_definition(game_id)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="Game not found")
+# Literal routes must come before /{game_id} to avoid parameter capture
+@router.get("/rooms")
+async def list_active_rooms():
+    return get_active_rooms()
 
 
 @router.post("/rooms")
@@ -44,3 +42,11 @@ async def get_room_info(room_id: str, user: dict = Depends(get_current_user)):
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     return room
+
+
+@router.get("/{game_id}")
+async def get_game_info(game_id: str):
+    try:
+        return get_definition(game_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Game not found")

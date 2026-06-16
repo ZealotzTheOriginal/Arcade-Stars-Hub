@@ -21,6 +21,25 @@
       <a class="nav-item" routerLink="/profile">👤 Perfil</a>
       <a class="nav-item" (click)="logout()">🚪 Salir</a>
     </nav>
+
+    <!-- Online players -->
+    <div class="online-section">
+      <h3 class="section-title">🟢 En línea ({{ onlineUsers().length }})</h3>
+      @if (onlineUsers().length === 0) {
+        <p class="empty-hint">Nadie más en línea</p>
+      }
+      @for (u of onlineUsers(); track u.uid) {
+        <div class="online-user">
+          <span class="online-dot"></span>
+          <span class="ou-avatar">{{ u.avatar }}</span>
+          <span class="ou-name">{{ u.display_name }}</span>
+          <div class="ou-actions">
+            <button class="icon-btn" title="Añadir amigo" (click)="addFriend(u.uid)">➕</button>
+            <button class="icon-btn" title="Invitar a partida" (click)="startInvite(u.uid)">✉️</button>
+          </div>
+        </div>
+      }
+    </div>
   </aside>
 
   <!-- Main content -->
@@ -53,6 +72,48 @@
         <p class="join-error">{{ joinError() }}</p>
       }
     </div>
+
+    <!-- Active public rooms -->
+    @if (activeRooms().length > 0) {
+      <section class="rooms-section">
+        <h2 class="section-heading">🚪 Salas activas</h2>
+        <div class="rooms-list">
+          @for (room of activeRooms(); track room.room_id) {
+            <div class="room-row card">
+              <div class="room-info">
+                <span class="room-game-thumb">
+                  {{ room.game_id === 'connect_four' ? '🔴' : room.game_id === 'tic_tac_toe' ? '✖️' : '💣' }}
+                </span>
+                <div>
+                  <p class="room-code-label">{{ room.room_id }}</p>
+                  <p class="room-meta">
+                    <span class="room-status" [class.status--playing]="room.status === 'playing'">
+                      {{ roomStatusLabel(room.status) }}
+                    </span>
+                    · {{ room.players.length }} jugador{{ room.players.length !== 1 ? 'es' : '' }}
+                    @if (room.spectators_count > 0) {
+                      · {{ room.spectators_count }} esp.
+                    }
+                  </p>
+                  <p class="room-players">
+                    @for (p of room.players; track p.uid) {
+                      <span>{{ p.display_name }}</span>
+                    }
+                  </p>
+                </div>
+              </div>
+              <div class="room-actions">
+                @if (room.status === 'waiting') {
+                  <button class="btn btn--primary btn--sm" (click)="joinActiveRoom(room)">Unirse</button>
+                } @else {
+                  <button class="btn btn--ghost btn--sm" (click)="spectateRoom(room)">Espectar</button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+    }
 
     @if (loading()) {
       <div class="loading">Cargando juegos...</div>
@@ -101,3 +162,21 @@
     </div>
   </aside>
 </div>
+
+<!-- Invite game picker overlay -->
+@if (invitingUser()) {
+  <div class="overlay" (click)="cancelInvite()">
+    <div class="invite-picker card" (click)="$event.stopPropagation()">
+      <h3>Invitar a jugar — elige el juego</h3>
+      <div class="invite-games">
+        @for (game of games(); track game.id) {
+          <button class="invite-game-btn" (click)="inviteToGame(game)" [disabled]="!!creatingRoom()">
+            <span class="ig-thumb">{{ game.thumbnail }}</span>
+            <span class="ig-name">{{ game.name }}</span>
+          </button>
+        }
+      </div>
+      <button class="btn btn--ghost" (click)="cancelInvite()">Cancelar</button>
+    </div>
+  </div>
+}

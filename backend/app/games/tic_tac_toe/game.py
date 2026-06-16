@@ -66,6 +66,43 @@ class TicTacToeGame(BaseGame):
         board = state["board"]
         return [{"row": r, "col": c} for r in range(SIZE) for c in range(SIZE) if board[r][c] == 0]
 
+    def get_best_move(self, state: dict) -> Any:
+        _AI_UID = "AI_PLAYER"
+        players = state["players"]
+        if _AI_UID not in players:
+            return None
+        ai_piece = players.index(_AI_UID) + 1
+        human_piece = 3 - ai_piece
+        board = [r[:] for r in state["board"]]
+
+        best_score, best_move = float("-inf"), None
+        for r in range(SIZE):
+            for c in range(SIZE):
+                if board[r][c] == 0:
+                    board[r][c] = ai_piece
+                    score = self._minimax(board, False, ai_piece, human_piece)
+                    board[r][c] = 0
+                    if score > best_score:
+                        best_score, best_move = score, {"row": r, "col": c}
+        return best_move
+
+    def _minimax(self, board: list, is_max: bool, ai_piece: int, human_piece: int) -> int:
+        if self._check_win(board, ai_piece):
+            return 1
+        if self._check_win(board, human_piece):
+            return -1
+        if all(board[r][c] != 0 for r in range(SIZE) for c in range(SIZE)):
+            return 0
+        best = float("-inf") if is_max else float("inf")
+        for r in range(SIZE):
+            for c in range(SIZE):
+                if board[r][c] == 0:
+                    board[r][c] = ai_piece if is_max else human_piece
+                    val = self._minimax(board, not is_max, ai_piece, human_piece)
+                    board[r][c] = 0
+                    best = max(best, val) if is_max else min(best, val)
+        return best
+
     def board_to_prompt(self, state: dict) -> str:
         board = state["board"]
         symbols = {0: ".", 1: "X", 2: "O"}

@@ -1,9 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { WsService } from '../../core/services/ws.service';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
 import { UserProfile } from '../../core/models/user.model';
 
@@ -14,9 +15,10 @@ import { UserProfile } from '../../core/models/user.model';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
 })
-export class HomeComponent implements OnInit {
+export class HomeComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private auth = inject(AuthService);
+  private ws = inject(WsService);
   private router = inject(Router);
 
   games = signal<GameDefinition[]>([]);
@@ -30,28 +32,49 @@ export class HomeComponent implements OnInit {
   joiningRoom = signal(false);
   joinError = signal('');
 
+  activeRooms = signal<any[]>([]);
+  onlineUsers = signal<any[]>([]);
+  invitingUser = signal<string | null>(null);  // uid of user we're inviting
+
+  private pollInterval?: ReturnType<typeof setInterval>;
+
   async ngOnInit() {
-    // Only games list is critical — it's pure in-memory, no Firestore needed
     try {
       const games = await this.api.listGames();
       this.games.set(games);
     } catch (e: any) {
       const status = e?.status ?? 'sin respuesta';
-      const msg    = e?.message ?? String(e);
-      this.error.set(`Error ${status}: ${msg}`);
-      console.error('listGames failed:', e);
+      this.error.set(`Error ${status}: ${e?.message ?? String(e)}`);
     } finally {
       this.loading.set(false);
     }
 
-    // These require Firestore/Firebase — load in background, don't block games
     this.api.getGlobalLeaderboard()
       .then((lb) => this.leaderboard.set(lb))
-      .catch((e) => console.warn('Leaderboard unavailable:', e));
+      .catch(() => {});
 
     this.api.getMe()
-      .then((p) => this.profile.set(p))
-      .catch((e) => console.warn('Profile unavailable:', e));
+      .then((p) => {
+        this.profile.set(p);
+        this.ws.send('register_presence', { display_name: p.display_name, avatar: p.avatar });
+      })
+      .catch(() => {});
+
+    this._fetchLive();
+    this.pollInterval = setInterval(() => this._fetchLive(), 15_000);
+  }
+
+  ngOnDestroy() {
+    clearInterval(this.pollInterval);
+  }
+
+  private async _fetchLive() {
+    const [rooms, users] = await Promise.allSettled([
+      this.api.listActiveRooms(),
+      this.api.getOnlineUsers(),
+    ]);
+    if (rooms.status === 'fulfilled') this.activeRooms.set(rooms.value);
+    if (users.status === 'fulfilled') this.onlineUsers.set(users.value);
   }
 
   async joinRoom() {
@@ -82,6 +105,51 @@ export class HomeComponent implements OnInit {
     } finally {
       this.creatingRoom.set(null);
     }
+  }
+
+  joinActiveRoom(room: any) {
+    this.router.navigate(['/room', room.room_id], { queryParams: { game: room.game_id } });
+  }
+
+  spectateRoom(room: any) {
+    this.router.navigate(['/room', room.room_id], { queryParams: { game: room.game_id, spectate: '1' } });
+  }
+
+  async addFriend(uid: string) {
+    try {
+      await this.api.addFriend(uid);
+    } catch { /* ignore */ }
+  }
+
+  startInvite(uid: string) {
+    this.invitingUser.set(uid);
+  }
+
+  cancelInvite() {
+    this.invitingUser.set(null);
+  }
+
+  async inviteToGame(game: GameDefinition) {
+    const targetUid = this.invitingUser();
+    if (!targetUid) return;
+    this.invitingUser.set(null);
+    this.creatingRoom.set(game.id);
+    try {
+      const p = this.profile();
+      const { room_id } = await this.api.createRoom(
+        game.id,
+        p?.display_name ?? 'Player',
+        p?.avatar ?? '⭐'
+      );
+      this.ws.send('send_invite', { to_uid: targetUid, room_id, game_id: game.id });
+      this.router.navigate(['/room', room_id], { queryParams: { game: game.id } });
+    } finally {
+      this.creatingRoom.set(null);
+    }
+  }
+
+  roomStatusLabel(status: string): string {
+    return status === 'waiting' ? 'Esperando' : status === 'playing' ? 'En juego' : 'Terminada';
   }
 
   logout() {

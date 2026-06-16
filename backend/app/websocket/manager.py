@@ -8,6 +8,10 @@ class ConnectionManager:
     def __init__(self):
         # room_id -> {uid: websocket}
         self._rooms: dict[str, dict[str, WebSocket]] = {}
+        # uid -> WebSocket for direct messaging (invite / invite_response)
+        self._direct: dict[str, WebSocket] = {}
+
+    # ── Room membership ────────────────────────────────────
 
     def add(self, room_id: str, uid: str, ws: WebSocket):
         self._rooms.setdefault(room_id, {})[uid] = ws
@@ -21,9 +25,30 @@ class ConnectionManager:
     def players_in_room(self, room_id: str) -> list[str]:
         return list(self._rooms.get(room_id, {}).keys())
 
+    # ── Direct (global) presence ───────────────────────────
+
+    def register_direct(self, uid: str, ws: WebSocket):
+        self._direct[uid] = ws
+
+    def unregister_direct(self, uid: str):
+        self._direct.pop(uid, None)
+
+    def online_uids(self) -> list[str]:
+        return list(self._direct.keys())
+
+    # ── Send helpers ───────────────────────────────────────
+
     async def send(self, ws: WebSocket, event: str, data=None):
         msg = WSMessage(event=event, data=data)
         await ws.send_text(msg.model_dump_json())
+
+    async def send_direct(self, uid: str, event: str, data=None):
+        ws = self._direct.get(uid)
+        if ws:
+            try:
+                await self.send(ws, event, data)
+            except Exception:
+                self._direct.pop(uid, None)
 
     async def broadcast(self, room_id: str, event: str, data=None, exclude_uid: str | None = None):
         msg = WSMessage(event=event, data=data).model_dump_json()

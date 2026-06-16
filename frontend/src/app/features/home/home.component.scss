@@ -181,6 +181,182 @@
   }
 }
 
+/* Online players sidebar section */
+.online-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.25rem;
+}
+
+.empty-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.online-user {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.25rem;
+  border-radius: 6px;
+  &:hover { background: rgba(255,255,255,0.04); }
+
+  .online-dot {
+    width: 7px; height: 7px;
+    background: #4caf50;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .ou-avatar { font-size: 1.1rem; flex-shrink: 0; }
+  .ou-name { flex: 1; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ou-actions { display: flex; gap: 0.125rem; opacity: 0; transition: opacity 0.15s; }
+  &:hover .ou-actions { opacity: 1; }
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.15rem 0.25rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+  &:hover { opacity: 1; background: rgba(255,255,255,0.08); }
+}
+
+/* Active rooms */
+.rooms-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.section-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.rooms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.room-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+
+  .room-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
+  }
+  .room-game-thumb { font-size: 1.75rem; flex-shrink: 0; }
+  .room-code-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--rainbow-teal);
+    margin: 0 0 0.2rem;
+    font-family: monospace;
+  }
+  .room-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0 0 0.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .room-status {
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    &.status--playing { background: rgba(70,67,255,0.2); color: #a0a0ff; }
+  }
+  .room-players {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0;
+    display: flex;
+    gap: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .room-actions { flex-shrink: 0; }
+}
+
+.btn--sm { padding: 0.3rem 0.75rem; font-size: 0.8rem; }
+
+/* Invite picker overlay */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.invite-picker {
+  padding: 1.5rem;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  h3 { margin: 0; font-size: 1rem; }
+}
+
+.invite-games {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.invite-game-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  text-align: left;
+  width: 100%;
+
+  &:hover:not(:disabled) {
+    background: rgba(110,70,220,0.15);
+    border-color: rgba(110,70,220,0.5);
+  }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .ig-thumb { font-size: 1.5rem; }
+  .ig-name { font-weight: 600; }
+}
+
 /* Leaderboard */
 .leaderboard {
   height: fit-content;

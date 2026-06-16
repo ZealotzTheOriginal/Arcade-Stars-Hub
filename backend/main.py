@@ -1,4 +1,5 @@
 import json
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.firebase_client import verify_token
 from app.websocket.manager import manager
-from app.websocket.handler import handle_message
+from app.websocket.handler import handle_message, unregister_presence, cleanup_stale_rooms
 from app.api.routes import users, games, leaderboard
 
 # ── Game registry bootstrap ───────────────────────────────
@@ -15,6 +16,15 @@ from app.models.game_room import GameDefinition
 from app.games.connect_four.game import ConnectFourGame
 from app.games.tic_tac_toe.game import TicTacToeGame
 from app.games.minesweeper.game import MinesweeperGame
+
+
+async def _room_cleanup_loop():
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await cleanup_stale_rooms()
+        except Exception:
+            pass
 
 
 @asynccontextmanager
@@ -51,11 +61,18 @@ async def lifespan(_: FastAPI):
             category="Puzzle",
             thumbnail="💣",
             max_players=2,
-            has_ai=False,
+            has_ai=True,
         ),
         MinesweeperGame(),
     )
+
+    cleanup_task = asyncio.create_task(_room_cleanup_loop())
     yield
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(title="Arcade Stars Hub API", version="1.0.0", lifespan=lifespan)
@@ -119,7 +136,6 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     except Exception:
         pass
     finally:
-        # Clean up from all rooms
-        from app.websocket.handler import handle_message as hm
-        import json as _json
-        await handle_message(ws, uid, _json.dumps({"event": "leave_room", "data": {}}))
+        await handle_message(ws, uid, json.dumps({"event": "leave_room", "data": {}}))
+        manager.unregister_direct(uid)
+        unregister_presence(uid)
