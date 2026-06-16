@@ -23,9 +23,11 @@ export class ProfileComponent implements OnInit {
   private auth = inject(AuthService);
 
   profile = signal<UserProfile | null>(null);
+  friends = signal<any[]>([]);
   leaderboard = signal<LeaderboardEntry[]>([]);
   activeTab = signal<Tab>('stats');
   saving = signal(false);
+  loadingFriends = signal(false);
   editName = '';
 
   readonly avatars = AVATARS;
@@ -46,7 +48,21 @@ export class ProfileComponent implements OnInit {
     this.editName = profile.display_name;
   }
 
-  setTab(tab: Tab) { this.activeTab.set(tab); }
+  setTab(tab: Tab) {
+    this.activeTab.set(tab);
+    if (tab === 'friends' && this.friends().length === 0) {
+      this._loadFriends();
+    }
+  }
+
+  private async _loadFriends() {
+    this.loadingFriends.set(true);
+    try {
+      this.friends.set(await this.api.getFriends());
+    } catch { /* silent */ } finally {
+      this.loadingFriends.set(false);
+    }
+  }
 
   async selectAvatar(avatar: string) {
     await this.api.updateMe({ avatar } as any);

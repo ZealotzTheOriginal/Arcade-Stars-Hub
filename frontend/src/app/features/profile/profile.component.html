@@ -97,13 +97,31 @@
       @if (activeTab() === 'friends') {
         <section class="friends-section">
           <h2>Amigos</h2>
-          @if ((profile()?.friends?.length ?? 0) === 0) {
-            <p class="empty">Aún no tienes amigos añadidos.</p>
+          @if (loadingFriends()) {
+            <p class="empty">Cargando amigos...</p>
+          } @else if (friends().length === 0) {
+            <p class="empty">
+              Aún no tienes amigos añadidos.<br>
+              <span class="empty-hint">Usa el botón ➕ junto a los jugadores en línea desde la pantalla de inicio.</span>
+            </p>
           } @else {
-            <div class="friends-list">
-              @for (uid of profile()?.friends ?? []; track uid) {
-                <div class="friend-item">
-                  <span>{{ uid }}</span>
+            <div class="friends-grid">
+              @for (f of friends(); track f.uid) {
+                <div class="friend-card">
+                  <div class="friend-avatar">{{ f.avatar }}</div>
+                  <div class="friend-info">
+                    <p class="friend-name">{{ f.display_name }}</p>
+                    <div class="friend-badges">
+                      <span class="badge">Nivel {{ f.level }}</span>
+                      <span class="badge badge--gold">⭐ {{ f.total_points }} pts</span>
+                    </div>
+                    @if (f.best_game) {
+                      <p class="friend-best">
+                        🏆 Mejor juego: <strong>{{ f.best_game }}</strong>
+                        <span class="friend-best-pts">({{ f.best_game_points }} pts)</span>
+                      </p>
+                    }
+                  </div>
                 </div>
               }
             </div>

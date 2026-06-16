@@ -33,6 +33,14 @@ export class ApiService {
     );
   }
 
+  async getFriends(): Promise<any[]> {
+    return firstValueFrom(
+      this.http.get<any[]>(`${environment.apiUrl}/users/friends`, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
   async addFriend(friendUid: string): Promise<void> {
     await firstValueFrom(
       this.http.post(`${environment.apiUrl}/users/friends/${friendUid}`, {}, {

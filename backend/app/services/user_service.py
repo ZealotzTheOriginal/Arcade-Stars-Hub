@@ -68,3 +68,43 @@ async def add_friend(uid: str, friend_uid: str):
     db = get_db()
     from google.cloud.firestore_v1.transforms import ArrayUnion
     db.collection("users").document(uid).update({"friends": ArrayUnion([friend_uid])})
+
+
+async def get_friend_profiles(uid: str) -> list[dict]:
+    db = get_db()
+    ref = db.collection("users").document(uid)
+    snap = ref.get()
+    if not snap.exists:
+        return []
+
+    friend_uids: list[str] = snap.to_dict().get("friends", [])
+    if not friend_uids:
+        return []
+
+    game_names = {
+        "connect_four": "Conecta Cuatro",
+        "tic_tac_toe": "Tres en Raya",
+        "minesweeper": "Buscaminas",
+    }
+
+    profiles = []
+    for fuid in friend_uids:
+        try:
+            fsnap = db.collection("users").document(fuid).get()
+            if not fsnap.exists:
+                continue
+            d = fsnap.to_dict()
+            stats: dict = d.get("game_stats", {})
+            best_game_id = max(stats, key=lambda g: stats[g].get("points", 0)) if stats else None
+            profiles.append({
+                "uid": fuid,
+                "display_name": d.get("display_name", "Unknown"),
+                "avatar": d.get("avatar", "⭐"),
+                "level": d.get("level", 1),
+                "total_points": d.get("total_points", 0),
+                "best_game": game_names.get(best_game_id, best_game_id) if best_game_id else None,
+                "best_game_points": stats[best_game_id].get("points", 0) if best_game_id else 0,
+            })
+        except Exception:
+            continue
+    return profiles

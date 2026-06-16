@@ -79,12 +79,20 @@ def unregister_presence(uid: str):
 
 
 async def cleanup_stale_rooms():
-    """Close rooms that have been inactive for ROOM_TIMEOUT_SECONDS."""
+    """Close rooms that are stale or abandoned."""
     now = time.time()
     for room_id in list(_rooms.keys()):
         room = _rooms.get(room_id)
-        if room and now - room.get("last_activity", now) > ROOM_TIMEOUT_SECONDS:
+        if not room:
+            continue
+        # Normal inactivity timeout
+        if now - room.get("last_activity", now) > ROOM_TIMEOUT_SECONDS:
             await _close_room(room_id, "Sala cerrada por inactividad")
+            continue
+        # Playing rooms with no active connections → close after 2-minute grace period
+        if room["status"] == "playing" and not manager.players_in_room(room_id):
+            if now - room.get("last_activity", now) > 120:
+                await _close_room(room_id, "Sala cerrada: partida abandonada")
 
 
 async def _close_room(room_id: str, reason: str = "Sala cerrada"):
@@ -182,34 +190,50 @@ async def _handle_join(ws: WebSocket, uid: str, data: dict):
 
 
 async def _handle_leave(ws: WebSocket, uid: str, data: dict):
+    left_room_id: str | None = None
+
     # Remove from spectators if applicable
-    found_as_spectator = False
     for room_id, room in list(_rooms.items()):
-        spec_uids = [s["uid"] for s in room.get("spectators", [])]
-        if uid in spec_uids:
+        if uid in [s["uid"] for s in room.get("spectators", [])]:
             room["spectators"] = [s for s in room["spectators"] if s["uid"] != uid]
             manager.remove(room_id, uid)
             await manager.broadcast(room_id, ServerEvent.SPECTATOR_LEFT, {"uid": uid})
-            found_as_spectator = True
+            left_room_id = room_id
             break
 
-    if found_as_spectator:
-        return
+    if left_room_id is None:
+        # Remove from players
+        for room_id, room in list(_rooms.items()):
+            if uid in [p["uid"] for p in room["players"]]:
+                manager.remove(room_id, uid)
+                await manager.broadcast(room_id, ServerEvent.PLAYER_LEFT, {"uid": uid})
+                if room["status"] == "playing":
+                    pass  # keep slot; _auto_close_if_empty will expedite cleanup
+                else:
+                    room["players"] = [p for p in room["players"] if p["uid"] != uid]
+                    if not room["players"] or all(p.get("is_ai") for p in room["players"]):
+                        _rooms.pop(room_id, None)
+                if uid in _presence:
+                    _presence[uid]["room_id"] = None
+                left_room_id = room_id
+                break
 
-    # Remove from players
-    for room_id, room in list(_rooms.items()):
-        if uid in [p["uid"] for p in room["players"]]:
-            manager.remove(room_id, uid)
-            await manager.broadcast(room_id, ServerEvent.PLAYER_LEFT, {"uid": uid})
-            if room["status"] == "playing":
-                pass  # keep slot for reconnect
-            else:
-                room["players"] = [p for p in room["players"] if p["uid"] != uid]
-                if not room["players"] or all(p.get("is_ai") for p in room["players"]):
-                    _rooms.pop(room_id, None)
-            if uid in _presence:
-                _presence[uid]["room_id"] = None
-            break
+    # If the room now has zero WS connections, decide what to do with it
+    if left_room_id:
+        _auto_close_if_empty(left_room_id)
+
+
+def _auto_close_if_empty(room_id: str):
+    """Close or expedite cleanup when no connections remain in a room."""
+    room = _rooms.get(room_id)
+    if not room or manager.players_in_room(room_id):
+        return  # room gone or still has connections
+    if room["status"] in ("waiting", "finished"):
+        # No reconnect needed: delete immediately
+        _rooms.pop(room_id, None)
+    elif room["status"] == "playing":
+        # Give ~60 s grace for reconnect, then background cleanup closes it
+        room["last_activity"] = time.time() - (ROOM_TIMEOUT_SECONDS - 60)
 
 
 async def _handle_move(ws: WebSocket, uid: str, data: dict):

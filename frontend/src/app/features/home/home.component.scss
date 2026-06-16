@@ -235,6 +235,12 @@
   &:hover { opacity: 1; background: rgba(255,255,255,0.08); }
 }
 
+.rooms-loading {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 0.25rem 0;
+}
+
 /* Active rooms */
 .rooms-section {
   display: flex;

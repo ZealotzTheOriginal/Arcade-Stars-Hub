@@ -74,7 +74,9 @@
     </div>
 
     <!-- Active public rooms -->
-    @if (activeRooms().length > 0) {
+    @if (loadingRooms()) {
+      <div class="rooms-loading">Cargando salas...</div>
+    } @else if (activeRooms().length > 0) {
       <section class="rooms-section">
         <h2 class="section-heading">🚪 Salas activas</h2>
         <div class="rooms-list">

@@ -34,6 +34,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   activeRooms = signal<any[]>([]);
   onlineUsers = signal<any[]>([]);
+  loadingRooms = signal(true);
   invitingUser = signal<string | null>(null);  // uid of user we're inviting
 
   private pollInterval?: ReturnType<typeof setInterval>;
@@ -68,13 +69,16 @@ export class HomeComponent implements OnInit, OnDestroy {
     clearInterval(this.pollInterval);
   }
 
-  private async _fetchLive() {
-    const [rooms, users] = await Promise.allSettled([
-      this.api.listActiveRooms(),
-      this.api.getOnlineUsers(),
-    ]);
-    if (rooms.status === 'fulfilled') this.activeRooms.set(rooms.value);
-    if (users.status === 'fulfilled') this.onlineUsers.set(users.value);
+  private _fetchLive() {
+    // Rooms: no auth needed, update immediately when ready
+    this.api.listActiveRooms()
+      .then((rooms) => { this.activeRooms.set(rooms); this.loadingRooms.set(false); })
+      .catch(() => this.loadingRooms.set(false));
+
+    // Online users: requires auth token, may be slightly slower — independent
+    this.api.getOnlineUsers()
+      .then((users) => this.onlineUsers.set(users))
+      .catch(() => {});
   }
 
   async joinRoom() {
