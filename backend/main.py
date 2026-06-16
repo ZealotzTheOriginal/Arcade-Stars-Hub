@@ -60,10 +60,12 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Arcade Stars Hub API", version="1.0.0", lifespan=lifespan)
 
+_extra_origins = [settings.frontend_url] if settings.frontend_url != "http://localhost:4200" else []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
-    allow_origin_regex=r"http://localhost:\d+",  # any local port in dev
+    allow_origins=["http://localhost:4200", *_extra_origins],
+    allow_origin_regex=r"(http://localhost:\d+|https://[\w-]+\.onrender\.com)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -77,6 +79,24 @@ app.include_router(leaderboard.router, prefix="/api")
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/debug/firebase")
+async def debug_firebase():
+    import os
+    has_json = bool(os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON"))
+    has_file = False
+    try:
+        from pathlib import Path
+        has_file = Path(settings.firebase_service_account_path).exists()
+    except Exception:
+        pass
+    try:
+        from app.core.firebase_client import get_firebase_app
+        get_firebase_app()
+        return {"firebase": "ok", "source": "json_env" if has_json else "file", "has_json_env": has_json, "has_file": has_file}
+    except Exception as e:
+        return {"firebase": "error", "detail": str(e), "has_json_env": has_json, "has_file": has_file}
 
 
 # ── WebSocket endpoint ────────────────────────────────────
