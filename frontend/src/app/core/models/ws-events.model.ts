@@ -7,7 +7,8 @@ export type ServerEvent =
   | 'game_over'
   | 'chat_message'
   | 'ai_thinking'
-  | 'error';
+  | 'error'
+  | 'pong';
 
 export interface WSMessage {
   event: ServerEvent;
