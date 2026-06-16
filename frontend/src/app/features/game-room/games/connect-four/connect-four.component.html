@@ -36,11 +36,11 @@
     @if (isTerminal()) {
       <div class="result-banner">
         @if (gameState.draw) {
-          <span>🤝 ¡Empate!</span>
+          <span><i class="fa-solid fa-handshake"></i> ¡Empate!</span>
         } @else if (gameState.winner === myUid) {
-          <span>🎉 ¡Ganaste!</span>
+          <span><i class="fa-solid fa-trophy"></i> ¡Ganaste!</span>
         } @else {
-          <span>😔 Perdiste</span>
+          <span><i class="fa-solid fa-skull"></i> Perdiste</span>
         }
       </div>
     }

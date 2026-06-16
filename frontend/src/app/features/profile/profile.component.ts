@@ -4,12 +4,28 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { WsService } from '../../core/services/ws.service';
 import { UserProfile } from '../../core/models/user.model';
-import { LeaderboardEntry } from '../../core/models/game.model';
+import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
 
 type Tab = 'stats' | 'games' | 'friends';
 
-const AVATARS = ['⭐', '🔥', '💎', '🦊', '🐉', '👾', '🎮', '🏆', '🚀', '🌟'];
+const AVATARS = [
+  // Facciones y Escuadras Animales
+  '🐉', '🦎', '🐀', '🦅', '🐺', '🦁', '🦂', '🦈', 
+  
+  // Amenaza Alienígena (Insectores) y Biología Sci-Fi
+  '🛸', '👾', '🐜', '🕷️', '🧬', 
+  
+  // Tecnología, Flota y Estaciones Espaciales
+  '🛰️', '🚀', '🚀', '🌌', '☄️', '🪐', 
+  
+  // Armamento, Táctica y Combate en Gravedad Cero
+  '🛡️', '⚔️', '🎯', '💥', '⚡', '🔮', '🌀', '🔋',
+  
+  // Rangos, Victorias y Comandantes
+  '👑', '🏆', '⭐', '🎖️'
+];
 
 @Component({
   selector: 'app-profile',
@@ -21,13 +37,16 @@ const AVATARS = ['⭐', '🔥', '💎', '🦊', '🐉', '👾', '🎮', '🏆', 
 export class ProfileComponent implements OnInit {
   private api = inject(ApiService);
   private auth = inject(AuthService);
+  private ws = inject(WsService);
 
   profile = signal<UserProfile | null>(null);
   friends = signal<any[]>([]);
+  games = signal<GameDefinition[]>([]);
   leaderboard = signal<LeaderboardEntry[]>([]);
   activeTab = signal<Tab>('stats');
   saving = signal(false);
   loadingFriends = signal(false);
+  invitingFriend = signal<string | null>(null);
   editName = '';
 
   readonly avatars = AVATARS;
@@ -39,12 +58,14 @@ export class ProfileComponent implements OnInit {
   };
 
   async ngOnInit() {
-    const [profile, lb] = await Promise.all([
+    const [profile, lb, gamesData] = await Promise.all([
       this.api.getMe(),
       this.api.getGlobalLeaderboard(),
+      this.api.listGames(),
     ]);
     this.profile.set(profile);
     this.leaderboard.set(lb);
+    this.games.set(gamesData);
     this.editName = profile.display_name;
   }
 
@@ -78,6 +99,28 @@ export class ProfileComponent implements OnInit {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  async removeFriend(uid: string) {
+    try {
+      await this.api.removeFriend(uid);
+      this.friends.update(list => list.filter(f => f.uid !== uid));
+    } catch { /* ignore */ }
+  }
+
+  startFriendInvite(uid: string) {
+    this.invitingFriend.set(uid);
+  }
+
+  cancelFriendInvite() {
+    this.invitingFriend.set(null);
+  }
+
+  inviteFriendToGame(game: GameDefinition) {
+    const uid = this.invitingFriend();
+    if (!uid) return;
+    this.invitingFriend.set(null);
+    this.ws.send('send_invite', { to_uid: uid, game_id: game.id });
   }
 
   gameStatsList(): Array<{ id: string; name: string; played: number; won: number; points: number }> {

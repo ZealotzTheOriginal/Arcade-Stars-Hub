@@ -8,11 +8,11 @@
           <p class="user-email">{{ p.email }}</p>
           <div class="user-badges">
             <span class="badge">Nivel {{ p.level }}</span>
-            <span class="badge badge--gold">⭐ {{ p.total_points }} pts</span>
+            <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ p.total_points }} pts</span>
           </div>
         </div>
         <div class="header-actions">
-          <a class="btn btn--ghost" routerLink="/home">← Inicio</a>
+          <a class="btn btn--ghost" routerLink="/home"><i class="fa-solid fa-arrow-left"></i> Inicio</a>
           <button class="btn btn--danger" (click)="logout()">Salir</button>
         </div>
       </div>
@@ -22,9 +22,9 @@
   <div class="profile-body">
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab" [class.active]="activeTab() === 'stats'" (click)="setTab('stats')">📊 Estadísticas</button>
-      <button class="tab" [class.active]="activeTab() === 'games'" (click)="setTab('games')">🎮 Juegos</button>
-      <button class="tab" [class.active]="activeTab() === 'friends'" (click)="setTab('friends')">👥 Amigos</button>
+      <button class="tab" [class.active]="activeTab() === 'stats'" (click)="setTab('stats')"><i class="fa-solid fa-chart-bar"></i> Estadísticas</button>
+      <button class="tab" [class.active]="activeTab() === 'games'" (click)="setTab('games')"><i class="fa-solid fa-gamepad"></i> Juegos</button>
+      <button class="tab" [class.active]="activeTab() === 'friends'" (click)="setTab('friends')"><i class="fa-solid fa-users"></i> Amigos</button>
     </div>
 
     <!-- Content -->
@@ -102,7 +102,7 @@
           } @else if (friends().length === 0) {
             <p class="empty">
               Aún no tienes amigos añadidos.<br>
-              <span class="empty-hint">Usa el botón ➕ junto a los jugadores en línea desde la pantalla de inicio.</span>
+              <span class="empty-hint">Usa el botón <i class="fa-solid fa-plus"></i> junto a los jugadores en línea desde la pantalla de inicio.</span>
             </p>
           } @else {
             <div class="friends-grid">
@@ -113,14 +113,18 @@
                     <p class="friend-name">{{ f.display_name }}</p>
                     <div class="friend-badges">
                       <span class="badge">Nivel {{ f.level }}</span>
-                      <span class="badge badge--gold">⭐ {{ f.total_points }} pts</span>
+                      <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ f.total_points }} pts</span>
                     </div>
                     @if (f.best_game) {
                       <p class="friend-best">
-                        🏆 Mejor juego: <strong>{{ f.best_game }}</strong>
+                        <i class="fa-solid fa-trophy"></i> Mejor juego: <strong>{{ f.best_game }}</strong>
                         <span class="friend-best-pts">({{ f.best_game_points }} pts)</span>
                       </p>
                     }
+                    <div class="friend-actions">
+                      <button class="btn btn--primary btn--xs" (click)="startFriendInvite(f.uid)"><i class="fa-solid fa-envelope"></i> Invitar</button>
+                      <button class="btn btn--danger btn--xs" (click)="removeFriend(f.uid)">Eliminar</button>
+                    </div>
                   </div>
                 </div>
               }
@@ -132,3 +136,20 @@
     </div>
   </div>
 </div>
+
+@if (invitingFriend()) {
+  <div class="overlay" (click)="cancelFriendInvite()">
+    <div class="invite-picker card" (click)="$event.stopPropagation()">
+      <h3>Invitar a jugar — elige el juego</h3>
+      <div class="invite-games">
+        @for (game of games(); track game.id) {
+          <button class="invite-game-btn" (click)="inviteFriendToGame(game)">
+            <span class="ig-thumb">{{ game.thumbnail }}</span>
+            <span class="ig-name">{{ game.name }}</span>
+          </button>
+        }
+      </div>
+      <button class="btn btn--ghost" (click)="cancelFriendInvite()">Cancelar</button>
+    </div>
+  </div>
+}

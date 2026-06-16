@@ -33,7 +33,7 @@ async def create_game_room(body: dict, user: dict = Depends(get_current_user)):
         "avatar": body.get("avatar", "⭐"),
     }
     room = create_room(room_id, game_id, user["uid"], player_info)
-    return {"room_id": room_id, "room": room}
+    return {"room_id": room_id, "name": room["name"], "room": room}
 
 
 @router.get("/rooms/{room_id}")

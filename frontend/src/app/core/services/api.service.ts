@@ -49,6 +49,14 @@ export class ApiService {
     );
   }
 
+  async removeFriend(friendUid: string): Promise<void> {
+    await firstValueFrom(
+      this.http.delete(`${environment.apiUrl}/users/friends/${friendUid}`, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
   // ── Games ──────────────────────────────────────────────
   async listGames(): Promise<GameDefinition[]> {
     return firstValueFrom(this.http.get<GameDefinition[]>(`${environment.apiUrl}/games/`));

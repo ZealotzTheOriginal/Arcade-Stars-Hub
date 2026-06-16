@@ -2,29 +2,31 @@
   <!-- Sidebar / nav -->
   <aside class="sidebar card" [class.mobile-hidden]="activePanel() !== 'sidebar'">
     <div class="sidebar-logo">
-      <span>⭐</span>
+      <i class="fa-solid fa-star logo-star"></i>
       <span class="logo-text">ARCADE</span>
     </div>
 
     @if (profile(); as p) {
       <div class="user-info">
         <div class="avatar">{{ p.avatar }}</div>
-        <div>
+        <div class="user-details">
           <p class="user-name">{{ p.display_name }}</p>
-          <p class="user-level">Nivel {{ p.level }} · {{ p.total_points }} pts</p>
+          <p class="user-level">Nivel {{ p.level }}</p>
         </div>
+        <button class="logout-btn" (click)="logout()" title="Cerrar sesión">
+          <img src="/StarCross.svg" class="logout-icon" alt="Salir" />
+        </button>
       </div>
     }
 
     <nav class="nav">
-      <a class="nav-item active" (click)="activePanel.set('main')">🎮 Juegos</a>
-      <a class="nav-item" routerLink="/profile">👤 Perfil</a>
-      <a class="nav-item" (click)="logout()">🚪 Salir</a>
+      <a class="nav-item active" (click)="activePanel.set('main')"><i class="fa-solid fa-gamepad"></i> Juegos</a>
+      <a class="nav-item" routerLink="/profile"><i class="fa-solid fa-user"></i> Perfil</a>
     </nav>
 
     <!-- Online players -->
     <div class="online-section">
-      <h3 class="section-title">🟢 En línea ({{ onlineUsers().length }})</h3>
+      <h3 class="section-title"><i class="fa-solid fa-circle online-dot-fa"></i> En línea ({{ onlineUsers().length }})</h3>
       @if (onlineUsers().length === 0) {
         <p class="empty-hint">Nadie más en línea</p>
       }
@@ -38,8 +40,18 @@
           </span>
           @if (!u.is_me) {
             <div class="ou-actions">
-              <button class="icon-btn" title="Añadir amigo" (click)="addFriend(u.uid)">➕</button>
-              <button class="icon-btn" title="Invitar a partida" (click)="startInvite(u.uid)">✉️</button>
+              @if (isFriend(u.uid)) {
+                <span class="friend-heart" title="Amigo">
+                  <img src="/Heart.svg" class="action-icon icon-heart" alt="Amigo" />
+                </span>
+              } @else {
+                <button class="icon-btn" title="Añadir amigo" (click)="addFriend(u.uid)">
+                  <img src="/PlusCross.svg" class="action-icon" alt="Añadir amigo" />
+                </button>
+              }
+              <button class="icon-btn" title="Invitar a partida" (click)="startInvite(u.uid)">
+                <img src="/Play.svg" class="action-icon" alt="Invitar" />
+              </button>
             </div>
           }
         </div>
@@ -57,13 +69,15 @@
     <!-- Reconnect banner -->
     @if (reconnectableRoom()) {
       <div class="reconnect-banner">
-        <span class="reconnect-icon">🎮</span>
+        <span class="reconnect-icon"><i class="fa-solid fa-gamepad"></i></span>
         <div class="reconnect-text">
           <strong>Tienes una partida en curso</strong>
-          <span>Sala {{ reconnectableRoom().room_id }}</span>
+          <span>{{ reconnectableRoom().name || reconnectableRoom().room_id }}</span>
         </div>
-        <button class="btn btn--primary btn--sm" (click)="joinActiveRoom(reconnectableRoom())">Reconectar</button>
-        <button class="reconnect-dismiss" (click)="reconnectableRoom.set(null)">✕</button>
+        <div class="reconnect-actions">
+          <button class="btn btn--join btn--sm" (click)="joinActiveRoom(reconnectableRoom())">Reconectar</button>
+          <button class="btn btn--danger btn--sm" (click)="abandonFromOutside()">Abandonar</button>
+        </div>
       </div>
     }
 
@@ -96,39 +110,40 @@
       <div class="rooms-loading">Cargando salas...</div>
     } @else if (activeRooms().length > 0) {
       <section class="rooms-section">
-        <h2 class="section-heading">🚪 Salas activas</h2>
+        <h2 class="section-heading"><i class="fa-solid fa-door-open"></i> Salas activas</h2>
         <div class="rooms-list">
           @for (room of activeRooms(); track room.room_id) {
             <div class="room-row card">
               <div class="room-info">
-                <span class="room-game-thumb">
-                  {{ room.game_id === 'connect_four' ? '🔴' : room.game_id === 'tic_tac_toe' ? '✖️' : '💣' }}
+                <span [class]="'room-game-icon room-game-icon--' + room.game_id">
+                  @if (room.game_id === 'connect_four') { <i class="fa-solid fa-circle"></i> }
+                  @else if (room.game_id === 'tic_tac_toe') { <i class="fa-solid fa-xmark"></i> }
+                  @else { <i class="fa-solid fa-bomb"></i> }
                 </span>
                 <div>
-                  <p class="room-code-label">{{ room.room_id }}</p>
+                  <p class="room-name-label">Sala: {{ room.name || room.room_id }}</p>
                   <p class="room-meta">
+                    <span class="room-game-badge" [class]="'game-badge--' + room.game_id">{{ gameLabel(room.game_id) }}</span>
                     <span class="room-status" [class.status--playing]="room.status === 'playing'">
                       {{ roomStatusLabel(room.status) }}
                     </span>
-                    · {{ room.players.length }} jugador{{ room.players.length !== 1 ? 'es' : '' }}
+                    · {{ room.players.length }} jugador{{ room.players.length !== 1 ? 'es' : '' }}:
+                    @for (p of room.players; track p.uid) {
+                      <span class="room-player-name">{{ p.display_name }}</span>
+                    }
                     @if (room.spectators_count > 0) {
                       · {{ room.spectators_count }} esp.
-                    }
-                  </p>
-                  <p class="room-players">
-                    @for (p of room.players; track p.uid) {
-                      <span>{{ p.display_name }}</span>
                     }
                   </p>
                 </div>
               </div>
               <div class="room-actions">
                 @if (room.status === 'waiting') {
-                  <button class="btn btn--primary btn--sm" (click)="joinActiveRoom(room)">Unirse</button>
+                  <button class="btn btn--join btn--sm" (click)="joinActiveRoom(room)">Unirse</button>
                 } @else if (isMyRoom(room)) {
-                  <button class="btn btn--primary btn--sm" (click)="joinActiveRoom(room)">Reconectar</button>
+                  <button class="btn btn--join btn--sm" (click)="joinActiveRoom(room)">Reconectar</button>
                 } @else {
-                  <button class="btn btn--ghost btn--sm" (click)="spectateRoom(room)">Espectar</button>
+                  <button class="btn btn--ghost btn--sm" (click)="spectateRoom(room)"><i class="fa-solid fa-eye"></i> Espectar</button>
                 }
               </div>
             </div>
@@ -140,38 +155,36 @@
     @if (loading()) {
       <div class="loading">Cargando juegos...</div>
     } @else if (error()) {
-      <div class="error-banner">⚠️ {{ error() }}</div>
+      <div class="error-banner"><i class="fa-solid fa-triangle-exclamation"></i> {{ error() }}</div>
     } @else {
       <div class="games-grid">
         @for (game of games(); track game.id) {
-          <div class="game-card card">
-            <div class="game-thumb">{{ game.thumbnail }}</div>
-            <div class="game-info">
+          <div class="game-card" (click)="playGame(game)" [class.game-card--loading]="creatingRoom() === game.id">
+            <img [src]="gameImage(game.id)" class="game-img" [alt]="game.name" />
+            <div class="game-gradient"></div>
+            <div class="game-play-area">
+              @if (creatingRoom() === game.id) {
+                <span class="game-loading-text">Creando...</span>
+              } @else {
+                <img src="/Play.svg" class="game-play-icon" alt="Jugar" />
+              }
+            </div>
+            <div class="game-footer">
               <h3>{{ game.name }}</h3>
-              <p class="game-desc">{{ game.description }}</p>
               <div class="game-tags">
                 <span class="tag">{{ game.category }}</span>
-                <span class="tag">{{ game.max_players }} jugadores</span>
-                @if (game.has_ai) {
-                  <span class="tag tag--ai">IA disponible</span>
-                }
+                @if (game.has_ai) { <span class="tag tag--ai">IA</span> }
               </div>
             </div>
-            <button
-              class="btn btn--primary"
-              (click)="playGame(game)"
-              [disabled]="creatingRoom() === game.id">
-              {{ creatingRoom() === game.id ? 'Creando sala...' : 'Jugar' }}
-            </button>
           </div>
         }
       </div>
     }
   </main>
 
-  <!-- Leaderboard -->
+  <!-- Leaderboard + Chat -->
   <aside class="leaderboard card" [class.mobile-hidden]="activePanel() !== 'leaderboard'">
-    <h2>🏆 Ranking Global</h2>
+    <h2><i class="fa-solid fa-trophy"></i> Ranking Global</h2>
     <div class="lb-list">
       @for (entry of leaderboard(); track entry.uid; let i = $index) {
         <div class="lb-row" [class.top3]="i < 3">
@@ -182,21 +195,48 @@
         </div>
       }
     </div>
+
+    <!-- Global chat -->
+    <div class="global-chat">
+      <h3 class="chat-title"><i class="fa-solid fa-comments"></i> Chat global</h3>
+      <div class="chat-messages" #chatMessages>
+        @for (m of globalMessages(); track m.ts; let i = $index) {
+          <div class="chat-msg" [class.chat-msg--continued]="!isFirstGlobalMsg(i)">
+            @if (isFirstGlobalMsg(i)) {
+              <span class="chat-name">{{ m.display_name }}</span>
+            }
+            <span class="chat-text">{{ m.text }}</span>
+          </div>
+        } @empty {
+          <p class="chat-empty">Sin mensajes aún...</p>
+        }
+      </div>
+      <div class="chat-input-row">
+        <input
+          class="input chat-input"
+          [(ngModel)]="globalChatInput"
+          placeholder="Escribe un mensaje..."
+          maxlength="200"
+          (keyup.enter)="sendGlobalChat()"
+        />
+        <button class="chat-send-btn" (click)="sendGlobalChat()" [disabled]="!globalChatInput.trim()"><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+    </div>
   </aside>
 </div>
 
 <!-- Mobile bottom tab bar -->
 <nav class="mobile-tabs">
   <button class="mobile-tab" [class.active]="activePanel() === 'sidebar'" (click)="activePanel.set('sidebar')">
-    <span class="tab-icon">🟢</span>
+    <span class="tab-icon"><i class="fa-solid fa-circle-dot"></i></span>
     <span>En línea</span>
   </button>
   <button class="mobile-tab" [class.active]="activePanel() === 'main'" (click)="activePanel.set('main')">
-    <span class="tab-icon">🎮</span>
+    <span class="tab-icon"><i class="fa-solid fa-gamepad"></i></span>
     <span>Juegos</span>
   </button>
   <button class="mobile-tab" [class.active]="activePanel() === 'leaderboard'" (click)="activePanel.set('leaderboard')">
-    <span class="tab-icon">🏆</span>
+    <span class="tab-icon"><i class="fa-solid fa-trophy"></i></span>
     <span>Ranking</span>
   </button>
 </nav>

@@ -2,23 +2,23 @@
 
   <!-- Header -->
   <header class="room-header">
-    <a routerLink="/home" class="back-btn">← Salir</a>
+    <a routerLink="/home" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Salir</a>
     <div class="room-id">
-      Sala: <strong>{{ roomId }}</strong>
-      <span class="copy-hint" (click)="copyRoomId()">📋</span>
+      <strong class="room-name-label">{{ roomName() || roomId }}</strong>
+      <span class="room-code-chip" (click)="copyRoomId()" title="Copiar código">{{ roomId }} <i class="fa-solid fa-copy"></i></span>
     </div>
     @if (isSpectator()) {
-      <div class="spectator-badge">👁️ Espectando</div>
+      <div class="spectator-badge"><i class="fa-solid fa-eye"></i> Espectando</div>
     }
     <div class="header-right">
       @if (roomStatus() === 'playing' && !isSpectator()) {
-        <button class="abandon-btn" (click)="abandonGame()">🚩 Abandonar</button>
+        <button class="abandon-btn" (click)="abandonGame()"><i class="fa-solid fa-flag"></i> Abandonar</button>
       }
       @if (aiThinking()) {
-        <div class="ai-badge">🤖 IA pensando...</div>
+        <div class="ai-badge"><i class="fa-solid fa-robot"></i> IA pensando...</div>
       }
       @if (spectators().length > 0) {
-        <div class="spectators-count">👁️ {{ spectators().length }}</div>
+        <div class="spectators-count"><i class="fa-solid fa-eye"></i> {{ spectators().length }}</div>
       }
       @if (toast()) {
         <div class="room-toast">{{ toast() }}</div>
@@ -48,12 +48,15 @@
           @if (isSpectator()) {
             <h2>Esperando que empiece la partida...</h2>
             <p class="hint">Estás como espectador</p>
+          } @else if (isInvited()) {
+            <h2>Conectando...</h2>
+            <p class="hint">Esperando al otro jugador</p>
           } @else {
             <h2>Esperando jugadores...</h2>
             <p class="room-code">Código de sala: <strong class="highlight">{{ roomId }}</strong></p>
             <p class="hint">Comparte este código con un amigo o añade la IA</p>
             <div class="lobby-actions">
-              <button class="btn btn--ghost" (click)="addAI()">🤖 Añadir IA (DeepSeek)</button>
+              <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> Añadir IA</button>
             </div>
           }
           <div class="players-waiting">
@@ -99,7 +102,7 @@
       <!-- Abandoned overlay -->
       @if (abandonedData()) {
         <div class="game-over-banner">
-          <span class="result loss">🚩 Partida abandonada</span>
+          <span class="result loss"><i class="fa-solid fa-flag"></i> Partida abandonada</span>
           <p class="abandon-msg">{{ abandonedData()!.display_name }} abandonó la partida. Nadie recibe puntos.</p>
           <a class="btn btn--ghost" routerLink="/home">Volver al inicio</a>
         </div>
@@ -109,18 +112,17 @@
       @if (gameOverData()) {
         <div class="game-over-banner">
           @if (gameOverData().winner === myUid) {
-            <span class="result win">🎉 ¡Victoria!</span>
+            <span class="result win"><i class="fa-solid fa-trophy"></i> ¡Victoria!</span>
           } @else if (!gameOverData().winner) {
-            <span class="result draw">🤝 Empate</span>
+            <span class="result draw"><i class="fa-solid fa-handshake"></i> Empate</span>
           } @else {
-            <span class="result loss">💀 Derrota</span>
+            <span class="result loss"><i class="fa-solid fa-skull"></i> Derrota</span>
           }
 
-          <!-- Rematch (only for players, not spectators) -->
           @if (!isSpectator()) {
             <div class="rematch-area">
               @if (!hasVotedRematch()) {
-                <button class="btn btn--primary" (click)="requestRematch()">🔁 Revancha</button>
+                <button class="btn btn--primary" (click)="requestRematch()"><i class="fa-solid fa-rotate"></i> Revancha</button>
               } @else {
                 <p class="rematch-waiting">
                   Esperando revancha... ({{ rematchVotes().length }}/{{ humanPlayers().length }})
@@ -135,12 +137,13 @@
     </div>
 
     <!-- Chat panel -->
-    <div class="chat-panel card">
+    <div class="chat-panel card" [class.chat-open]="chatOpen()">
       <app-chat
         [messages]="chatMessages()"
         [roomId]="roomId"
         [myUid]="myUid"
-        [displayName]="(isSpectator() ? '[Esp] ' : '') + (myProfile?.display_name ?? 'Player')">
+        [displayName]="(isSpectator() ? '[ Espectador ] ' : '') + (myProfile?.display_name ?? 'Player')"
+        (openChange)="chatOpen.set($event)">
       </app-chat>
     </div>
   </div>
@@ -149,7 +152,7 @@
 @if (showAbandonConfirm()) {
   <div class="abandon-overlay" (click)="cancelAbandon()">
     <div class="abandon-dialog card rainbow-border" (click)="$event.stopPropagation()">
-      <span class="abandon-dialog-icon">🚩</span>
+      <span class="abandon-dialog-icon"><i class="fa-solid fa-flag"></i></span>
       <h3>Abandonar partida</h3>
       <p>Ningún jugador recibirá puntos por esta partida si la abandonas.</p>
       <div class="abandon-dialog-actions">

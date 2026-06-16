@@ -19,7 +19,8 @@ export type ServerEvent =
   | 'player_disconnected'
   | 'player_reconnected'
   | 'game_abandoned'
-  | 'invite_accepted';
+  | 'invite_accepted'
+  | 'global_chat_message';
 
 export interface WSMessage {
   event: ServerEvent;

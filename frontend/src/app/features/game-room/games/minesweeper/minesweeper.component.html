@@ -28,9 +28,9 @@
     @if (gameState.game_over) {
       <div class="result-banner">
         @if (gameState.winner === myUid) {
-          <span>🏆 ¡Ganaste!</span>
+          <span><i class="fa-solid fa-trophy"></i> ¡Ganaste!</span>
         } @else {
-          <span>💣 Mejor suerte la próxima</span>
+          <span><i class="fa-solid fa-bomb"></i> Mejor suerte la próxima</span>
         }
       </div>
     }

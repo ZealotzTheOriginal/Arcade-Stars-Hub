@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, ViewChild, ElementRef, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WsService } from '../../../core/services/ws.service';
@@ -11,28 +11,56 @@ import { ChatMessage } from '../../../core/models/ws-events.model';
   templateUrl: './chat.component.html',
   styleUrls: ['./chat.component.scss'],
 })
-export class ChatComponent implements AfterViewChecked, OnChanges {
+export class ChatComponent implements OnChanges {
   @Input() messages: ChatMessage[] = [];
   @Input() roomId: string = '';
   @Input() displayName: string = '';
   @Input() myUid: string = '';
 
-  @ViewChild('msgList') private msgList!: ElementRef;
+  @Output() openChange = new EventEmitter<boolean>();
+
+  @ViewChild('msgList') private msgList?: ElementRef;
 
   text = '';
-  private shouldScroll = false;
+  open = signal(false);
+  renderContent = signal(false);
+  unread = signal(0);
+  private prevMsgCount = 0;
+  private openTimer?: ReturnType<typeof setTimeout>;
 
   constructor(private ws: WsService) {}
 
-  ngAfterViewChecked() {
-    if (this.shouldScroll) {
-      this.scrollToBottom();
-      this.shouldScroll = false;
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['messages']) {
+      const newCount = this.messages.length;
+      const added = newCount - this.prevMsgCount;
+      if (added > 0) {
+        if (!this.open()) {
+          this.unread.update(n => n + added);
+        } else {
+          setTimeout(() => this.scrollToBottom(), 0);
+        }
+      }
+      this.prevMsgCount = newCount;
     }
   }
 
-  ngOnChanges() {
-    this.shouldScroll = true;
+  toggle() {
+    this.open.update(v => !v);
+    this.openChange.emit(this.open());
+
+    if (this.open()) {
+      this.unread.set(0);
+      // Wait for the width transition (300ms) before adding content to DOM
+      // so the layout jump from new elements never happens
+      this.openTimer = setTimeout(() => {
+        this.renderContent.set(true);
+        setTimeout(() => this.scrollToBottom(), 0);
+      }, 300);
+    } else {
+      clearTimeout(this.openTimer);
+      this.renderContent.set(false);
+    }
   }
 
   isFirstInGroup(index: number): boolean {
@@ -59,8 +87,7 @@ export class ChatComponent implements AfterViewChecked, OnChanges {
   }
 
   private scrollToBottom() {
-    if (this.msgList?.nativeElement) {
-      this.msgList.nativeElement.scrollTop = this.msgList.nativeElement.scrollHeight;
-    }
+    const el = this.msgList?.nativeElement;
+    if (el) el.scrollTop = el.scrollHeight;
   }
 }

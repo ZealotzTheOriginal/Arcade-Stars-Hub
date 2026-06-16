@@ -3,6 +3,7 @@ import json
 import time
 import uuid
 import asyncio
+import random
 from fastapi import WebSocket
 
 from app.websocket.manager import manager
@@ -10,6 +11,7 @@ from app.websocket.events import ClientEvent, ServerEvent
 from app.games.registry import get_game, get_definition
 from app.services.deepseek import get_ai_move, AI_UID
 from app.services.scoring import award_points, mark_win
+from app.services.room_names import pick_room_name
 
 # In-memory room store: room_id -> GameRoom dict
 _rooms: dict[str, dict] = {}
@@ -19,6 +21,74 @@ _presence: dict[str, dict] = {}
 
 ROOM_TIMEOUT_SECONDS = 600  # 10 minutes
 
+# ── AI personality message pools ──────────────────────────────
+_AI_POOL_START = [
+    "Bienvenido a mi juego. Intenta no manchar el suelo con tus lágrimas.",
+    "Te daré un poco de ventaja, solo para que la historia sea emocionante.",
+    "¿Quieres el primer puesto? El peaje es intentar ganarme, y hoy no acepto propinas.",
+    "Mírame bien ahora, porque cuando esto empiece no vas a volver a verme el pelo.",
+    "Hagamos una apuesta: si gano yo, te sorprendes. Si ganas tú... despierta del sueño.",
+    "Me encanta el olor a victoria por la mañana. Y a todas horas, la verdad.",
+]
+
+# Respuesta cuando el rival escribe en el chat (mandarlo a callar)
+_AI_POOL_SILENCE = [
+    "Menos charla y más nivel, que me estás durmiendo con tanto discurso.",
+    "Ahorra saliva para cuando llores, que te va a hacer falta.",
+    "¿Sientes eso? Es el sonido de tu boca cerrándose ante mi superioridad.",
+    "Tu estrategia habla mucho, pero tus resultados no dicen nada.",
+    "Shh. Estoy intentando concentrarme y no me ayuda escucharte.",
+    "Avísame cuando empieces a jugar en serio, ¿vale?",
+    "¿Vienes a competir o a dar una conferencia? Decide ya.",
+    "Deja que tu juego hable por ti, porque de momento está mudo.",
+]
+
+# Respuesta cuando el rival gana (fingir que fue suerte)
+_AI_POOL_LUCK = [
+    "Felicidades. Has gastado toda la suerte de tu vida en una sola jugada.",
+    "Disfruta del milagro, porque los rayos no caen dos veces en el mismo sitio.",
+    "Hasta un reloj roto acierta dos veces al día. Hoy te ha tocado a ti.",
+    "Eso no ha sido talento, ha sido un error en la Matrix a tu favor.",
+    "Vaya potra. Compra un boleto de lotería antes de que se te pase el efecto.",
+    "Qué tierno. Crees que lo has hecho a propósito.",
+    "Bonita casualidad. Ahora intenta repetirlo.",
+    "El universo te ha regalado esa jugada porque te tenía lástima.",
+]
+
+# Respuesta cuando el rival tarda demasiado en jugar
+_AI_POOL_BORED = [
+    "Oye, ¿vas a jugar o me da tiempo a echarme una siesta?",
+    "¿Esto es todo lo que tienes? Me habían prometido un reto de verdad.",
+    "Voy a empezar a jugar con una sola mano para que esto sea más justo.",
+    "Me estoy haciendo viejo esperando a que me pongas las cosas difíciles.",
+    "Si lo sé, me quedo durmiendo. En serio.",
+    "Pensé que venía a competir, no a hacer de niñera. Espabila.",
+    "Mi mayor rival hoy estás siendo tú... y el sueño que me estás dando.",
+    "Estoy ganando tan fácil que esto ya parece un tutorial.",
+]
+
+# Frases cortas de desprecio (jugada rápida del rival o comentario espontáneo)
+_AI_POOL_SHORT = [
+    "¿Me avisas cuando empiece la parte difícil?",
+    "Eso no me lo esperaba. Que hayas hecho algo tan mediocre.",
+    "Suerte de principiante. No te acostumbres.",
+    "¿Ese era tu gran plan? Decepcionante.",
+    "Siguiente.",
+    "Previsible.",
+    "Vaya.",
+]
+
+_AI_POOL_WIN = [
+    "Te lo advertí. El trono solo tiene sitio para uno.",
+    "No te sientas mal, perder contra alguien como yo sigue siendo un honor.",
+    "Guarda el recuerdo de esta partida. Es lo más cerca que vas a estar de ganarme.",
+    "Fue divertido mientras duró... bueno, divertido para mí, claro.",
+    "Anota otra victoria en mi cuenta. Me estoy quedando sin espacio para tantos trofeos.",
+]
+
+# room_id -> Task: boredom check that fires if the human doesn't move in time
+_boredom_tasks: dict[str, "asyncio.Task[None]"] = {}
+
 
 # ── Public accessors ──────────────────────────────────────
 
@@ -27,8 +97,10 @@ def get_room(room_id: str) -> dict | None:
 
 
 def create_room(room_id: str, game_id: str, host_uid: str, host_info: dict) -> dict:
+    existing_names = {r.get("name", "") for r in _rooms.values()}
     room = {
         "room_id": room_id,
+        "name": pick_room_name(existing_names),
         "game_id": game_id,
         "host_uid": host_uid,
         "players": [host_info],
@@ -46,6 +118,7 @@ def get_active_rooms() -> list[dict]:
     return [
         {
             "room_id": r["room_id"],
+            "name": r.get("name", r["room_id"]),
             "game_id": r["game_id"],
             "status": r["status"],
             "players": [
@@ -56,8 +129,6 @@ def get_active_rooms() -> list[dict]:
             "last_activity": r.get("last_activity", 0),
         }
         for r in _rooms.values()
-        # Only expose rooms with at least one active WS connection.
-        # Prevents invite-created rooms from appearing before either player joins.
         if manager.players_in_room(r["room_id"])
     ]
 
@@ -102,6 +173,9 @@ async def cleanup_stale_rooms():
 async def _close_room(room_id: str, reason: str = "Sala cerrada"):
     if room_id not in _rooms:
         return
+    task = _boredom_tasks.pop(room_id, None)
+    if task:
+        task.cancel()
     await manager.broadcast(room_id, ServerEvent.ROOM_CLOSED, {"reason": reason})
     del _rooms[room_id]
 
@@ -130,6 +204,7 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.RESPOND_INVITE: _handle_respond_invite,
         ClientEvent.REGISTER_PRESENCE: _handle_register_presence,
         ClientEvent.ABANDON_GAME: _handle_abandon,
+        ClientEvent.GLOBAL_CHAT: _handle_global_chat,
     }
     handler = handlers.get(event)
     if handler:
@@ -236,20 +311,29 @@ async def _handle_leave(ws: WebSocket, uid: str, data: dict):
 
     # If the room now has zero WS connections, decide what to do with it
     if left_room_id:
-        _auto_close_if_empty(left_room_id)
+        await _auto_close_if_empty(left_room_id)
 
 
-def _auto_close_if_empty(room_id: str):
-    """Close or expedite cleanup when no connections remain in a room."""
+async def _auto_close_if_empty(room_id: str):
+    """Close a room when no players remain connected, evicting any spectators.
+
+    Spectators do not count as "active" for this check — a room kept alive
+    only by spectators is one where both players have already left, so there
+    is nothing left to watch.
+    """
     room = _rooms.get(room_id)
-    if not room or manager.players_in_room(room_id):
-        return  # room gone or still has connections
-    if room["status"] in ("waiting", "finished"):
-        # No reconnect needed: delete immediately
-        _rooms.pop(room_id, None)
-    elif room["status"] == "playing":
-        # Give ~60 s grace for reconnect, then background cleanup closes it
-        room["last_activity"] = time.time() - (ROOM_TIMEOUT_SECONDS - 60)
+    if not room:
+        return
+
+    connected_uids = set(manager.players_in_room(room_id))
+    player_uids = {p["uid"] for p in room.get("players", [])}
+
+    # If at least one player is still connected, keep the room alive
+    if connected_uids & player_uids:
+        return
+
+    # No players remain — broadcast ROOM_CLOSED (reaches spectators too) and delete
+    await _close_room(room_id, "Los jugadores han abandonado la sala")
 
 
 async def _handle_move(ws: WebSocket, uid: str, data: dict):
@@ -259,6 +343,17 @@ async def _handle_move(ws: WebSocket, uid: str, data: dict):
     if not room or room["status"] != "playing":
         await manager.send(ws, ServerEvent.ERROR, {"message": "Room not in play"})
         return
+
+    # Human moved — cancel any pending boredom check
+    boredom_task = _boredom_tasks.pop(room_id, None)
+    if boredom_task:
+        boredom_task.cancel()
+
+    # Detect suspiciously quick moves (only after AI has had a turn)
+    turn_start = room.pop("human_turn_start", None)
+    has_ai = any(p.get("is_ai") for p in room.get("players", []))
+    if has_ai and turn_start is not None and (time.time() - turn_start) < 2.5 and random.random() < 0.35:
+        asyncio.create_task(_ai_chat(room_id, random.choice(_AI_POOL_SHORT), delay=1.0))
 
     game = get_game(room["game_id"])
     try:
@@ -307,6 +402,11 @@ async def _handle_chat(ws: WebSocket, uid: str, data: dict):
         "is_spectator": is_spectator,
     })
 
+    if uid != AI_UID and any(p.get("is_ai") for p in room.get("players", [])) and random.random() < 0.65:
+        asyncio.create_task(
+            _ai_chat(room_id, random.choice(_AI_POOL_SILENCE), delay=random.uniform(2.0, 3.5))
+        )
+
 
 async def _handle_ping(ws: WebSocket, uid: str, data: dict):
     await manager.send(ws, ServerEvent.PONG, {})
@@ -319,7 +419,7 @@ async def _handle_add_ai(ws: WebSocket, uid: str, data: dict):
         await manager.send(ws, ServerEvent.ERROR, {"message": "Only the host can add AI"})
         return
 
-    ai_info = {"uid": AI_UID, "display_name": "DeepSeek AI", "avatar": "🤖", "is_ai": True}
+    ai_info = {"uid": AI_UID, "display_name": "Arcade IA", "avatar": "🤖", "is_ai": True}
     room["players"].append(ai_info)
     await manager.broadcast(room_id, ServerEvent.PLAYER_JOINED, {"player": ai_info, "uid": AI_UID})
 
@@ -433,9 +533,24 @@ async def _handle_respond_invite(ws: WebSocket, uid: str, data: dict):
     }
     create_room(room_id, game_id, to_uid, host_player)
 
-    payload = {"room_id": room_id, "game_id": game_id}
+    room = _rooms[room_id]
+    payload = {"room_id": room_id, "game_id": game_id, "room_name": room["name"]}
     await manager.send_direct(to_uid, ServerEvent.INVITE_ACCEPTED, payload)
     await manager.send_direct(uid, ServerEvent.INVITE_ACCEPTED, payload)
+
+
+async def _handle_global_chat(ws: WebSocket, uid: str, data: dict):
+    text = str(data.get("text", "")).strip()
+    if not text or len(text) > 200:
+        return
+    presence = _presence.get(uid, {})
+    await manager.broadcast_global(ServerEvent.GLOBAL_CHAT_MESSAGE, {
+        "uid": uid,
+        "display_name": presence.get("display_name", "Jugador"),
+        "avatar": presence.get("avatar", "⭐"),
+        "text": text,
+        "ts": int(time.time() * 1000),
+    })
 
 
 async def _handle_register_presence(ws: WebSocket, uid: str, data: dict):
@@ -458,11 +573,41 @@ async def _handle_abandon(ws: WebSocket, uid: str, data: dict):
         "uid": uid,
         "display_name": player_info.get("display_name", "Jugador"),
     })
-    # Room is deleted immediately — no points awarded to anyone
+    task = _boredom_tasks.pop(room_id, None)
+    if task:
+        task.cancel()
+    # Kick any remaining spectators with ROOM_CLOSED, then delete the room
+    spectator_uids = {s["uid"] for s in room.get("spectators", [])}
+    for spec_uid in spectator_uids:
+        await manager.send_to(room_id, spec_uid, ServerEvent.ROOM_CLOSED, {"reason": "Partida abandonada"})
     _rooms.pop(room_id, None)
 
 
 # ── Internal helpers ──────────────────────────────────────
+
+async def _ai_chat(room_id: str, message: str, delay: float = 0.0) -> None:
+    if delay:
+        await asyncio.sleep(delay)
+    if room_id not in _rooms:
+        return
+    await manager.broadcast(room_id, ServerEvent.CHAT_MESSAGE, {
+        "uid": AI_UID,
+        "display_name": "Arcade IA",
+        "message": message,
+        "is_spectator": False,
+    })
+
+
+async def _boredom_check(room_id: str, expected_uid: str) -> None:
+    """Fire a bored message if the human hasn't moved after 25 seconds."""
+    await asyncio.sleep(25)
+    _boredom_tasks.pop(room_id, None)
+    room = _rooms.get(room_id)
+    if not room or room.get("status") != "playing":
+        return
+    if room.get("game_state", {}).get("current_turn") == expected_uid:
+        await _ai_chat(room_id, random.choice(_AI_POOL_BORED))
+
 
 async def _start_game(room_id: str):
     room = _rooms[room_id]
@@ -478,6 +623,9 @@ async def _start_game(room_id: str):
 
     if room["game_state"].get("current_turn") == AI_UID:
         asyncio.create_task(_do_ai_move(room_id))
+
+    if any(p.get("is_ai") for p in room["players"]):
+        asyncio.create_task(_ai_chat(room_id, random.choice(_AI_POOL_START), delay=1.5))
 
 
 async def _do_ai_move(room_id: str):
@@ -504,6 +652,15 @@ async def _do_ai_move(room_id: str):
 
     if game.is_terminal(new_state):
         await _end_game(room_id, room, game, new_state)
+        return
+
+    next_uid = new_state.get("current_turn")
+    if next_uid and next_uid != AI_UID:
+        room["human_turn_start"] = time.time()
+        old = _boredom_tasks.pop(room_id, None)
+        if old:
+            old.cancel()
+        _boredom_tasks[room_id] = asyncio.create_task(_boredom_check(room_id, next_uid))
 
 
 async def _end_game(room_id: str, room: dict, game, state: dict):
@@ -519,9 +676,16 @@ async def _end_game(room_id: str, room: dict, game, state: dict):
         "rematch_votes": [],
     })
 
+    has_ai = any(p.get("is_ai") for p in room.get("players", []))
     asyncio.create_task(award_points(scores, room["game_id"]))
     if winner and winner != AI_UID:
         asyncio.create_task(mark_win(winner, room["game_id"]))
+
+    if has_ai:
+        if winner == AI_UID:
+            asyncio.create_task(_ai_chat(room_id, random.choice(_AI_POOL_WIN), delay=1.5))
+        elif winner is not None:
+            asyncio.create_task(_ai_chat(room_id, random.choice(_AI_POOL_LUCK), delay=1.5))
 
 
 def _safe_room(room: dict) -> dict:

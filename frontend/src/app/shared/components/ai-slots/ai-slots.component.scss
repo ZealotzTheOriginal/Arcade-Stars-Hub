@@ -1,0 +1,15 @@
+.ai-slots {
+  font-size: 0.75rem;
+  font-family: monospace;
+  font-weight: normal;
+  animation: ai-rainbow 3.2s linear infinite;
+}
+
+@keyframes ai-rainbow {
+  0%   { color: #ff0000; }
+  20%  { color: #ffc700; }
+  40%  { color: #45f6d7; }
+  60%  { color: #4643ff; }
+  80%  { color: #ff00d6; }
+  100% { color: #ff0000; }
+}

@@ -68,5 +68,16 @@ class ConnectionManager:
         if ws:
             await self.send(ws, event, data)
 
+    async def broadcast_global(self, event: str, data=None):
+        msg = WSMessage(event=event, data=data).model_dump_json()
+        dead = []
+        for uid, ws in list(self._direct.items()):
+            try:
+                await ws.send_text(msg)
+            except Exception:
+                dead.append(uid)
+        for uid in dead:
+            self._direct.pop(uid, None)
+
 
 manager = ConnectionManager()

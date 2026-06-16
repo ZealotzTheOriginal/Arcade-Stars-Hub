@@ -89,6 +89,15 @@ a {
     background: var(--rainbow-red);
     color: #fff;
   }
+
+  &--join {
+    background: transparent;
+    border: 1px solid var(--rainbow-red);
+    color: var(--text-primary);
+    animation: rainbow-border 4s linear infinite;
+    font-weight: 600;
+    &:hover { background: rgba(255, 255, 255, 0.06); }
+  }
 }
 
 .input {

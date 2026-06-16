@@ -50,7 +50,10 @@ async def get_leaderboard(game_id: str | None = None, limit: int = 20) -> list[d
 
     docs = query.stream()
     result = []
-    for rank, doc in enumerate(docs, start=1):
+    rank = 1
+    for doc in docs:
+        if doc.id == "AI_PLAYER":
+            continue
         d = doc.to_dict()
         pts = d.get(f"game_stats.{game_id}.points", 0) if game_id else d.get("total_points", 0)
         result.append({
@@ -61,6 +64,7 @@ async def get_leaderboard(game_id: str | None = None, limit: int = 20) -> list[d
             "level": d.get("level", 1),
             "rank": rank,
         })
+        rank += 1
     return result
 
 
@@ -68,6 +72,12 @@ async def add_friend(uid: str, friend_uid: str):
     db = get_db()
     from google.cloud.firestore_v1.transforms import ArrayUnion
     db.collection("users").document(uid).update({"friends": ArrayUnion([friend_uid])})
+
+
+async def remove_friend(uid: str, friend_uid: str):
+    db = get_db()
+    from google.cloud.firestore_v1.transforms import ArrayRemove
+    db.collection("users").document(uid).update({"friends": ArrayRemove([friend_uid])})
 
 
 async def get_friend_profiles(uid: str) -> list[dict]:

@@ -18,6 +18,7 @@ class ClientEvent(str, Enum):
     RESPOND_INVITE = "respond_invite"
     REGISTER_PRESENCE = "register_presence"
     ABANDON_GAME = "abandon_game"
+    GLOBAL_CHAT = "global_chat"
 
 
 # ── Outgoing event types (server → client) ──────────────
@@ -43,6 +44,7 @@ class ServerEvent(str, Enum):
     PLAYER_RECONNECTED = "player_reconnected"
     GAME_ABANDONED = "game_abandoned"
     INVITE_ACCEPTED = "invite_accepted"
+    GLOBAL_CHAT_MESSAGE = "global_chat_message"
 
 
 class WSMessage(BaseModel):

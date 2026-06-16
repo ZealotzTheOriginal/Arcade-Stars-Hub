@@ -8,6 +8,7 @@ import { Subscription, interval } from 'rxjs';
 import { WsService } from '../../core/services/ws.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ApiService } from '../../core/services/api.service';
+import { ChallengeAnimService } from '../../core/services/challenge-anim.service';
 import { PlayerInfo } from '../../core/models/game.model';
 import { ChatMessage } from '../../core/models/ws-events.model';
 
@@ -34,6 +35,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   private ws = inject(WsService);
   private auth = inject(AuthService);
   private api = inject(ApiService);
+  private challengeAnim = inject(ChallengeAnimService);
 
   roomId = '';
   gameId = '';
@@ -54,6 +56,9 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   toast = signal<string | null>(null);
   abandonedData = signal<{ uid: string; display_name: string } | null>(null);
   showAbandonConfirm = signal(false);
+  roomName = signal('');
+  isInvited = signal(false);
+  chatOpen = signal(false);
 
   private subs: Subscription[] = [];
   private timerSub?: Subscription;
@@ -63,6 +68,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.roomId = this.route.snapshot.paramMap.get('roomId') ?? '';
     this.gameId = this.route.snapshot.queryParamMap.get('game') ?? '';
     const spectateParam = this.route.snapshot.queryParamMap.get('spectate');
+    this.isInvited.set(this.route.snapshot.queryParamMap.get('invited') === '1');
     this.myUid = this.auth.currentUser()?.uid ?? '';
     this.myProfile = await this.api.getMe();
 
@@ -95,7 +101,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         this.players.set(msg.data.players ?? []);
         this.spectators.set(msg.data.spectators ?? []);
         this.roomStatus.set(msg.data.status ?? 'waiting');
-        // Detect if we joined as spectator (not in players list)
+        if (msg.data.name) this.roomName.set(msg.data.name);
         if (!this.isSpectator() && !msg.data.players?.find((p: any) => p.uid === this.myUid)) {
           this.isSpectator.set(true);
         }
@@ -124,6 +130,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
       case 'game_started':
         this.players.set(msg.data.players ?? []);
         this.gameState.set(msg.data.game_state);
+        this.challengeAnim.dismiss(); // Room is ready — hide the RETO ACEPTADO overlay
         if (msg.data.reconnected) {
           this.showToast('Reconectado a la partida');
           this.disconnectedUids.set(new Set());

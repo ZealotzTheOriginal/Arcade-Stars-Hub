@@ -1,14 +1,14 @@
 <div class="auth-layout">
   <div class="auth-card card rainbow-border">
     <div class="auth-logo">
-      <span class="logo-icon">⭐</span>
+      <span class="logo-icon"><i class="fa-solid fa-star"></i></span>
       <h1>Arcade Stars Hub</h1>
     </div>
     <h2>Recuperar Contraseña</h2>
 
     @if (success()) {
       <div class="success-box">
-        <p>✅ Correo enviado. Revisa tu bandeja de entrada.</p>
+        <p><i class="fa-solid fa-circle-check"></i> Correo enviado. Revisa tu bandeja de entrada.</p>
         <a routerLink="/login">Volver al inicio</a>
       </div>
     } @else {
@@ -28,7 +28,7 @@
       </form>
 
       <div class="auth-links">
-        <a routerLink="/login">← Volver al inicio</a>
+        <a routerLink="/login"><i class="fa-solid fa-arrow-left"></i> Volver al inicio</a>
       </div>
     }
   </div>

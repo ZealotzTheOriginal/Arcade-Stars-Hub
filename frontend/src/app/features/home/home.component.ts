@@ -1,13 +1,13 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { WsService } from '../../core/services/ws.service';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
 import { UserProfile } from '../../core/models/user.model';
-
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -38,8 +38,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   invitingUser = signal<string | null>(null);
   activePanel = signal<'main' | 'sidebar' | 'leaderboard'>('main');
   reconnectableRoom = signal<any>(null);
+  globalMessages = signal<{ uid: string; display_name: string; avatar: string; text: string; ts: number }[]>([]);
+  globalChatInput = '';
+
+  @ViewChild('chatMessages') private chatMessagesEl?: ElementRef;
 
   private pollInterval?: ReturnType<typeof setInterval>;
+  private reconnectPollInterval?: ReturnType<typeof setInterval>;
+  private wsSub?: Subscription;
 
   async ngOnInit() {
     try {
@@ -73,10 +79,22 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this._fetchLive();
     this.pollInterval = setInterval(() => this._fetchLive(), 15_000);
+
+    this.wsSub = this.ws.messages$.subscribe((msg) => {
+      if (msg.event === 'global_chat_message') {
+        this.globalMessages.update(list => [...list, msg.data].slice(-50));
+        setTimeout(() => {
+          const el = this.chatMessagesEl?.nativeElement;
+          if (el) el.scrollTop = el.scrollHeight;
+        }, 0);
+      }
+    });
   }
 
   ngOnDestroy() {
     clearInterval(this.pollInterval);
+    clearInterval(this.reconnectPollInterval);
+    this.wsSub?.unsubscribe();
   }
 
   private _fetchLive() {
@@ -100,6 +118,23 @@ export class HomeComponent implements OnInit, OnDestroy {
       (r) => r.status === 'playing' && r.players.some((p: any) => p.uid === uid)
     );
     this.reconnectableRoom.set(room ?? null);
+
+    // When there's a potentially reconnectable room, poll every 3s so the banner
+    // and room list update promptly when the other player leaves and the room
+    // is deleted — without waiting for the normal 15s interval.
+    if (room && !this.reconnectPollInterval) {
+      this.reconnectPollInterval = setInterval(() => {
+        this.api.listActiveRooms()
+          .then((rooms) => {
+            this.activeRooms.set(rooms);
+            this._checkReconnectable();
+          })
+          .catch(() => {});
+      }, 3_000);
+    } else if (!room && this.reconnectPollInterval) {
+      clearInterval(this.reconnectPollInterval);
+      this.reconnectPollInterval = undefined;
+    }
   }
 
   isMyRoom(room: any): boolean {
@@ -141,13 +176,27 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.router.navigate(['/room', room.room_id], { queryParams: { game: room.game_id } });
   }
 
+  abandonFromOutside() {
+    const room = this.reconnectableRoom();
+    if (!room) return;
+    this.ws.send('abandon_game', { room_id: room.room_id });
+    this.reconnectableRoom.set(null);
+    clearInterval(this.reconnectPollInterval);
+    this.reconnectPollInterval = undefined;
+  }
+
   spectateRoom(room: any) {
     this.router.navigate(['/room', room.room_id], { queryParams: { game: room.game_id, spectate: '1' } });
+  }
+
+  isFriend(uid: string): boolean {
+    return (this.profile()?.friends ?? []).includes(uid);
   }
 
   async addFriend(uid: string) {
     try {
       await this.api.addFriend(uid);
+      this.profile.update(p => p ? { ...p, friends: [...(p.friends ?? []), uid] } : p);
     } catch { /* ignore */ }
   }
 
@@ -168,6 +217,31 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.ws.send('send_invite', { to_uid: targetUid, game_id: game.id });
   }
 
+  gameImage(id: string): string {
+    const map: Record<string, string> = {
+      connect_four: '/conecta%20cuatro.png',
+      minesweeper: '/buscaminas.jpg',
+      tic_tac_toe: '/tres%20en%20raya.jpg',
+    };
+    return map[id] ?? '';
+  }
+
+  gameLabel(id: string): string {
+    const map: Record<string, string> = {
+      connect_four: 'Conecta 4',
+      minesweeper: 'Buscaminas',
+      tic_tac_toe: 'Tres en Raya',
+    };
+    return map[id] ?? id;
+  }
+
+  sendGlobalChat() {
+    const text = this.globalChatInput.trim();
+    if (!text) return;
+    this.ws.send('global_chat', { text });
+    this.globalChatInput = '';
+  }
+
   dotDelay(uid: string): string {
     // Spread dots across the 4s cycle so adjacent users show different colors
     const offset = uid.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 40;
@@ -176,6 +250,12 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   roomStatusLabel(status: string): string {
     return status === 'waiting' ? 'Esperando' : status === 'playing' ? 'En juego' : 'Terminada';
+  }
+
+  isFirstGlobalMsg(index: number): boolean {
+    if (index === 0) return true;
+    const msgs = this.globalMessages();
+    return msgs[index].uid !== msgs[index - 1].uid;
   }
 
   logout() {

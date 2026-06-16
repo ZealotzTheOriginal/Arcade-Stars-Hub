@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
 import { WsService } from './core/services/ws.service';
+import { ChallengeAnimService } from './core/services/challenge-anim.service';
 import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
 
 @Component({
@@ -34,7 +35,14 @@ import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
       </div>
     }
 
-    @if (showChallengeAnim()) {
+    @if (rejectedBy()) {
+      <div class="rejected-toast">
+        <i class="fa-solid fa-circle-xmark rejected-icon"></i>
+        <span><strong>{{ rejectedBy() }}</strong> ha rechazado tu invitación</span>
+      </div>
+    }
+
+    @if (challengeAnim.active()) {
       <div class="reto-overlay">
         <div class="reto-blur"></div>
         <div class="reto-flash"></div>
@@ -64,42 +72,38 @@ import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
       from { transform: translateX(110%); opacity: 0; }
       to   { transform: translateX(0);    opacity: 1; }
     }
-    .invite-content {
-      display: flex;
-      align-items: center;
-      gap: 0.875rem;
-    }
+    .invite-content { display: flex; align-items: center; gap: 0.875rem; }
     .invite-avatar { font-size: 2.25rem; flex-shrink: 0; }
     .invite-body { flex: 1; min-width: 0; }
-    .invite-text {
-      margin: 0 0 0.5rem;
+    .invite-text { margin: 0 0 0.5rem; color: #e0e0e0; font-size: 0.875rem; line-height: 1.3; }
+    .invite-bar { height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+    .invite-bar-fill { height: 100%; background: #6e46dc; transition: width 0.1s linear; }
+    .invite-btns { display: flex; flex-direction: column; gap: 0.375rem; flex-shrink: 0; }
+    .btn-sm { padding: 0.3rem 0.75rem; font-size: 0.78rem; }
+
+    /* ── Rejection toast ─────────────────────────────────── */
+    .rejected-toast {
+      position: fixed;
+      top: 1.25rem;
+      right: 1.25rem;
+      z-index: 9999;
+      background: #13131f;
+      border: 1px solid rgba(220, 70, 70, 0.6);
+      border-radius: 14px;
+      padding: 0.85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-width: 260px;
+      max-width: 360px;
       color: #e0e0e0;
       font-size: 0.875rem;
-      line-height: 1.3;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+      animation: slideIn 0.3s cubic-bezier(.22,1,.36,1);
     }
-    .invite-bar {
-      height: 3px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .invite-bar-fill {
-      height: 100%;
-      background: #6e46dc;
-      transition: width 0.1s linear;
-    }
-    .invite-btns {
-      display: flex;
-      flex-direction: column;
-      gap: 0.375rem;
-      flex-shrink: 0;
-    }
-    .btn-sm {
-      padding: 0.3rem 0.75rem;
-      font-size: 0.78rem;
-    }
+    .rejected-icon { color: #dc4646; font-size: 1.2rem; flex-shrink: 0; }
 
-    /* ── "RETO ACEPTADO" animation ────────────────────────── */
+    /* ── "RETO ACEPTADO" overlay ──────────────────────────── */
     .reto-overlay {
       position: fixed;
       inset: 0;
@@ -108,17 +112,17 @@ import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
       pointer-events: none;
     }
 
-    /* Blurred dark backdrop */
+    /* Dark blurred backdrop — fades in with the bars, fades out with them too */
     .reto-blur {
       position: absolute;
       inset: 0;
-      background: rgba(5, 5, 18, 0.78);
+      background: rgba(5, 5, 18, 0.82);
       backdrop-filter: blur(6px);
       opacity: 0;
-      animation: reto-fade-in 0.3s ease forwards, reto-fade-out 0.5s ease 2s forwards;
+      animation: reto-fade-in 0.3s ease forwards, reto-elem-out 0.6s ease 1.8s forwards;
     }
 
-    /* Brief white flash at the start (Pokémon-style) */
+    /* Brief white flash (Pokémon-style) */
     .reto-flash {
       position: absolute;
       inset: 0;
@@ -132,42 +136,40 @@ import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
       100% { opacity: 0; }
     }
 
-    /* Top cinematic bar — asymmetric diagonal cut */
+    /* Top cinematic bar — left edge deeper, right edge shallower */
     .reto-bar-top {
       position: absolute;
       top: 0; left: -3%; right: -3%;
       height: 40vh;
       background: #06060f;
-      /* Left edge reaches 100% bar height, right edge only 70% → steep left, gentle right */
       clip-path: polygon(0 0, 100% 0, 100% 70%, 0 100%);
       transform: translateY(-110%);
       z-index: 2;
       animation:
         reto-bar-top-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.1s forwards,
-        reto-fade-out 0.5s ease 2s forwards;
+        reto-elem-out   0.5s ease 1.8s forwards;
     }
 
-    /* Bottom cinematic bar — mirror of top, asymmetric */
+    /* Bottom cinematic bar — mirror asymmetry */
     .reto-bar-bottom {
       position: absolute;
       bottom: 0; left: -3%; right: -3%;
       height: 40vh;
       background: #06060f;
-      /* Left edge starts at 30% from top (gentle), right edge at 0% (steep) */
       clip-path: polygon(0 30%, 100% 0, 100% 100%, 0 100%);
       transform: translateY(110%);
       z-index: 2;
       animation:
         reto-bar-bottom-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.1s forwards,
-        reto-fade-out 0.5s ease 2s forwards;
+        reto-elem-out      0.5s ease 1.8s forwards;
     }
 
     @keyframes reto-bar-top-in    { to { transform: translateY(0); } }
     @keyframes reto-bar-bottom-in { to { transform: translateY(0); } }
     @keyframes reto-fade-in  { to { opacity: 1; } }
-    @keyframes reto-fade-out { to { opacity: 0; } }
+    @keyframes reto-elem-out { to { opacity: 0; } }
 
-    /* "RETO ACEPTADO" text with rainbow gradient */
+    /* "RETO ACEPTADO" rainbow gradient text */
     .reto-text {
       position: absolute;
       inset: 0;
@@ -181,46 +183,35 @@ import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
       text-transform: uppercase;
       font-family: 'Segoe UI', system-ui, sans-serif;
       background: linear-gradient(135deg,
-        #ff0000 0%,
-        #ffc700 25%,
-        #45f6d7 50%,
-        #4643ff 75%,
-        #ff00d6 100%
+        #ff0000 0%, #ffc700 25%, #45f6d7 50%, #4643ff 75%, #ff00d6 100%
       );
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       opacity: 0;
       animation:
-        reto-text-in 0.4s ease 0.7s forwards,
-        reto-fade-out 0.5s ease 2s forwards;
+        reto-text-in  0.4s ease 0.7s forwards,
+        reto-elem-out 0.5s ease 1.8s forwards;
+    }
+    @keyframes reto-text-in {
+      from { opacity: 0; transform: scale(0.8) translateY(10px); letter-spacing: 0.55em; }
+      to   { opacity: 1; transform: scale(1) translateY(0);      letter-spacing: 0.25em; }
     }
 
-    @keyframes reto-text-in {
-      from {
-        opacity: 0;
-        transform: scale(0.8) translateY(10px);
-        letter-spacing: 0.55em;
-      }
-      to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-        letter-spacing: 0.25em;
-      }
-    }
   `],
 })
 export class App implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private ws = inject(WsService);
   private router = inject(Router);
+  readonly challengeAnim = inject(ChallengeAnimService);
 
   activeInvite = signal<InviteData | null>(null);
   timerPercent = signal(100);
-  showChallengeAnim = signal<InviteAcceptedData | null>(null);
+  rejectedBy = signal<string | null>(null);
 
   private inviteTimer?: ReturnType<typeof setInterval>;
-  private challengeNavTimer?: ReturnType<typeof setTimeout>;
+  private rejectedTimer?: ReturnType<typeof setTimeout>;
   private subs: Subscription[] = [];
   private readonly INVITE_SECONDS = 15;
 
@@ -248,19 +239,23 @@ export class App implements OnInit, OnDestroy {
         if (msg.event === 'invite_received') {
           this._showInvite(msg.data as InviteData);
         }
+        if (msg.event === 'invite_response' && msg.data?.accepted === false) {
+          clearTimeout(this.rejectedTimer);
+          this.rejectedBy.set(msg.data.from_name ?? 'El usuario');
+          this.rejectedTimer = setTimeout(() => this.rejectedBy.set(null), 4000);
+        }
         if (msg.event === 'invite_accepted') {
           this._clearInvite();
           const data = msg.data as InviteAcceptedData;
-          this.showChallengeAnim.set(data);
-          this.challengeNavTimer = setTimeout(() => {
-            this.showChallengeAnim.set(null);
-            // Navigate through /home first so Angular is forced to destroy the current
-            // GameRoomComponent (Angular reuses the component instance when navigating
-            // between routes of the same pattern, e.g. /room/A → /room/B).
-            this.router.navigate(['/home']).then(() => {
-              this.router.navigate(['/room', data.room_id], { queryParams: { game: data.game_id } });
+          this.challengeAnim.show();
+          // Navigate immediately — animation overlays the transition.
+          // Go through /home first to force Angular to destroy any active
+          // GameRoomComponent (same-pattern routes are reused without destroy).
+          this.router.navigate(['/home']).then(() => {
+            this.router.navigate(['/room', data.room_id], {
+              queryParams: { game: data.game_id, invited: '1' },
             });
-          }, 2500);
+          });
         }
       }),
       this.ws.reconnected$.subscribe(() => {
@@ -278,7 +273,7 @@ export class App implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.subs.forEach((s) => s.unsubscribe());
     clearInterval(this.inviteTimer);
-    clearTimeout(this.challengeNavTimer);
+    clearTimeout(this.rejectedTimer);
   }
 
   private _showInvite(data: InviteData) {
@@ -297,8 +292,6 @@ export class App implements OnInit, OnDestroy {
   acceptInvite() {
     const inv = this.activeInvite();
     if (!inv) return;
-    // Backend creates the room and notifies both players via 'invite_accepted'.
-    // Navigation happens when that event is received.
     this.ws.send('respond_invite', { to_uid: inv.from_uid, accepted: true, game_id: inv.game_id });
     this._clearInvite();
   }

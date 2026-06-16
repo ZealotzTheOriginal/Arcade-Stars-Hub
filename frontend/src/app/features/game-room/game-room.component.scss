@@ -22,10 +22,28 @@
   }
 
   .room-id {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    strong { color: var(--rainbow-teal); margin-left: 0.25rem; }
-    .copy-hint { margin-left: 0.5rem; cursor: pointer; opacity: 0.6; &:hover { opacity: 1; } }
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    .room-name-label {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .room-code-chip {
+      font-size: 0.7rem;
+      font-family: monospace;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      padding: 0.1rem 0.4rem;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+      &:hover { color: var(--rainbow-teal); background: rgba(69, 246, 215, 0.06); }
+    }
   }
 
   .spectator-badge {
@@ -91,7 +109,7 @@
 
 .room-main {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: 1fr auto;
   gap: 0.75rem;
   flex: 1;
 
@@ -111,7 +129,20 @@
 .chat-panel {
   display: flex;
   flex-direction: column;
-  height: 500px;
+  align-self: stretch;
+  width: 52px;
+  overflow: hidden;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.chat-open {
+    width: 280px;
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+    align-self: auto;
+    &.chat-open { width: 100%; }
+  }
 }
 
 /* Lobby */

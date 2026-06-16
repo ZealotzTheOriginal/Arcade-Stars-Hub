@@ -6,10 +6,14 @@
         <span class="avatar">{{ player.avatar }}</span>
         <div class="player-details">
           <span class="player-name">{{ player.display_name }}</span>
-          <span class="player-pts">{{ scores[player.uid] || 0 }} pts</span>
+          @if (player.is_ai) {
+            <app-ai-slots />
+          } @else {
+            <span class="player-pts">{{ scores[player.uid] || 0 }} pts</span>
+          }
         </div>
         @if (player.uid === currentTurn && status === 'playing') {
-          <span class="turn-indicator">▶</span>
+          <span class="turn-indicator"><i class="fa-solid fa-play"></i></span>
         }
         @if (player.is_ai) {
           <span class="ai-badge">IA</span>

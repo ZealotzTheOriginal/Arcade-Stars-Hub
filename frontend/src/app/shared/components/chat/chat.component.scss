@@ -1,26 +1,114 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .chat {
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: 0.5rem;
 }
 
-.chat-title {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  padding-bottom: 0.25rem;
+/* ── Toggle header ── */
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  background: none;
+  border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  padding: 0.6rem 0.5rem;
+  width: 100%;
+  text-align: left;
+  border-radius: 0;
+  flex-shrink: 0;
+
+  /* Collapsed: no divider, icon centered */
+  &--closed {
+    border-bottom: none;
+    justify-content: center;
+    padding: 0.75rem 0;
+  }
+
+  .chat-title-text {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    transition: color 0.15s;
+  }
+
+  .chat-chevron {
+    font-size: 1rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: color 0.15s, transform 0.3s;
+  }
+
+  &:hover .chat-title-text,
+  &:hover .chat-chevron { color: var(--text-primary); }
+}
+
+/* ── Icon-only collapsed state ── */
+.chat-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  font-size: 1.15rem;
+  color: var(--text-muted);
+
+  .unread-dot--badge {
+    position: absolute;
+    top: -4px;
+    right: -5px;
+  }
+}
+
+/* ── Unread indicator ── */
+.unread-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  box-shadow: 0 0 7px rgba(34, 197, 94, 0.75);
+  animation: pulse-dot 1.4s ease-in-out infinite;
+
+  &--count {
+    width: auto;
+    height: 16px;
+    padding: 0 5px;
+    min-width: 16px;
+    border-radius: 8px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.65; transform: scale(0.82); }
 }
 
 /* ── Message list ── */
 .msg-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  padding: 0.25rem 0.25rem 0.25rem 0;
+  padding: 0.5rem 0.25rem 0.25rem 0;
   gap: 0;
+  margin-top: 0.25rem;
+  animation: chat-reveal 0.15s ease both;
 
   &::-webkit-scrollbar { width: 3px; }
   &::-webkit-scrollbar-track { background: transparent; }
@@ -35,17 +123,8 @@
   margin-top: 0.18rem;
   max-width: 100%;
 
-  &.first {
-    margin-top: 0.75rem;
-
-    &:first-child {
-      margin-top: 0;
-    }
-  }
-
-  &.mine {
-    align-items: flex-end;
-  }
+  &.first { margin-top: 0.75rem; &:first-child { margin-top: 0; } }
+  &.mine { align-items: flex-end; }
 }
 
 /* ── Sender label ── */
@@ -69,18 +148,13 @@
   background: rgba(255, 255, 255, 0.07);
   color: var(--text-primary);
 
-  /* Other player: top-left corner flat on first bubble */
-  .first:not(.mine) & {
-    border-top-left-radius: 3px;
-  }
+  .first:not(.mine) & { border-top-left-radius: 3px; }
 
-  /* Mine: right-aligned, purple tint, bottom-right flat */
   .mine & {
     background: rgba(110, 70, 220, 0.35);
     border-bottom-right-radius: 3px;
   }
 
-  /* Mine first: top-right also squared */
   .first.mine & {
     border-top-right-radius: 3px;
     border-bottom-right-radius: 3px;
@@ -96,10 +170,18 @@
   opacity: 0.6;
 }
 
+@keyframes chat-reveal {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* ── Input ── */
 .chat-input {
   display: flex;
   gap: 0.4rem;
+  margin-top: 0.5rem;
+  flex-shrink: 0;
+  animation: chat-reveal 0.15s ease both;
 
   .input {
     flex: 1;
