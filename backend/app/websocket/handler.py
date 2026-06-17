@@ -98,11 +98,15 @@ def get_room(room_id: str) -> dict | None:
 
 def create_room(room_id: str, game_id: str, host_uid: str, host_info: dict) -> dict:
     existing_names = {r.get("name", "") for r in _rooms.values()}
+    defn = get_definition(game_id)
     room = {
         "room_id": room_id,
         "name": pick_room_name(existing_names),
         "game_id": game_id,
         "host_uid": host_uid,
+        "leader_uid": host_uid,
+        "min_players": defn.min_players,
+        "max_players": defn.max_players,
         "players": [host_info],
         "spectators": [],
         "status": "waiting",
@@ -205,6 +209,7 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.REGISTER_PRESENCE: _handle_register_presence,
         ClientEvent.ABANDON_GAME: _handle_abandon,
         ClientEvent.GLOBAL_CHAT: _handle_global_chat,
+        ClientEvent.START_GAME: _handle_start_game,
     }
     handler = handlers.get(event)
     if handler:
@@ -269,10 +274,6 @@ async def _handle_join(ws: WebSocket, uid: str, data: dict):
     manager.add(room_id, uid, ws)
     await manager.broadcast(room_id, ServerEvent.PLAYER_JOINED, {"player": {"uid": uid, **player_info}, "uid": uid})
     await manager.send(ws, ServerEvent.ROOM_STATE, _safe_room(room))
-
-    defn = get_definition(room["game_id"])
-    if len(room["players"]) >= defn.max_players and room["status"] == "waiting":
-        await _start_game(room_id)
 
 
 async def _handle_leave(ws: WebSocket, uid: str, data: dict):
@@ -422,10 +423,7 @@ async def _handle_add_ai(ws: WebSocket, uid: str, data: dict):
     ai_info = {"uid": AI_UID, "display_name": "Arcade IA", "avatar": "🤖", "is_ai": True}
     room["players"].append(ai_info)
     await manager.broadcast(room_id, ServerEvent.PLAYER_JOINED, {"player": ai_info, "uid": AI_UID})
-
-    defn = get_definition(room["game_id"])
-    if len(room["players"]) >= defn.max_players and room["status"] == "waiting":
-        await _start_game(room_id)
+    await manager.send(ws, ServerEvent.ROOM_STATE, _safe_room(room))
 
 
 async def _handle_spectate(ws: WebSocket, uid: str, data: dict):
@@ -620,6 +618,21 @@ async def _boredom_check(room_id: str, expected_uid: str) -> None:
         return
     if room.get("game_state", {}).get("current_turn") == expected_uid:
         await _ai_chat(room_id, random.choice(_AI_POOL_BORED))
+
+
+async def _handle_start_game(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("leader_uid") != uid:
+        await manager.send(ws, ServerEvent.ERROR, {"message": "Solo el líder puede iniciar la partida"})
+        return
+    min_p = room.get("min_players", 2)
+    if len(room["players"]) < min_p:
+        await manager.send(ws, ServerEvent.ERROR, {"message": f"Se necesitan al menos {min_p} jugadores"})
+        return
+    await _start_game(room_id)
 
 
 async def _start_game(room_id: str):

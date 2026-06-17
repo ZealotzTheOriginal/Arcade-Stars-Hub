@@ -62,6 +62,11 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   friends = signal<any[]>([]);
   onlineUids = signal<Set<string>>(new Set());
   showFriendsModal = signal(false);
+  leaderUid = signal('');
+  minPlayers = signal(2);
+
+  isLeader = computed(() => !!this.myUid && this.myUid === this.leaderUid());
+  canStart = computed(() => this.players().length >= this.minPlayers());
 
   private subs: Subscription[] = [];
   private timerSub?: Subscription;
@@ -111,6 +116,8 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         this.spectators.set(msg.data.spectators ?? []);
         this.roomStatus.set(msg.data.status ?? 'waiting');
         if (msg.data.name) this.roomName.set(msg.data.name);
+        if (msg.data.leader_uid) this.leaderUid.set(msg.data.leader_uid);
+        if (msg.data.min_players) this.minPlayers.set(msg.data.min_players);
         if (!this.isSpectator() && !msg.data.players?.find((p: any) => p.uid === this.myUid)) {
           this.isSpectator.set(true);
         }
@@ -249,6 +256,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   makeMove(move: any) {
     if (this.isSpectator()) return;
     this.ws.send('make_move', { room_id: this.roomId, move });
+  }
+
+  startGame() {
+    this.ws.send('start_game', { room_id: this.roomId });
   }
 
   addAI() {

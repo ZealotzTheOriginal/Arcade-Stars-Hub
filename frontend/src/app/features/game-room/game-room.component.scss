@@ -159,6 +159,52 @@
 
 .lobby-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; }
 
+.btn-start-game {
+  margin-top: 0.5rem;
+  padding: 0.75rem 2.5rem;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #ff0000, #ffc700, #45f6d7, #4643ff, #ff00d6, #ff0000);
+  background-size: 300% 300%;
+  animation: rainbow-shift 3s linear infinite;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 24px rgba(110, 70, 220, 0.45);
+  transition: transform 0.15s, box-shadow 0.15s;
+
+  &:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 8px 32px rgba(110, 70, 220, 0.6);
+  }
+  &:active { transform: translateY(0) scale(0.98); }
+}
+
+@keyframes rainbow-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.waiting-players-hint {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  i { animation: pulse-opacity 1.5s ease-in-out infinite; }
+}
+
+@keyframes pulse-opacity {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1; }
+}
+
 .players-waiting {
   display: flex;
   flex-wrap: wrap;

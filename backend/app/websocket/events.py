@@ -19,6 +19,7 @@ class ClientEvent(str, Enum):
     REGISTER_PRESENCE = "register_presence"
     ABANDON_GAME = "abandon_game"
     GLOBAL_CHAT = "global_chat"
+    START_GAME = "start_game"
 
 
 # ── Outgoing event types (server → client) ──────────────

@@ -48,18 +48,32 @@
           @if (isSpectator()) {
             <h2>Esperando que empiece la partida...</h2>
             <p class="hint">Estás como espectador</p>
-          } @else if (isInvited()) {
-            <h2>Conectando...</h2>
-            <p class="hint">Esperando al otro jugador</p>
           } @else {
-            <h2>Esperando jugadores...</h2>
-            <p class="hint">Comparte el código de sala o añade jugadores</p>
-            <div class="lobby-actions">
-              <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> Añadir IA</button>
-              @if (friends().length > 0) {
-                <button class="btn btn--ghost" (click)="showFriendsModal.set(true)"><i class="fa-solid fa-user-group"></i> Invitar amigo</button>
+
+            @if (isLeader()) {
+              <h2 class="lobby-title">Sala lista</h2>
+              <p class="hint">Eres el líder — tú decides cuándo empieza</p>
+              <div class="lobby-actions">
+                <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> Añadir IA</button>
+                @if (friends().length > 0) {
+                  <button class="btn btn--ghost" (click)="showFriendsModal.set(true)"><i class="fa-solid fa-user-group"></i> Invitar amigo</button>
+                }
+              </div>
+              @if (canStart()) {
+                <button class="btn-start-game" (click)="startGame()">
+                  <i class="fa-solid fa-play"></i> Iniciar partida
+                </button>
+              } @else {
+                <p class="waiting-players-hint">
+                  <i class="fa-solid fa-hourglass-half"></i>
+                  Esperando jugadores... ({{ players().length }}/{{ minPlayers() }})
+                </p>
               }
-            </div>
+            } @else {
+              <h2>Esperando al líder...</h2>
+              <p class="hint">El líder de la sala iniciará la partida cuando esté listo</p>
+            }
+
           }
           <div class="players-waiting">
             @for (p of players(); track p.uid) {
