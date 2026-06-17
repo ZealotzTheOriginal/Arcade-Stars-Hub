@@ -6,6 +6,7 @@ import { Subscription } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { WsService } from '../../core/services/ws.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
 import { UserProfile } from '../../core/models/user.model';
 @Component({
@@ -20,6 +21,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private ws = inject(WsService);
   private router = inject(Router);
+  readonly notifService = inject(NotificationService);
 
   games = signal<GameDefinition[]>([]);
   leaderboard = signal<LeaderboardEntry[]>([]);
@@ -60,6 +62,13 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.api.getGlobalLeaderboard()
       .then((lb) => this.leaderboard.set(lb))
+      .catch(() => {});
+
+    this.api.getFriends()
+      .then((list) => {
+        const pending = list.filter((f: any) => f.is_pending_request).length;
+        this.notifService.setInitialPending(pending);
+      })
       .catch(() => {});
 
     this.api.getMe()

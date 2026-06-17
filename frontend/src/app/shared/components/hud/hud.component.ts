@@ -17,6 +17,11 @@ export class HudComponent {
   @Input() level: number = 1;
   @Input() elapsedSeconds: number = 0;
   @Input() status: string = 'waiting';
+  @Input() roomCode: string = '';
+
+  copyCode() {
+    if (this.roomCode) navigator.clipboard.writeText(this.roomCode).catch(() => {});
+  }
 
   get formattedTime(): string {
     const m = Math.floor(this.elapsedSeconds / 60).toString().padStart(2, '0');

@@ -24,6 +24,13 @@
 
   <!-- Stats -->
   <div class="hud-stats">
+    @if (roomCode) {
+      <div class="stat">
+        <span class="stat-label">Código</span>
+        <span class="hud-code-chip" (click)="copyCode()" title="Copiar código">{{ roomCode }} <i class="fa-solid fa-copy"></i></span>
+      </div>
+      <div class="stat-divider"></div>
+    }
     <div class="stat">
       <span class="stat-label">Tiempo</span>
       <span class="stat-value">{{ formattedTime }}</span>

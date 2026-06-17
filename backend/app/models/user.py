@@ -17,6 +17,7 @@ class UserProfile(BaseModel):
     total_points: int = 0
     game_stats: dict[str, GameStats] = {}
     friends: list[str] = []
+    friend_requests: list[str] = []
 
 
 class UserUpdate(BaseModel):

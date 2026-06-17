@@ -154,17 +154,6 @@
   text-align: center;
 
   h2 { font-size: 1.3rem; }
-
-  .room-code {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    .highlight {
-      font-size: 1.5rem;
-      color: var(--rainbow-teal);
-      letter-spacing: 0.15em;
-    }
-  }
-
   .hint { font-size: 0.8rem; color: var(--text-muted); }
 }
 
@@ -225,6 +214,51 @@
   .rematch-waiting { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
   .abandon-msg { font-size: 0.85rem; color: var(--text-muted); margin: 0; text-align: center; }
 }
+
+/* Friends invite modal */
+.friends-modal {
+  padding: 1.5rem;
+  min-width: 300px;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  h3 { margin: 0; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+}
+
+.friend-invite-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.friend-invite-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.15s;
+
+  &:not(.fi-offline):hover { border-color: rgba(110, 70, 220, 0.4); }
+
+  &.fi-offline {
+    opacity: 0.35;
+    pointer-events: none;
+    filter: grayscale(0.4);
+  }
+
+  .fi-avatar { font-size: 1.5rem; flex-shrink: 0; }
+  .fi-name { flex: 1; font-size: 0.88rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fi-status { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+}
+
+.btn--xs { padding: 0.2rem 0.6rem; font-size: 0.72rem; }
 
 /* Abandon confirm dialog */
 .abandon-overlay {

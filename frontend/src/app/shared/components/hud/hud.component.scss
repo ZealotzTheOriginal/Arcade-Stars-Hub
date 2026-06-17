@@ -52,7 +52,29 @@
 
 .hud-stats {
   display: flex;
+  align-items: center;
   gap: 1.5rem;
+}
+
+.hud-code-chip {
+  font-family: monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--rainbow-teal);
+  background: rgba(69, 246, 215, 0.08);
+  border: 1px solid rgba(69, 246, 215, 0.25);
+  border-radius: 5px;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: background 0.15s;
+  &:hover { background: rgba(69, 246, 215, 0.15); }
+}
+
+.stat-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .stat {

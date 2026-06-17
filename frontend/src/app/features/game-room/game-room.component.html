@@ -5,7 +5,6 @@
     <a routerLink="/home" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Salir</a>
     <div class="room-id">
       <strong class="room-name-label">{{ roomName() || roomId }}</strong>
-      <span class="room-code-chip" (click)="copyRoomId()" title="Copiar código">{{ roomId }} <i class="fa-solid fa-copy"></i></span>
     </div>
     @if (isSpectator()) {
       <div class="spectator-badge"><i class="fa-solid fa-eye"></i> Espectando</div>
@@ -33,7 +32,8 @@
     [currentTurn]="gameState()?.current_turn ?? ''"
     [level]="currentLevel"
     [elapsedSeconds]="elapsedSeconds()"
-    [status]="roomStatus()">
+    [status]="roomStatus()"
+    [roomCode]="roomId">
   </app-hud>
 
   <!-- Main area -->
@@ -53,10 +53,12 @@
             <p class="hint">Esperando al otro jugador</p>
           } @else {
             <h2>Esperando jugadores...</h2>
-            <p class="room-code">Código de sala: <strong class="highlight">{{ roomId }}</strong></p>
-            <p class="hint">Comparte este código con un amigo o añade la IA</p>
+            <p class="hint">Comparte el código de sala o añade jugadores</p>
             <div class="lobby-actions">
               <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> Añadir IA</button>
+              @if (friends().length > 0) {
+                <button class="btn btn--ghost" (click)="showFriendsModal.set(true)"><i class="fa-solid fa-user-group"></i> Invitar amigo</button>
+              }
             </div>
           }
           <div class="players-waiting">
@@ -148,6 +150,28 @@
     </div>
   </div>
 </div>
+
+@if (showFriendsModal()) {
+  <div class="abandon-overlay" (click)="showFriendsModal.set(false)">
+    <div class="friends-modal card" (click)="$event.stopPropagation()">
+      <h3><i class="fa-solid fa-user-group"></i> Invitar amigo</h3>
+      <div class="friend-invite-list">
+        @for (f of friends(); track f.uid) {
+          <div class="friend-invite-row" [class.fi-offline]="!isFriendOnline(f.uid)">
+            <span class="fi-avatar">{{ f.avatar }}</span>
+            <span class="fi-name">{{ f.display_name }}</span>
+            @if (isFriendOnline(f.uid)) {
+              <button class="btn btn--primary btn--xs" (click)="inviteFriend(f.uid)">Invitar</button>
+            } @else {
+              <span class="fi-status">Sin conexión</span>
+            }
+          </div>
+        }
+      </div>
+      <button class="btn btn--ghost" (click)="showFriendsModal.set(false)">Cerrar</button>
+    </div>
+  </div>
+}
 
 @if (showAbandonConfirm()) {
   <div class="abandon-overlay" (click)="cancelAbandon()">

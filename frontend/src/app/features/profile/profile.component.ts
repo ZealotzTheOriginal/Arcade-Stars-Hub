@@ -1,29 +1,22 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { RouterLink, ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { WsService } from '../../core/services/ws.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { UserProfile } from '../../core/models/user.model';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
 
-type Tab = 'stats' | 'games' | 'friends';
+type Tab = 'stats' | 'games' | 'friends' | 'ranking' | 'notifs';
 
 const AVATARS = [
-  // Facciones y Escuadras Animales
-  '🐉', '🦎', '🐀', '🦅', '🐺', '🦁', '🦂', '🦈', 
-  
-  // Amenaza Alienígena (Insectores) y Biología Sci-Fi
-  '🛸', '👾', '🐜', '🕷️', '🧬', 
-  
-  // Tecnología, Flota y Estaciones Espaciales
-  '🛰️', '🚀', '🚀', '🌌', '☄️', '🪐', 
-  
-  // Armamento, Táctica y Combate en Gravedad Cero
+  '🐉', '🦎', '🐀', '🦅', '🐺', '🦁', '🦂', '🦈',
+  '🛸', '👾', '🐜', '🕷️', '🧬',
+  '🛰️', '🚀', '🚀', '🌌', '☄️', '🪐',
   '🛡️', '⚔️', '🎯', '💥', '⚡', '🔮', '🌀', '🔋',
-  
-  // Rangos, Victorias y Comandantes
   '👑', '🏆', '⭐', '🎖️'
 ];
 
@@ -34,10 +27,13 @@ const AVATARS = [
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.scss'],
 })
-export class ProfileComponent implements OnInit {
+export class ProfileComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private auth = inject(AuthService);
   private ws = inject(WsService);
+  private route = inject(ActivatedRoute);
+  readonly notifService = inject(NotificationService);
+  private wsSub?: Subscription;
 
   profile = signal<UserProfile | null>(null);
   friends = signal<any[]>([]);
@@ -47,6 +43,7 @@ export class ProfileComponent implements OnInit {
   saving = signal(false);
   loadingFriends = signal(false);
   invitingFriend = signal<string | null>(null);
+  openMenuUid = signal<string | null>(null);
   editName = '';
 
   readonly avatars = AVATARS;
@@ -67,12 +64,33 @@ export class ProfileComponent implements OnInit {
     this.leaderboard.set(lb);
     this.games.set(gamesData);
     this.editName = profile.display_name;
+
+    // Open the tab requested via query param (e.g. ?tab=notifs from the bell icon)
+    const tabParam = this.route.snapshot.queryParamMap.get('tab') as Tab | null;
+    if (tabParam) this.setTab(tabParam);
+
+    // Always load friends on init so notifications tab and pending count work immediately
+    this._loadFriends();
+
+    // Listen for live friend requests while profile is open
+    this.wsSub = this.ws.messages$.subscribe((msg) => {
+      if (msg.event === 'friend_request') {
+        this._loadFriends();
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    this.wsSub?.unsubscribe();
   }
 
   setTab(tab: Tab) {
     this.activeTab.set(tab);
-    if (tab === 'friends' && this.friends().length === 0) {
+    if (tab === 'friends' || tab === 'notifs') {
       this._loadFriends();
+    }
+    if (tab === 'notifs') {
+      this.notifService.markAllRead();
     }
   }
 
@@ -83,6 +101,14 @@ export class ProfileComponent implements OnInit {
     } catch { /* silent */ } finally {
       this.loadingFriends.set(false);
     }
+  }
+
+  pendingRequests() {
+    return this.friends().filter(f => f.is_pending_request);
+  }
+
+  acceptedFriends() {
+    return this.friends().filter(f => !f.is_pending_request);
   }
 
   async selectAvatar(avatar: string) {
@@ -102,13 +128,33 @@ export class ProfileComponent implements OnInit {
   }
 
   async removeFriend(uid: string) {
+    this.openMenuUid.set(null);
     try {
       await this.api.removeFriend(uid);
       this.friends.update(list => list.filter(f => f.uid !== uid));
     } catch { /* ignore */ }
   }
 
+  async acceptFriendRequest(uid: string) {
+    try {
+      await this.api.acceptFriendRequest(uid);
+      this.friends.update(list => list.map(f => f.uid === uid ? { ...f, is_pending_request: false } : f));
+    } catch { /* ignore */ }
+  }
+
+  async rejectFriendRequest(uid: string) {
+    try {
+      await this.api.rejectFriendRequest(uid);
+      this.friends.update(list => list.filter(f => f.uid !== uid));
+    } catch { /* ignore */ }
+  }
+
+  toggleFriendMenu(uid: string) {
+    this.openMenuUid.set(this.openMenuUid() === uid ? null : uid);
+  }
+
   startFriendInvite(uid: string) {
+    this.openMenuUid.set(null);
     this.invitingFriend.set(uid);
   }
 

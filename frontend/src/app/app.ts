@@ -6,6 +6,7 @@ import { Subscription } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
 import { WsService } from './core/services/ws.service';
 import { ChallengeAnimService } from './core/services/challenge-anim.service';
+import { NotificationService } from './core/services/notification.service';
 import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
 
 @Component({
@@ -39,6 +40,17 @@ import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
       <div class="rejected-toast">
         <i class="fa-solid fa-circle-xmark rejected-icon"></i>
         <span><strong>{{ rejectedBy() }}</strong> ha rechazado tu invitación</span>
+      </div>
+    }
+
+    @if (friendRequest()) {
+      <div class="friend-request-toast">
+        <span class="fr-avatar">{{ friendRequest()!.avatar }}</span>
+        <div class="fr-body">
+          <p class="fr-text"><strong>{{ friendRequest()!.name }}</strong> te ha enviado una solicitud de amistad</p>
+          <p class="fr-hint">Ve a Perfil → Amigos para aceptarla</p>
+        </div>
+        <button class="fr-close" (click)="friendRequest.set(null)"><i class="fa-solid fa-xmark"></i></button>
       </div>
     }
 
@@ -102,6 +114,34 @@ import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
       animation: slideIn 0.3s cubic-bezier(.22,1,.36,1);
     }
     .rejected-icon { color: #dc4646; font-size: 1.2rem; flex-shrink: 0; }
+
+    /* ── Friend request toast ───────────────────────────────── */
+    .friend-request-toast {
+      position: fixed;
+      top: 1.25rem;
+      right: 1.25rem;
+      z-index: 9999;
+      background: #13131f;
+      border: 1px solid rgba(0, 200, 170, 0.55);
+      border-radius: 14px;
+      padding: 0.9rem 1rem 0.9rem 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-width: 280px;
+      max-width: 370px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,200,170,0.12);
+      animation: slideIn 0.3s cubic-bezier(.22,1,.36,1);
+    }
+    .fr-avatar { font-size: 2rem; flex-shrink: 0; }
+    .fr-body { flex: 1; min-width: 0; }
+    .fr-text { margin: 0 0 0.15rem; color: #e0e0e0; font-size: 0.85rem; line-height: 1.35; }
+    .fr-hint { margin: 0; color: rgba(0,200,170,0.8); font-size: 0.75rem; }
+    .fr-close {
+      background: none; border: none; color: rgba(255,255,255,0.35);
+      cursor: pointer; padding: 0.2rem; font-size: 0.95rem; flex-shrink: 0;
+    }
+    .fr-close:hover { color: rgba(255,255,255,0.7); }
 
     /* ── "RETO ACEPTADO" overlay ──────────────────────────── */
     .reto-overlay {
@@ -205,13 +245,16 @@ export class App implements OnInit, OnDestroy {
   private ws = inject(WsService);
   private router = inject(Router);
   readonly challengeAnim = inject(ChallengeAnimService);
+  private notifService = inject(NotificationService);
 
   activeInvite = signal<InviteData | null>(null);
   timerPercent = signal(100);
   rejectedBy = signal<string | null>(null);
+  friendRequest = signal<{ name: string; avatar: string } | null>(null);
 
   private inviteTimer?: ReturnType<typeof setInterval>;
   private rejectedTimer?: ReturnType<typeof setTimeout>;
+  private frTimer?: ReturnType<typeof setTimeout>;
   private subs: Subscription[] = [];
   private readonly INVITE_SECONDS = 15;
 
@@ -244,6 +287,18 @@ export class App implements OnInit, OnDestroy {
           this.rejectedBy.set(msg.data.from_name ?? 'El usuario');
           this.rejectedTimer = setTimeout(() => this.rejectedBy.set(null), 4000);
         }
+        if (msg.event === 'friend_request') {
+          clearTimeout(this.frTimer);
+          this.friendRequest.set({ name: msg.data.from_name, avatar: msg.data.from_avatar });
+          this.frTimer = setTimeout(() => this.friendRequest.set(null), 8000);
+          this.notifService.addFriendRequest();
+        }
+        if (msg.event === 'friend_request_rejected') {
+          this.notifService.addFriendRequestRejected(msg.data.from_name, msg.data.from_avatar);
+        }
+        if (msg.event === 'friend_removed') {
+          this.notifService.addFriendRemoved(msg.data.from_name, msg.data.from_avatar);
+        }
         if (msg.event === 'invite_accepted') {
           this._clearInvite();
           const data = msg.data as InviteAcceptedData;
@@ -274,6 +329,7 @@ export class App implements OnInit, OnDestroy {
     this.subs.forEach((s) => s.unsubscribe());
     clearInterval(this.inviteTimer);
     clearTimeout(this.rejectedTimer);
+    clearTimeout(this.frTimer);
   }
 
   private _showInvite(data: InviteData) {
@@ -285,21 +341,26 @@ export class App implements OnInit, OnDestroy {
     this.inviteTimer = setInterval(() => {
       elapsed += 100;
       this.timerPercent.set(Math.max(0, 100 - (elapsed / total) * 100));
-      if (elapsed >= total) this.rejectInvite();
+      if (elapsed >= total) this.rejectInvite(true);
     }, 100);
   }
 
   acceptInvite() {
     const inv = this.activeInvite();
     if (!inv) return;
-    this.ws.send('respond_invite', { to_uid: inv.from_uid, accepted: true, game_id: inv.game_id });
+    const payload: any = { to_uid: inv.from_uid, accepted: true, game_id: inv.game_id };
+    if (inv.room_id) payload.room_id = inv.room_id;
+    this.ws.send('respond_invite', payload);
     this._clearInvite();
   }
 
-  rejectInvite() {
+  rejectInvite(missed = false) {
     const inv = this.activeInvite();
     if (inv) {
       this.ws.send('respond_invite', { to_uid: inv.from_uid, accepted: false });
+      if (missed) {
+        this.notifService.addMissedInvite(inv.from_name, inv.from_avatar, inv.game_id);
+      }
     }
     this._clearInvite();
   }

@@ -494,22 +494,27 @@ async def _handle_rematch(ws: WebSocket, uid: str, data: dict):
 async def _handle_send_invite(ws: WebSocket, uid: str, data: dict):
     to_uid = data.get("to_uid")
     game_id = data.get("game_id")
+    room_id = data.get("room_id")  # optional: invite into an existing waiting room
     if not to_uid or not game_id:
         return
 
     info = _presence.get(uid, {})
-    await manager.send_direct(to_uid, ServerEvent.INVITE_RECEIVED, {
+    payload: dict = {
         "from_uid": uid,
         "from_name": info.get("display_name", "Alguien"),
         "from_avatar": info.get("avatar", "⭐"),
         "game_id": game_id,
-    })
+    }
+    if room_id:
+        payload["room_id"] = room_id
+    await manager.send_direct(to_uid, ServerEvent.INVITE_RECEIVED, payload)
 
 
 async def _handle_respond_invite(ws: WebSocket, uid: str, data: dict):
     to_uid = data.get("to_uid")
     accepted = data.get("accepted", False)
     game_id = data.get("game_id")
+    existing_room_id = data.get("room_id")
     if not to_uid:
         return
 
@@ -521,6 +526,14 @@ async def _handle_respond_invite(ws: WebSocket, uid: str, data: dict):
             "from_name": accepter_info.get("display_name", "Alguien"),
             "accepted": False,
         })
+        return
+
+    # If inviting into an existing waiting room, skip room creation
+    if existing_room_id and existing_room_id in _rooms:
+        room = _rooms[existing_room_id]
+        payload = {"room_id": existing_room_id, "game_id": room["game_id"], "room_name": room.get("name", "")}
+        await manager.send_direct(to_uid, ServerEvent.INVITE_ACCEPTED, payload)
+        await manager.send_direct(uid, ServerEvent.INVITE_ACCEPTED, payload)
         return
 
     # Create room with just the inviter as host; accepter joins via join_room after animation

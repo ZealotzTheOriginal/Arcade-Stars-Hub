@@ -20,7 +20,10 @@ export type ServerEvent =
   | 'player_reconnected'
   | 'game_abandoned'
   | 'invite_accepted'
-  | 'global_chat_message';
+  | 'global_chat_message'
+  | 'friend_request'
+  | 'friend_request_rejected'
+  | 'friend_removed';
 
 export interface WSMessage {
   event: ServerEvent;
@@ -40,6 +43,7 @@ export interface InviteData {
   from_name: string;
   from_avatar: string;
   game_id: string;
+  room_id?: string;
 }
 
 export interface InviteAcceptedData {

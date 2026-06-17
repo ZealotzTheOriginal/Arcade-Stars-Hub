@@ -57,6 +57,22 @@ export class ApiService {
     );
   }
 
+  async acceptFriendRequest(friendUid: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${environment.apiUrl}/users/friends/${friendUid}/accept`, {}, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
+  async rejectFriendRequest(friendUid: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${environment.apiUrl}/users/friends/${friendUid}/reject`, {}, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
   // ── Games ──────────────────────────────────────────────
   async listGames(): Promise<GameDefinition[]> {
     return firstValueFrom(this.http.get<GameDefinition[]>(`${environment.apiUrl}/games/`));

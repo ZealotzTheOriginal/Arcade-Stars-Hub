@@ -1,5 +1,12 @@
 <div class="profile-layout">
   <header class="profile-header card">
+    <div class="header-nav">
+      <a class="btn btn--ghost btn--sm" routerLink="/home"><i class="fa-solid fa-arrow-left"></i> Inicio</a>
+      <button class="profile-logout-btn" (click)="logout()" title="Cerrar sesión">
+        <img src="/StarCross.svg" class="profile-logout-icon" alt="Salir" />
+        <span>Salir</span>
+      </button>
+    </div>
     @if (profile(); as p) {
       <div class="user-hero">
         <div class="avatar-big">{{ p.avatar }}</div>
@@ -11,10 +18,6 @@
             <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ p.total_points }} pts</span>
           </div>
         </div>
-        <div class="header-actions">
-          <a class="btn btn--ghost" routerLink="/home"><i class="fa-solid fa-arrow-left"></i> Inicio</a>
-          <button class="btn btn--danger" (click)="logout()">Salir</button>
-        </div>
       </div>
     }
   </header>
@@ -25,6 +28,13 @@
       <button class="tab" [class.active]="activeTab() === 'stats'" (click)="setTab('stats')"><i class="fa-solid fa-chart-bar"></i> Estadísticas</button>
       <button class="tab" [class.active]="activeTab() === 'games'" (click)="setTab('games')"><i class="fa-solid fa-gamepad"></i> Juegos</button>
       <button class="tab" [class.active]="activeTab() === 'friends'" (click)="setTab('friends')"><i class="fa-solid fa-users"></i> Amigos</button>
+      <button class="tab" [class.active]="activeTab() === 'ranking'" (click)="setTab('ranking')"><i class="fa-solid fa-trophy"></i> Ranking</button>
+      <button class="tab tab--notifs" [class.active]="activeTab() === 'notifs'" (click)="setTab('notifs')">
+        <i class="fa-solid fa-bell"></i> Notificaciones
+        @if (pendingRequests().length + notifService.items().length > 0) {
+          <span class="tab-badge">{{ pendingRequests().length + notifService.items().length }}</span>
+        }
+      </button>
     </div>
 
     <!-- Content -->
@@ -36,7 +46,7 @@
           <h2>Editar Perfil</h2>
           <div class="edit-name">
             <input class="input" [(ngModel)]="editName" placeholder="Nombre de usuario" />
-            <button class="btn btn--primary" (click)="saveName()" [disabled]="saving()">
+            <button class="btn btn--ghost" (click)="saveName()" [disabled]="saving()">
               {{ saving() ? 'Guardando...' : 'Guardar' }}
             </button>
           </div>
@@ -50,19 +60,6 @@
                 (click)="selectAvatar(av)">
                 {{ av }}
               </button>
-            }
-          </div>
-
-          <h3>Ranking Global</h3>
-          <div class="lb-table">
-            @for (entry of leaderboard(); track entry.uid; let i = $index) {
-              <div class="lb-row" [class.me]="entry.uid === profile()?.uid">
-                <span class="rank">{{ i + 1 }}</span>
-                <span class="av">{{ entry.avatar }}</span>
-                <span class="name">{{ entry.display_name }}</span>
-                <span class="lvl">Nv.{{ entry.level }}</span>
-                <span class="pts">{{ entry.points }} pts</span>
-              </div>
             }
           </div>
         </section>
@@ -96,18 +93,67 @@
       <!-- Friends -->
       @if (activeTab() === 'friends') {
         <section class="friends-section">
-          <h2>Amigos</h2>
+
+          <!-- Pending requests -->
+          @if (pendingRequests().length > 0) {
+            <h2><i class="fa-solid fa-user-clock"></i> Solicitudes pendientes</h2>
+            <div class="friends-list pending-list">
+              @for (f of pendingRequests(); track f.uid) {
+                <div class="friend-card friend-card--pending">
+                  <div class="friend-avatar">{{ f.avatar }}</div>
+                  <div class="friend-info">
+                    <p class="friend-name">{{ f.display_name }}</p>
+                    <div class="friend-badges">
+                      <span class="badge">Nivel {{ f.level }}</span>
+                      <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ f.total_points }} pts</span>
+                    </div>
+                  </div>
+                  <div class="friend-request-actions">
+                    <button class="btn btn--primary btn--sm" (click)="acceptFriendRequest(f.uid)">
+                      <i class="fa-solid fa-check"></i> Aceptar
+                    </button>
+                    <button class="btn btn--ghost btn--sm" (click)="rejectFriendRequest(f.uid)">
+                      Rechazar
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Accepted friends -->
+          <h2>
+            <i class="fa-solid fa-users"></i> Amigos
+            @if (acceptedFriends().length > 0) { <span class="friends-count">{{ acceptedFriends().length }}</span> }
+          </h2>
           @if (loadingFriends()) {
             <p class="empty">Cargando amigos...</p>
-          } @else if (friends().length === 0) {
+          } @else if (acceptedFriends().length === 0 && pendingRequests().length === 0) {
             <p class="empty">
               Aún no tienes amigos añadidos.<br>
               <span class="empty-hint">Usa el botón <i class="fa-solid fa-plus"></i> junto a los jugadores en línea desde la pantalla de inicio.</span>
             </p>
+          } @else if (acceptedFriends().length === 0) {
+            <p class="empty">Tus solicitudes aceptadas aparecerán aquí.</p>
           } @else {
-            <div class="friends-grid">
-              @for (f of friends(); track f.uid) {
+            <div class="friends-list">
+              @for (f of acceptedFriends(); track f.uid) {
                 <div class="friend-card">
+                  <div class="friend-menu-wrap">
+                    <button class="friend-menu-btn" (click)="toggleFriendMenu(f.uid)" title="Opciones">
+                      <i class="fa-solid fa-ellipsis-vertical"></i>
+                    </button>
+                    @if (openMenuUid() === f.uid) {
+                      <div class="friend-menu-dropdown">
+                        <button class="friend-menu-item" (click)="startFriendInvite(f.uid)">
+                          <i class="fa-solid fa-envelope"></i> Invitar
+                        </button>
+                        <button class="friend-menu-item friend-menu-item--danger" (click)="removeFriend(f.uid)">
+                          Eliminar
+                        </button>
+                      </div>
+                    }
+                  </div>
                   <div class="friend-avatar">{{ f.avatar }}</div>
                   <div class="friend-info">
                     <p class="friend-name">{{ f.display_name }}</p>
@@ -121,15 +167,132 @@
                         <span class="friend-best-pts">({{ f.best_game_points }} pts)</span>
                       </p>
                     }
-                    <div class="friend-actions">
-                      <button class="btn btn--primary btn--xs" (click)="startFriendInvite(f.uid)"><i class="fa-solid fa-envelope"></i> Invitar</button>
-                      <button class="btn btn--danger btn--xs" (click)="removeFriend(f.uid)">Eliminar</button>
-                    </div>
                   </div>
                 </div>
               }
             </div>
           }
+        </section>
+      }
+
+      <!-- Notifications -->
+      @if (activeTab() === 'notifs') {
+        <section class="notifs-section">
+          <h2><i class="fa-solid fa-bell"></i> Notificaciones</h2>
+          @if (loadingFriends()) {
+            <p class="empty">Cargando notificaciones...</p>
+          } @else if (pendingRequests().length === 0 && notifService.items().length === 0) {
+            <div class="notifs-empty">
+              <i class="fa-regular fa-bell notifs-empty-icon"></i>
+              <p>Sin notificaciones pendientes</p>
+              <span class="empty-hint">Aquí aparecerán las solicitudes de amistad y las invitaciones no aceptadas</span>
+            </div>
+          } @else {
+            <div class="notif-list">
+
+              <!-- Friend requests -->
+              @for (f of pendingRequests(); track f.uid) {
+                <div class="notif-card">
+                  <div class="notif-icon-wrap">
+                    <span class="notif-avatar">{{ f.avatar }}</span>
+                    <span class="notif-type-dot notif-type-dot--friend"><i class="fa-solid fa-user-plus"></i></span>
+                  </div>
+                  <div class="notif-body">
+                    <p class="notif-title"><strong>{{ f.display_name }}</strong> te ha enviado una solicitud de amistad</p>
+                    <div class="notif-meta">
+                      <span class="badge">Nivel {{ f.level }}</span>
+                      <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ f.total_points }} pts</span>
+                    </div>
+                    <div class="notif-actions">
+                      <button class="btn btn--primary btn--sm" (click)="acceptFriendRequest(f.uid)">
+                        <i class="fa-solid fa-check"></i> Aceptar
+                      </button>
+                      <button class="btn btn--ghost btn--sm" (click)="rejectFriendRequest(f.uid)">
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- Dismissable notifications (missed invites, rejections, removals) -->
+              @for (n of notifService.items(); track n.id) {
+                @if (n.type === 'missed_invite') {
+                  <div class="notif-card notif-card--missed">
+                    <div class="notif-icon-wrap">
+                      <span class="notif-avatar">{{ n.from_avatar }}</span>
+                      <span class="notif-type-dot notif-type-dot--invite"><i class="fa-solid fa-gamepad"></i></span>
+                    </div>
+                    <div class="notif-body">
+                      <p class="notif-title">
+                        <strong>{{ n.from_name }}</strong> te invitó a jugar
+                        <strong>{{ gameNames[n.game_id!] ?? n.game_id }}</strong>
+                      </p>
+                      <p class="notif-subtitle notif-subtitle--invite">No aceptaste a tiempo</p>
+                    </div>
+                    <button class="notif-dismiss" (click)="notifService.dismiss(n.id)" title="Descartar">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                }
+                @if (n.type === 'friend_request_rejected') {
+                  <div class="notif-card notif-card--rejected">
+                    <div class="notif-icon-wrap">
+                      <span class="notif-avatar">{{ n.from_avatar }}</span>
+                      <span class="notif-type-dot notif-type-dot--rejected"><i class="fa-solid fa-user-xmark"></i></span>
+                    </div>
+                    <div class="notif-body">
+                      <p class="notif-title">
+                        <strong>{{ n.from_name }}</strong> rechazó tu solicitud de amistad
+                      </p>
+                      <p class="notif-subtitle notif-subtitle--rejected">Tu solicitud no fue aceptada</p>
+                    </div>
+                    <button class="notif-dismiss" (click)="notifService.dismiss(n.id)" title="Descartar">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                }
+                @if (n.type === 'friend_removed') {
+                  <div class="notif-card notif-card--removed">
+                    <div class="notif-icon-wrap">
+                      <span class="notif-avatar">{{ n.from_avatar }}</span>
+                      <span class="notif-type-dot notif-type-dot--removed"><i class="fa-solid fa-user-minus"></i></span>
+                    </div>
+                    <div class="notif-body">
+                      <p class="notif-title">
+                        <strong>{{ n.from_name }}</strong> te ha eliminado de sus amigos
+                      </p>
+                      <p class="notif-subtitle notif-subtitle--removed">Ya no sois amigos</p>
+                    </div>
+                    <button class="notif-dismiss" (click)="notifService.dismiss(n.id)" title="Descartar">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                }
+              }
+
+            </div>
+          }
+        </section>
+      }
+
+      <!-- Ranking -->
+      @if (activeTab() === 'ranking') {
+        <section class="ranking-section">
+          <h2><i class="fa-solid fa-trophy"></i> Ranking Global</h2>
+          <div class="lb-list">
+            @for (entry of leaderboard(); track entry.uid; let i = $index) {
+              <div class="lb-row"
+                [class.lb-gold]="i === 0"
+                [class.lb-silver]="i === 1"
+                [class.lb-bronze]="i === 2"
+                [class.me]="entry.uid === profile()?.uid">
+                <span class="lb-rank">{{ entry.rank }}</span>
+                <span class="lb-name">{{ entry.display_name }}</span>
+                <span class="lb-pts">{{ entry.points }}</span>
+              </div>
+            }
+          </div>
         </section>
       }
 

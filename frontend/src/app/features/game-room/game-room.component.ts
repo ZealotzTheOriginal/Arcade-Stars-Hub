@@ -59,6 +59,9 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   roomName = signal('');
   isInvited = signal(false);
   chatOpen = signal(false);
+  friends = signal<any[]>([]);
+  onlineUids = signal<Set<string>>(new Set());
+  showFriendsModal = signal(false);
 
   private subs: Subscription[] = [];
   private timerSub?: Subscription;
@@ -71,6 +74,12 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.isInvited.set(this.route.snapshot.queryParamMap.get('invited') === '1');
     this.myUid = this.auth.currentUser()?.uid ?? '';
     this.myProfile = await this.api.getMe();
+
+    // Load friends + online users for the lobby invite panel
+    Promise.all([this.api.getFriends(), this.api.getOnlineUsers()]).then(([fr, online]) => {
+      this.friends.set(fr);
+      this.onlineUids.set(new Set(online.map((u: any) => u.uid)));
+    }).catch(() => {});
 
     await this.ws.connect();
 
@@ -244,6 +253,15 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   addAI() {
     this.ws.send('add_ai_player', { room_id: this.roomId });
+  }
+
+  isFriendOnline(uid: string): boolean {
+    return this.onlineUids().has(uid);
+  }
+
+  inviteFriend(uid: string) {
+    this.ws.send('send_invite', { to_uid: uid, game_id: this.gameId, room_id: this.roomId });
+    this.showFriendsModal.set(false);
   }
 
   requestRematch() {

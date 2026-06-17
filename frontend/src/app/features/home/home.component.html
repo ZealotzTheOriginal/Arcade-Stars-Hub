@@ -2,7 +2,7 @@
   <!-- Sidebar / nav -->
   <aside class="sidebar card" [class.mobile-hidden]="activePanel() !== 'sidebar'">
     <div class="sidebar-logo">
-      <i class="fa-solid fa-star logo-star"></i>
+      <img src="/ArcadeStar.svg" class="logo-star-svg" alt="Arcade Stars" />
       <span class="logo-text">ARCADE</span>
     </div>
 
@@ -10,12 +10,15 @@
       <div class="user-info">
         <div class="avatar">{{ p.avatar }}</div>
         <div class="user-details">
-          <p class="user-name">{{ p.display_name }}</p>
+          <div class="user-top">
+            <p class="user-name">{{ p.display_name }}</p>
+            <button class="logout-btn" (click)="logout()" title="Cerrar sesión">
+              <img src="/StarCross.svg" class="logout-icon" alt="Salir" />
+              <span class="logout-label">Salir</span>
+            </button>
+          </div>
           <p class="user-level">Nivel {{ p.level }}</p>
         </div>
-        <button class="logout-btn" (click)="logout()" title="Cerrar sesión">
-          <img src="/StarCross.svg" class="logout-icon" alt="Salir" />
-        </button>
       </div>
     }
 
@@ -33,7 +36,6 @@
       @for (u of onlineUsers(); track u.uid) {
         <div class="online-user" [class.online-user--me]="u.is_me">
           <span class="online-dot" [style.animation-delay]="dotDelay(u.uid)"></span>
-          <span class="ou-avatar">{{ u.avatar }}</span>
           <span class="ou-name">
             {{ u.display_name }}
             @if (u.is_me) { <span class="ou-me">(Tú)</span> }
@@ -184,12 +186,21 @@
 
   <!-- Leaderboard + Chat -->
   <aside class="leaderboard card" [class.mobile-hidden]="activePanel() !== 'leaderboard'">
-    <h2><i class="fa-solid fa-trophy"></i> Ranking Global</h2>
+    <div class="lb-top-row">
+      <h2><i class="fa-solid fa-trophy"></i> Ranking Global</h2>
+      <a class="notif-bell" routerLink="/profile" [queryParams]="{tab: 'notifs'}" title="Notificaciones">
+        @if (notifService.unread() > 0) {
+          <i class="fa-solid fa-bell"></i>
+          <span class="notif-badge">{{ notifService.unread() }}</span>
+        } @else {
+          <i class="fa-regular fa-bell"></i>
+        }
+      </a>
+    </div>
     <div class="lb-list">
       @for (entry of leaderboard(); track entry.uid; let i = $index) {
-        <div class="lb-row" [class.top3]="i < 3">
+        <div class="lb-row" [class.lb-gold]="i === 0" [class.lb-silver]="i === 1" [class.lb-bronze]="i === 2">
           <span class="lb-rank">{{ entry.rank }}</span>
-          <span class="lb-avatar">{{ entry.avatar }}</span>
           <span class="lb-name">{{ entry.display_name }}</span>
           <span class="lb-pts">{{ entry.points }}</span>
         </div>
