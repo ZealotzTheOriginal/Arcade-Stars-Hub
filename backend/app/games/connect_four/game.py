@@ -40,7 +40,9 @@ class ConnectFourGame(BaseGame):
             draw = True
 
         players = state["players"]
-        next_turn = players[1] if uid == players[0] else players[0]
+        current_idx = players.index(uid)
+        next_idx = (current_idx + 1) % len(players)
+        next_turn = players[next_idx]
 
         return {
             **state,
@@ -59,10 +61,10 @@ class ConnectFourGame(BaseGame):
 
     def get_scores(self, state: dict) -> dict[str, int]:
         winner = state.get("winner")
+        players = state["players"]
         if winner:
-            loser = [p for p in state["players"] if p != winner][0]
-            return {winner: 100, loser: 10}
-        return {p: 25 for p in state["players"]}  # draw
+            return {p: (100 if p == winner else 10) for p in players}
+        return {p: 25 for p in players}  # draw
 
     def get_valid_moves(self, state: dict, uid: str) -> list[Any]:
         if self.is_terminal(state) or state["current_turn"] != uid:

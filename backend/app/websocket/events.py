@@ -20,6 +20,10 @@ class ClientEvent(str, Enum):
     ABANDON_GAME = "abandon_game"
     GLOBAL_CHAT = "global_chat"
     START_GAME = "start_game"
+    SET_PLAYER_COLOR = "set_player_color"
+    SET_GAME_MODE = "set_game_mode"
+    ASSIGN_TEAM = "assign_team"
+    SET_MAX_PLAYERS = "set_max_players"
 
 
 # ── Outgoing event types (server → client) ──────────────

@@ -45,20 +45,113 @@
       <!-- Waiting lobby -->
       @if (roomStatus() === 'waiting') {
         <div class="lobby">
-          @if (isSpectator()) {
-            <h2>Esperando que empiece la partida...</h2>
-            <p class="hint">Estás como espectador</p>
-          } @else {
 
-            @if (isLeader()) {
-              <h2 class="lobby-title">Sala lista</h2>
-              <p class="hint">Eres el líder — tú decides cuándo empieza</p>
+          <!-- Player slots -->
+          <div class="lobby-slots">
+            @for (slot of playerSlots(); track $index) {
+              @if (slot) {
+                <div class="player-slot player-slot--filled"
+                     [style.--slot-color]="playerColors()[slot.uid] ?? '#888'"
+                     [class.slot-team-a]="gameMode() === 'teams' && playerTeam(slot.uid) === 'a'"
+                     [class.slot-team-b]="gameMode() === 'teams' && playerTeam(slot.uid) === 'b'"
+                     [class.disconnected]="disconnectedUids().has(slot.uid)">
+                  <div class="slot-color-bar"></div>
+                  <div class="slot-avatar">{{ slot.avatar }}</div>
+                  <div class="slot-name">{{ slot.display_name }}</div>
+                  <div class="slot-tags">
+                    @if (slot.uid === leaderUid()) {
+                      <span class="tag tag--leader"><i class="fa-solid fa-crown"></i> Líder</span>
+                    }
+                    @if (slot.is_ai) { <span class="tag tag--ai">IA</span> }
+                    @if (disconnectedUids().has(slot.uid)) { <span class="tag tag--dc">DC</span> }
+                  </div>
+                  @if (gameMode() === 'teams') {
+                    @if (isLeader() && !isSpectator()) {
+                      <div class="team-assign">
+                        <button class="team-btn team-btn--a" [class.active]="playerTeam(slot.uid) === 'a'" (click)="assignTeam(slot.uid, 'a')">A</button>
+                        <button class="team-btn team-btn--b" [class.active]="playerTeam(slot.uid) === 'b'" (click)="assignTeam(slot.uid, 'b')">B</button>
+                      </div>
+                    } @else if (playerTeam(slot.uid)) {
+                      <span class="team-label" [class.team-label--a]="playerTeam(slot.uid) === 'a'" [class.team-label--b]="playerTeam(slot.uid) === 'b'">
+                        Equipo {{ playerTeam(slot.uid)!.toUpperCase() }}
+                      </span>
+                    }
+                  }
+                </div>
+              } @else {
+                <div class="player-slot player-slot--empty">
+                  <i class="fa-solid fa-user-plus slot-empty-icon"></i>
+                  <span class="slot-empty-text">Vacío</span>
+                </div>
+              }
+            }
+          </div>
+
+          <!-- Color picker -->
+          @if (!isSpectator()) {
+            <div class="color-picker-section">
+              <p class="color-picker-label">Tu color de ficha</p>
+              <div class="color-swatches">
+                @for (hex of CHIP_COLORS; track hex) {
+                  <button
+                    class="color-swatch"
+                    [style.background]="hex"
+                    [class.selected]="myColor() === hex"
+                    [class.taken]="isColorTaken(hex)"
+                    [disabled]="isColorTaken(hex)"
+                    (click)="setPlayerColor(hex)">
+                    @if (myColor() === hex) { <i class="fa-solid fa-check"></i> }
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
+          @if (isLeader() && !isSpectator()) {
+            <div class="leader-panel">
+
+              @if (gameId === 'connect_four') {
+                <div class="mode-section">
+                  <p class="leader-section-label"><i class="fa-solid fa-user-group"></i> Jugadores en sala</p>
+                  <div class="mode-toggle">
+                    @for (n of [2, 3, 4]; track n) {
+                      <button class="mode-btn" [class.active]="maxPlayers() === n" (click)="setMaxPlayers(n)">
+                        {{ n }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+
+              @if (maxPlayers() > 2) {
+                <div class="mode-section">
+                  <p class="leader-section-label"><i class="fa-solid fa-sliders"></i> Modo de juego</p>
+                  <div class="mode-toggle">
+                    <button class="mode-btn" [class.active]="gameMode() === 'ffa'" (click)="setGameMode('ffa')">
+                      <i class="fa-solid fa-users"></i> Todos vs Todos
+                    </button>
+                    <button class="mode-btn" [class.active]="gameMode() === 'teams'" (click)="setGameMode('teams')">
+                      <i class="fa-solid fa-shield-halved"></i> Equipos 2v2
+                    </button>
+                  </div>
+                </div>
+              }
+
               <div class="lobby-actions">
-                <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> Añadir IA</button>
+                @if (!hasAI()) {
+                  <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> Añadir IA</button>
+                }
                 @if (friends().length > 0) {
                   <button class="btn btn--ghost" (click)="showFriendsModal.set(true)"><i class="fa-solid fa-user-group"></i> Invitar amigo</button>
                 }
               </div>
+
+            </div>
+          }
+
+          <!-- Start / waiting -->
+          @if (!isSpectator()) {
+            @if (isLeader()) {
               @if (canStart()) {
                 <button class="btn-start-game" (click)="startGame()">
                   <i class="fa-solid fa-play"></i> Iniciar partida
@@ -70,21 +163,15 @@
                 </p>
               }
             } @else {
-              <h2>Esperando al líder...</h2>
-              <p class="hint">El líder de la sala iniciará la partida cuando esté listo</p>
+              <p class="waiting-players-hint">
+                <i class="fa-solid fa-hourglass-half"></i>
+                Esperando que el líder inicie la partida...
+              </p>
             }
-
+          } @else {
+            <p class="hint">Estás como espectador</p>
           }
-          <div class="players-waiting">
-            @for (p of players(); track p.uid) {
-              <div class="waiting-player" [class.disconnected]="disconnectedUids().has(p.uid)">
-                <span class="avatar">{{ p.avatar }}</span>
-                <span>{{ p.display_name }}</span>
-                @if (p.is_ai) { <span class="tag tag--ai">IA</span> }
-                @if (disconnectedUids().has(p.uid)) { <span class="tag tag--dc">desconectado</span> }
-              </div>
-            }
-          </div>
+
         </div>
       }
 
@@ -95,6 +182,9 @@
             <app-connect-four
               [gameState]="gameState()"
               [myUid]="isSpectator() ? '' : myUid"
+              [playerColors]="playerColors()"
+              [gameMode]="gameMode()"
+              [teams]="teams()"
               (moveMade)="makeMove($event)">
             </app-connect-four>
           }

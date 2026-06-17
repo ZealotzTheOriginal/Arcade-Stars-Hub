@@ -48,7 +48,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   readonly avatars = AVATARS;
 
-  readonly gameNames: Record<string, string> = {
+  readonly gameNames: Partial<Record<string, string>> = {
     connect_four: 'Conecta Cuatro',
     tic_tac_toe: 'Tres en Raya',
     minesweeper: 'Buscaminas',

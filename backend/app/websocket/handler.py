@@ -21,6 +21,17 @@ _presence: dict[str, dict] = {}
 
 ROOM_TIMEOUT_SECONDS = 600  # 10 minutes
 
+_DEFAULT_COLORS = ["#ef4444", "#3b82f6", "#eab308", "#22c55e", "#a855f7", "#f97316", "#ec4899", "#06b6d4"]
+
+
+def _assign_default_color(room: dict, uid: str):
+    taken = set(room.get("player_colors", {}).values())
+    for color in _DEFAULT_COLORS:
+        if color not in taken:
+            room.setdefault("player_colors", {})[uid] = color
+            return
+    room.setdefault("player_colors", {})[uid] = _DEFAULT_COLORS[0]
+
 # ── AI personality message pools ──────────────────────────────
 _AI_POOL_START = [
     "Bienvenido a mi juego. Intenta no manchar el suelo con tus lágrimas.",
@@ -113,7 +124,11 @@ def create_room(room_id: str, game_id: str, host_uid: str, host_info: dict) -> d
         "game_state": None,
         "last_activity": time.time(),
         "rematch_votes": [],
+        "player_colors": {},
+        "game_mode": "ffa",
+        "teams": {"a": [], "b": []},
     }
+    _assign_default_color(room, host_info["uid"])
     _rooms[room_id] = room
     return room
 
@@ -210,6 +225,10 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.ABANDON_GAME: _handle_abandon,
         ClientEvent.GLOBAL_CHAT: _handle_global_chat,
         ClientEvent.START_GAME: _handle_start_game,
+        ClientEvent.SET_PLAYER_COLOR: _handle_set_player_color,
+        ClientEvent.SET_GAME_MODE: _handle_set_game_mode,
+        ClientEvent.ASSIGN_TEAM: _handle_assign_team,
+        ClientEvent.SET_MAX_PLAYERS: _handle_set_max_players,
     }
     handler = handlers.get(event)
     if handler:
@@ -266,6 +285,7 @@ async def _handle_join(ws: WebSocket, uid: str, data: dict):
 
         if uid not in uids_in_room:
             room["players"].append({"uid": uid, **player_info})
+            _assign_default_color(room, uid)
 
     room["last_activity"] = time.time()
     if uid in _presence:
@@ -422,8 +442,8 @@ async def _handle_add_ai(ws: WebSocket, uid: str, data: dict):
 
     ai_info = {"uid": AI_UID, "display_name": "Arcade IA", "avatar": "🤖", "is_ai": True}
     room["players"].append(ai_info)
-    await manager.broadcast(room_id, ServerEvent.PLAYER_JOINED, {"player": ai_info, "uid": AI_UID})
-    await manager.send(ws, ServerEvent.ROOM_STATE, _safe_room(room))
+    _assign_default_color(room, AI_UID)
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
 
 
 async def _handle_spectate(ws: WebSocket, uid: str, data: dict):
@@ -620,6 +640,62 @@ async def _boredom_check(room_id: str, expected_uid: str) -> None:
         await _ai_chat(room_id, random.choice(_AI_POOL_BORED))
 
 
+async def _handle_set_player_color(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    color = data.get("color", "")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if uid not in [p["uid"] for p in room["players"]]:
+        return
+    if color not in _DEFAULT_COLORS:
+        return
+    taken_by = {v: k for k, v in room.get("player_colors", {}).items()}
+    if color in taken_by and taken_by[color] != uid:
+        await manager.send(ws, ServerEvent.ERROR, {"message": "Color ya en uso"})
+        return
+    room.setdefault("player_colors", {})[uid] = color
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+
+
+async def _handle_set_game_mode(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    mode = data.get("mode", "ffa")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("leader_uid") != uid:
+        return
+    if mode not in ("ffa", "teams"):
+        return
+    room["game_mode"] = mode
+    if mode == "teams":
+        uids = [p["uid"] for p in room["players"]]
+        mid = max(1, len(uids) // 2)
+        room["teams"] = {"a": uids[:mid], "b": uids[mid:]}
+    else:
+        room["teams"] = {"a": [], "b": []}
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+
+
+async def _handle_assign_team(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    target_uid = data.get("uid")
+    team = data.get("team")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("leader_uid") != uid:
+        return
+    if team not in ("a", "b"):
+        return
+    teams = room.setdefault("teams", {"a": [], "b": []})
+    teams["a"] = [u for u in teams.get("a", []) if u != target_uid]
+    teams["b"] = [u for u in teams.get("b", []) if u != target_uid]
+    teams[team].append(target_uid)
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+
+
 async def _handle_start_game(ws: WebSocket, uid: str, data: dict):
     room_id = data.get("room_id")
     room = _rooms.get(room_id)
@@ -633,6 +709,25 @@ async def _handle_start_game(ws: WebSocket, uid: str, data: dict):
         await manager.send(ws, ServerEvent.ERROR, {"message": f"Se necesitan al menos {min_p} jugadores"})
         return
     await _start_game(room_id)
+
+
+async def _handle_set_max_players(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    max_players = data.get("max_players")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("leader_uid") != uid:
+        return
+    if max_players not in (2, 3, 4):
+        await manager.send(ws, ServerEvent.ERROR, {"message": "Número de jugadores inválido"})
+        return
+    current_count = len(room["players"])
+    if max_players < current_count:
+        await manager.send(ws, ServerEvent.ERROR, {"message": f"Ya hay {current_count} jugadores en la sala"})
+        return
+    room["max_players"] = max_players
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
 
 
 async def _start_game(room_id: str):

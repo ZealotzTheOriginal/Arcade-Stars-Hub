@@ -64,9 +64,22 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   showFriendsModal = signal(false);
   leaderUid = signal('');
   minPlayers = signal(2);
+  maxPlayers = signal(2);
+  playerColors = signal<Partial<Record<string, string>>>({});
+  gameMode = signal<'ffa' | 'teams'>('ffa');
+  teams = signal<{ a: string[]; b: string[] }>({ a: [], b: [] });
 
   isLeader = computed(() => !!this.myUid && this.myUid === this.leaderUid());
   canStart = computed(() => this.players().length >= this.minPlayers());
+  myColor = computed(() => this.playerColors()[this.myUid] ?? '');
+  playerSlots = computed<(PlayerInfo | null)[]>(() =>
+    Array.from({ length: this.maxPlayers() }, (_, i) => this.players()[i] ?? null)
+  );
+
+  readonly CHIP_COLORS = [
+    '#ef4444', '#3b82f6', '#eab308', '#22c55e',
+    '#a855f7', '#f97316', '#ec4899', '#06b6d4',
+  ];
 
   private subs: Subscription[] = [];
   private timerSub?: Subscription;
@@ -118,6 +131,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         if (msg.data.name) this.roomName.set(msg.data.name);
         if (msg.data.leader_uid) this.leaderUid.set(msg.data.leader_uid);
         if (msg.data.min_players) this.minPlayers.set(msg.data.min_players);
+        if (msg.data.max_players) this.maxPlayers.set(msg.data.max_players);
+        if (msg.data.player_colors) this.playerColors.set(msg.data.player_colors);
+        if (msg.data.game_mode) this.gameMode.set(msg.data.game_mode);
+        if (msg.data.teams) this.teams.set(msg.data.teams);
         if (!this.isSpectator() && !msg.data.players?.find((p: any) => p.uid === this.myUid)) {
           this.isSpectator.set(true);
         }
@@ -264,6 +281,39 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   addAI() {
     this.ws.send('add_ai_player', { room_id: this.roomId });
+  }
+
+  setPlayerColor(hex: string) {
+    if (this.isColorTaken(hex)) return;
+    this.ws.send('set_player_color', { room_id: this.roomId, color: hex });
+  }
+
+  setGameMode(mode: 'ffa' | 'teams') {
+    this.ws.send('set_game_mode', { room_id: this.roomId, mode });
+  }
+
+  setMaxPlayers(n: number) {
+    this.ws.send('set_max_players', { room_id: this.roomId, max_players: n });
+  }
+
+  assignTeam(targetUid: string, team: 'a' | 'b') {
+    this.ws.send('assign_team', { room_id: this.roomId, uid: targetUid, team });
+  }
+
+  isColorTaken(hex: string): boolean {
+    return Object.entries(this.playerColors())
+      .some(([uid, color]) => color === hex && uid !== this.myUid);
+  }
+
+  playerTeam(uid: string): 'a' | 'b' | null {
+    const t = this.teams();
+    if (t.a?.includes(uid)) return 'a';
+    if (t.b?.includes(uid)) return 'b';
+    return null;
+  }
+
+  hasAI(): boolean {
+    return this.players().some((p: any) => p.is_ai);
   }
 
   isFriendOnline(uid: string): boolean {

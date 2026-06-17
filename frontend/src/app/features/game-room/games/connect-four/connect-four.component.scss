@@ -58,16 +58,9 @@
 
   &.hover { border-color: var(--rainbow-yellow); }
 
-  &.p1 {
-    background: radial-gradient(circle at 35% 35%, #ff4d4d, var(--rainbow-red));
-    box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
+  &.filled {
     border-color: transparent;
-  }
-
-  &.p2 {
-    background: radial-gradient(circle at 35% 35%, #ffdd55, var(--rainbow-yellow));
-    box-shadow: 0 0 8px rgba(255, 199, 0, 0.5);
-    border-color: transparent;
+    transition: box-shadow 0.15s;
   }
 }
 

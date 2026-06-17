@@ -24,6 +24,7 @@
           @for (col of cols; track col) {
             <div
               [class]="cellClass(r, col)"
+              [ngStyle]="cellStyle(r, col)"
               (mouseenter)="hoveredCol = col"
               (mouseleave)="hoveredCol = null"
               (click)="drop(col)">
