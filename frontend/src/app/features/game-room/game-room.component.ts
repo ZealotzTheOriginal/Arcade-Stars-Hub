@@ -58,6 +58,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   abandonCountdown = signal(5);
   maxPlayersShake = signal<number | null>(null);
   colorSwapRequest = signal<{ requester_uid: string; requester_name: string; requester_color: string; target_color: string } | null>(null);
+  coinFlipData = signal<{ name: string; avatar: string; color: string } | null>(null);
   showAbandonConfirm = signal(false);
   roomName = signal('');
   isInvited = signal(false);
@@ -69,6 +70,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   minPlayers = signal(2);
   maxPlayers = signal(2);
   playerColors = signal<Partial<Record<string, string>>>({});
+  tttPatterns = signal<Partial<Record<string, string>>>({});
   gameMode = signal<'ffa' | 'teams'>('ffa');
   teams = signal<{ a: string[]; b: string[] }>({ a: [], b: [] });
 
@@ -76,6 +78,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   canStart = computed(() => this.players().length >= this.maxPlayers());
   canAddAI = computed(() => this.players().length < this.maxPlayers());
   myColor = computed(() => this.playerColors()[this.myUid] ?? '');
+  myTttPattern = computed(() => this.tttPatterns()[this.myUid] ?? 'Classic');
+
+  readonly TTT_PATTERNS = ['Classic', 'Modern', 'Cyberpunk', 'Abstract', 'Squishy'];
+  previewPiece = signal<'X' | 'O'>('X');
   isWinner = computed(() => {
     const winner = this.gameOverData()?.winner;
     if (!winner) return false;
@@ -100,7 +106,9 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   private subs: Subscription[] = [];
   private timerSub?: Subscription;
   private toastTimer?: ReturnType<typeof setTimeout>;
+  private coinFlipTimer?: ReturnType<typeof setTimeout>;
   private abandonCdRef?: ReturnType<typeof setInterval>;
+  private previewInterval?: ReturnType<typeof setInterval>;
 
   async ngOnInit() {
     this.roomId = this.route.snapshot.paramMap.get('roomId') ?? '';
@@ -109,6 +117,13 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.isInvited.set(this.route.snapshot.queryParamMap.get('invited') === '1');
     this.myUid = this.auth.currentUser()?.uid ?? '';
     this.myProfile = await this.api.getMe();
+
+    if (this.gameId === 'tic_tac_toe') {
+      this.previewInterval = setInterval(
+        () => this.previewPiece.set(this.previewPiece() === 'X' ? 'O' : 'X'),
+        1200
+      );
+    }
 
     // Load friends + online users for the lobby invite panel
     Promise.all([this.api.getFriends(), this.api.getOnlineUsers()]).then(([fr, online]) => {
@@ -136,7 +151,9 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.subs.forEach((s) => s.unsubscribe());
     this.timerSub?.unsubscribe();
     clearTimeout(this.toastTimer);
+    clearTimeout(this.coinFlipTimer);
     clearInterval(this.abandonCdRef);
+    clearInterval(this.previewInterval);
     // WS stays alive — managed at app level for invites
   }
 
@@ -151,6 +168,14 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         if (msg.data.min_players) this.minPlayers.set(msg.data.min_players);
         if (msg.data.max_players) this.maxPlayers.set(msg.data.max_players);
         if (msg.data.player_colors) this.playerColors.set(msg.data.player_colors);
+        if (msg.data.ttt_patterns !== undefined) {
+          const patterns: Record<string, string> = { ...msg.data.ttt_patterns };
+          if (this.gameId === 'tic_tac_toe' && !patterns[this.myUid] && this.myProfile?.ttt_pattern) {
+            patterns[this.myUid] = this.myProfile.ttt_pattern;
+            this.ws.send('set_ttt_pattern', { room_id: this.roomId, pattern: this.myProfile.ttt_pattern });
+          }
+          this.tttPatterns.set(patterns);
+        }
         if (msg.data.game_mode) this.gameMode.set(msg.data.game_mode);
         if (msg.data.teams) this.teams.set(msg.data.teams);
         if (!this.isSpectator() && !msg.data.players?.find((p: any) => p.uid === this.myUid)) {
@@ -181,12 +206,24 @@ export class GameRoomComponent implements OnInit, OnDestroy {
       case 'game_started':
         this.players.set(msg.data.players ?? []);
         this.gameState.set(msg.data.game_state);
-        this.challengeAnim.dismiss(); // Room is ready — hide the RETO ACEPTADO overlay
+        this.challengeAnim.dismiss();
         if (msg.data.reconnected) {
           this.showToast('Reconectado a la partida');
           this.disconnectedUids.set(new Set());
         } else {
           this.startTimer();
+          const firstUid: string = msg.data.game_state?.current_turn;
+          const first = (msg.data.players ?? []).find((p: any) => p.uid === firstUid);
+          if (first) {
+            const colors: Record<string, string> = msg.data.player_colors ?? {};
+            this.coinFlipData.set({
+              name: (first as any).display_name,
+              avatar: (first as any).avatar,
+              color: colors[firstUid] ?? this.playerColors()[firstUid] ?? '#888',
+            });
+            clearTimeout(this.coinFlipTimer);
+            this.coinFlipTimer = setTimeout(() => this.coinFlipData.set(null), 3500);
+          }
         }
         this.roomStatus.set('playing');
         this.gameOverData.set(null);
@@ -351,6 +388,16 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   kickPlayer(uid: string) {
     this.ws.send('kick_player', { room_id: this.roomId, uid });
+  }
+
+  transferLeader(uid: string) {
+    this.ws.send('transfer_leader', { room_id: this.roomId, target_uid: uid });
+  }
+
+  setTttPattern(pattern: string) {
+    this.ws.send('set_ttt_pattern', { room_id: this.roomId, pattern });
+    if (this.myProfile) this.myProfile.ttt_pattern = pattern;
+    this.api.updateMe({ ttt_pattern: pattern }).catch(() => {});
   }
 
   joinAsPlayer() {

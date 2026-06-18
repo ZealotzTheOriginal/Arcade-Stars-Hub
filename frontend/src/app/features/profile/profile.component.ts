@@ -158,6 +158,24 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.invitingFriend.set(uid);
   }
 
+  gameIcon(id: string): string {
+    const map: Record<string, string> = {
+      connect_four: 'fa-solid fa-circle',
+      tic_tac_toe:  'fa-solid fa-hashtag',
+      minesweeper:  'fa-solid fa-bomb',
+    };
+    return map[id] ?? 'fa-solid fa-gamepad';
+  }
+
+  gameColor(id: string): string {
+    const map: Record<string, string> = {
+      connect_four: '#ef4444',
+      tic_tac_toe:  '#3b82f6',
+      minesweeper:  '#f97316',
+    };
+    return map[id] ?? '#a855f7';
+  }
+
   cancelFriendInvite() {
     this.invitingFriend.set(null);
   }

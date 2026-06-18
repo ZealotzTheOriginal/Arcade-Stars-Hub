@@ -539,32 +539,67 @@
 
 .invite-picker {
   padding: 1.5rem;
-  min-width: 300px;
+  width: 340px;
+  max-width: 92vw;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  h3 { margin: 0; font-size: 1rem; }
 }
 
-.invite-games { display: flex; flex-direction: column; gap: 0.5rem; }
-
-.invite-game-btn {
+.invite-picker-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  h3 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+}
+
+.invite-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  &:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+}
+
+.invite-games {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.75rem;
+}
+
+.invite-game-btn {
+  --ig-color: #a855f7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  padding: 1.1rem 0.5rem;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.2s, transform 0.15s, box-shadow 0.2s;
   color: var(--text-primary);
-  font-size: 0.9rem;
-  text-align: left;
-  width: 100%;
-  &:hover { background: rgba(110,70,220,0.15); border-color: rgba(110,70,220,0.5); }
-  .ig-thumb { font-size: 1.5rem; }
-  .ig-name { font-weight: 600; }
+
+  &:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: var(--ig-color);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--ig-color) 25%, transparent);
+  }
+
+  .ig-icon {
+    font-size: 1.8rem;
+    color: var(--ig-color);
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ig-color) 60%, transparent));
+  }
+  .ig-name { font-weight: 600; font-size: 0.72rem; text-align: center; line-height: 1.2; }
 }
 
 .empty { color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0; }

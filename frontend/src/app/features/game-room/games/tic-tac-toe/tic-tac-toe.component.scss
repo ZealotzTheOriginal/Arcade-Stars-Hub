@@ -24,12 +24,12 @@
   height: 100px;
   border-radius: 12px;
   background: var(--bg-component);
-  border: 2px solid var(--text-muted);
+  border: 2px solid rgba(255, 255, 255, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: default;
-  transition: border-color 0.15s, transform 0.1s;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
 
   &.playable {
     cursor: pointer;
@@ -40,23 +40,20 @@
     }
   }
 
-  &.p1 {
-    border-color: var(--rainbow-red);
-    background: rgba(255, 0, 0, 0.08);
-    .symbol { color: var(--rainbow-red); }
+  &.filled {
+    transition: none;
   }
+}
 
-  &.p2 {
-    border-color: var(--rainbow-blue);
-    background: rgba(70, 67, 255, 0.08);
-    .symbol { color: #7a78ff; }
-  }
-
-  .symbol {
-    font-size: 2.5rem;
-    font-weight: 900;
-    line-height: 1;
-  }
+.piece {
+  width: 62px;
+  height: 62px;
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-position: center;
 }
 
 .result-banner {

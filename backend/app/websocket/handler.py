@@ -22,6 +22,16 @@ _presence: dict[str, dict] = {}
 ROOM_TIMEOUT_SECONDS = 600  # 10 minutes
 
 _DEFAULT_COLORS = ["#ef4444", "#3b82f6", "#eab308", "#22c55e", "#a855f7", "#f97316", "#ec4899", "#06b6d4"]
+_AI_NAMES = ["Hal", "Tars", "Case", "Jarvis"]
+_TTT_PATTERNS = {"Classic", "Modern", "Cyberpunk", "Abstract", "Squishy"}
+
+
+def _pick_ai_name(room: dict) -> str:
+    used = {p.get("display_name", "").replace(" IA", "") for p in room.get("players", []) if p.get("is_ai")}
+    available = [n for n in _AI_NAMES if n not in used]
+    if available:
+        return f"{random.choice(available)} IA"
+    return "Arcade IA"
 
 
 def _assign_default_color(room: dict, uid: str):
@@ -125,6 +135,7 @@ def create_room(room_id: str, game_id: str, host_uid: str) -> dict:
         "last_activity": time.time(),
         "rematch_votes": [],
         "player_colors": {},
+        "ttt_patterns": {},
         "game_mode": "ffa",
         "teams": {"a": [], "b": []},
     }
@@ -252,6 +263,8 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.KICK_PLAYER: _handle_kick_player,
         ClientEvent.REQUEST_COLOR_SWAP: _handle_request_color_swap,
         ClientEvent.RESPOND_COLOR_SWAP: _handle_respond_color_swap,
+        ClientEvent.TRANSFER_LEADER: _handle_transfer_leader,
+        ClientEvent.SET_TTT_PATTERN: _handle_set_ttt_pattern,
     }
     handler = handlers.get(event)
     if handler:
@@ -319,6 +332,12 @@ async def _handle_join(ws: WebSocket, uid: str, data: dict):
             await manager.broadcast(room_id, ServerEvent.SPECTATOR_LEFT, {"uid": uid}, exclude_uid=uid)
         room["players"].append({"uid": uid, **player_info})
         _assign_default_color(room, uid)
+        if room.get("game_mode") == "teams":
+            teams = room.setdefault("teams", {"a": [], "b": []})
+            if len(teams.get("a", [])) <= len(teams.get("b", [])):
+                teams.setdefault("a", []).append(uid)
+            else:
+                teams.setdefault("b", []).append(uid)
 
     room["last_activity"] = time.time()
     if uid in _presence:
@@ -480,9 +499,15 @@ async def _handle_add_ai(ws: WebSocket, uid: str, data: dict):
         return
 
     ai_uid = f"AI_{uuid.uuid4().hex[:8].upper()}"
-    ai_info = {"uid": ai_uid, "display_name": "Arcade IA", "avatar": "🤖", "is_ai": True}
+    ai_info = {"uid": ai_uid, "display_name": _pick_ai_name(room), "avatar": "🤖", "is_ai": True}
     room["players"].append(ai_info)
     _assign_default_color(room, ai_uid)
+    if room.get("game_mode") == "teams":
+        teams = room.setdefault("teams", {"a": [], "b": []})
+        if len(teams.get("a", [])) <= len(teams.get("b", [])):
+            teams.setdefault("a", []).append(ai_uid)
+        else:
+            teams.setdefault("b", []).append(ai_uid)
     await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
 
 
@@ -820,6 +845,14 @@ async def _handle_start_game(ws: WebSocket, uid: str, data: dict):
     if len(room["players"]) < min_p:
         await manager.send(ws, ServerEvent.ERROR, {"message": f"Se necesitan al menos {min_p} jugadores"})
         return
+    if room.get("game_mode") == "teams":
+        player_uids = {p["uid"] for p in room["players"]}
+        teams = room.get("teams", {"a": [], "b": []})
+        team_a = [u for u in teams.get("a", []) if u in player_uids]
+        team_b = [u for u in teams.get("b", []) if u in player_uids]
+        if not team_a or not team_b:
+            await manager.send(ws, ServerEvent.ERROR, {"message": "Cada equipo debe tener al menos un jugador para iniciar en modo equipos"})
+            return
     await _start_game(room_id)
 
 
@@ -849,6 +882,37 @@ async def _handle_kick_player(ws: WebSocket, uid: str, data: dict):
         await manager.send_direct(target_uid, ServerEvent.KICKED, {"message": "Has sido expulsado de la sala"})
         manager.remove(room_id, target_uid)
 
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+
+
+async def _handle_set_ttt_pattern(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    pattern = data.get("pattern", "")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("game_id") != "tic_tac_toe":
+        return
+    if uid not in [p["uid"] for p in room["players"]]:
+        return
+    if pattern not in _TTT_PATTERNS:
+        return
+    room.setdefault("ttt_patterns", {})[uid] = pattern
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+
+
+async def _handle_transfer_leader(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    target_uid = data.get("target_uid")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("leader_uid") != uid:
+        return
+    target = next((p for p in room["players"] if p["uid"] == target_uid), None)
+    if not target or target.get("is_ai") or target_uid == uid:
+        return
+    room["leader_uid"] = target_uid
     await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
 
 
@@ -899,6 +963,11 @@ async def _start_game(room_id: str):
         interleaved.extend(u for u in player_uids if u not in assigned)
         player_uids = interleaved
 
+    # Random starting player — rotate the list by a random offset
+    if player_uids:
+        start = random.randrange(len(player_uids))
+        player_uids = player_uids[start:] + player_uids[:start]
+
     state = game.get_initial_state(player_uids)
     state["game_mode"] = room.get("game_mode", "ffa")
     state["teams"] = room.get("teams", {"a": [], "b": []})
@@ -908,11 +977,16 @@ async def _start_game(room_id: str):
     await manager.broadcast(room_id, ServerEvent.GAME_STARTED, {
         "game_state": _public_state(room["game_state"]),
         "players": room["players"],
+        "player_colors": room.get("player_colors", {}),
     })
 
     turn_uid = room["game_state"].get("current_turn")
     if turn_uid and _is_ai_uid(room, turn_uid):
-        asyncio.create_task(_do_ai_move(room_id))
+        # Delay first AI move so the coin-flip animation can finish on the client
+        async def _first_ai_move():
+            await asyncio.sleep(3.8)
+            await _do_ai_move(room_id)
+        asyncio.create_task(_first_ai_move())
 
     if any(p.get("is_ai") for p in room["players"]):
         asyncio.create_task(_ai_chat(room_id, random.choice(_AI_POOL_START), delay=1.5))

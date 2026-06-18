@@ -11,6 +11,8 @@ import { CommonModule } from '@angular/common';
 export class TicTacToeComponent {
   @Input() gameState: any = null;
   @Input() myUid: string = '';
+  @Input() playerColors: Partial<Record<string, string>> = {};
+  @Input() tttPatterns: Partial<Record<string, string>> = {};
   @Output() moveMade = new EventEmitter<{ row: number; col: number }>();
 
   readonly size = [0, 1, 2];
@@ -40,17 +42,48 @@ export class TicTacToeComponent {
     if (this.canPlay(row, col)) this.moveMade.emit({ row, col });
   }
 
-  cellSymbol(row: number, col: number): string {
-    const v = this.board[row]?.[col] ?? 0;
-    return v === 1 ? '✕' : v === 2 ? '○' : '';
+  private uidForCell(cell: number): string {
+    const players: string[] = this.gameState?.players ?? [];
+    return players[cell - 1] ?? '';
+  }
+
+  cellColor(cell: number): string {
+    const uid = this.uidForCell(cell);
+    return this.playerColors[uid] ?? (cell === 1 ? '#ef4444' : '#3b82f6');
+  }
+
+  cellPieceUrl(cell: number): string {
+    const uid = this.uidForCell(cell);
+    const pattern = this.tttPatterns[uid] ?? 'Classic';
+    const type = cell === 1 ? 'X' : 'O';
+    return `/tres_en_raya/${type}_${pattern}.svg`;
+  }
+
+  pieceStyle(cell: number): { [key: string]: string } {
+    const color = this.cellColor(cell);
+    const url = this.cellPieceUrl(cell);
+    return {
+      'background-color': color,
+      'mask-image': `url(${url})`,
+      '-webkit-mask-image': `url(${url})`,
+    };
+  }
+
+  cellStyle(row: number, col: number): { [key: string]: string } {
+    const cell = this.board[row]?.[col] ?? 0;
+    if (cell === 0) return {};
+    const color = this.cellColor(cell);
+    return {
+      '--cell-color': color,
+      'border-color': color,
+      'background': `color-mix(in srgb, ${color} 10%, transparent)`,
+    };
   }
 
   cellClass(row: number, col: number): string {
     const v = this.board[row]?.[col] ?? 0;
-    const base = 'cell';
-    if (v === 1) return `${base} p1`;
-    if (v === 2) return `${base} p2`;
-    if (this.canPlay(row, col)) return `${base} playable`;
-    return base;
+    if (v !== 0) return 'cell filled';
+    if (this.canPlay(row, col)) return 'cell playable';
+    return 'cell';
   }
 }

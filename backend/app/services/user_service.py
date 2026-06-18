@@ -20,6 +20,7 @@ async def get_or_create_user(uid: str, email: str, display_name: str) -> UserPro
             game_stats={k: GameStats(**v) for k, v in data.get("game_stats", {}).items()},
             friends=data.get("friends", []),
             friend_requests=data.get("friend_requests", []),
+            ttt_pattern=data.get("ttt_pattern", None),
         )
 
     if not display_name:

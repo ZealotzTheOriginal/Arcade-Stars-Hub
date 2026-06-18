@@ -13,9 +13,11 @@ export interface UserProfile {
   total_points: number;
   game_stats: Record<string, GameStats>;
   friends: string[];
+  ttt_pattern?: string;
 }
 
 export interface UserUpdate {
   display_name?: string;
   avatar?: string;
+  ttt_pattern?: string;
 }

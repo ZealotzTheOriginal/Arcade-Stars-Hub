@@ -18,8 +18,10 @@ class UserProfile(BaseModel):
     game_stats: dict[str, GameStats] = {}
     friends: list[str] = []
     friend_requests: list[str] = []
+    ttt_pattern: Optional[str] = None
 
 
 class UserUpdate(BaseModel):
     display_name: Optional[str] = None
     avatar: Optional[str] = None
+    ttt_pattern: Optional[str] = None

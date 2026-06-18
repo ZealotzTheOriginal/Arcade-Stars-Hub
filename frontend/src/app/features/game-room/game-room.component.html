@@ -46,6 +46,18 @@
       @if (roomStatus() === 'waiting') {
         <div class="lobby">
 
+          <!-- AI / invite actions (above slots) -->
+          @if (isLeader() && !isSpectator()) {
+            <div class="lobby-actions">
+              @if (canAddAI()) {
+                <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> Añadir IA</button>
+              }
+              @if (friends().length > 0 && players().length < maxPlayers()) {
+                <button class="btn btn--ghost" (click)="showFriendsModal.set(true)"><i class="fa-solid fa-user-group"></i> Invitar amigo</button>
+              }
+            </div>
+          }
+
           <!-- Player slots -->
           <div class="lobby-slots">
             @for (slot of playerSlots(); track $index) {
@@ -79,9 +91,16 @@
                     }
                   }
                   @if (isLeader() && !isSpectator() && slot.uid !== myUid) {
-                    <button class="slot-kick-btn" (click)="kickPlayer(slot.uid)" title="Expulsar">
-                      <i class="fa-solid fa-xmark"></i>
-                    </button>
+                    <div class="slot-actions">
+                      @if (!slot.is_ai) {
+                        <button class="slot-action-btn slot-action-btn--crown" (click)="transferLeader(slot.uid)" title="Ceder liderazgo">
+                          <i class="fa-solid fa-crown"></i>
+                        </button>
+                      }
+                      <button class="slot-action-btn slot-action-btn--kick" (click)="kickPlayer(slot.uid)" title="Expulsar">
+                        <i class="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
                   }
                 </div>
               } @else {
@@ -92,6 +111,25 @@
               }
             }
           </div>
+
+          <!-- TTT pattern picker -->
+          @if (!isSpectator() && gameId === 'tic_tac_toe') {
+            <div class="color-picker-section">
+              <p class="color-picker-label">Tu diseño de ficha</p>
+              <div class="pattern-swatches">
+                @for (p of TTT_PATTERNS; track p) {
+                  <button class="pattern-swatch" [class.selected]="myTttPattern() === p" (click)="setTttPattern(p)">
+                    <div class="pattern-preview-icon" [ngStyle]="{
+                      'background-color': myColor() || '#888888',
+                      'mask-image': 'url(/tres_en_raya/' + previewPiece() + '_' + p + '.svg)',
+                      '-webkit-mask-image': 'url(/tres_en_raya/' + previewPiece() + '_' + p + '.svg)'
+                    }"></div>
+                    <span>{{ p }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+          }
 
           <!-- Color picker -->
           @if (!isSpectator()) {
@@ -146,14 +184,6 @@
                 </div>
               }
 
-              <div class="lobby-actions">
-                @if (canAddAI()) {
-                  <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> Añadir IA</button>
-                }
-                @if (friends().length > 0 && players().length < maxPlayers()) {
-                  <button class="btn btn--ghost" (click)="showFriendsModal.set(true)"><i class="fa-solid fa-user-group"></i> Invitar amigo</button>
-                }
-              </div>
 
             </div>
           }
@@ -208,6 +238,8 @@
             <app-tic-tac-toe
               [gameState]="gameState()"
               [myUid]="isSpectator() ? '' : myUid"
+              [playerColors]="playerColors()"
+              [tttPatterns]="tttPatterns()"
               (moveMade)="makeMove($event)">
             </app-tic-tac-toe>
           }
@@ -271,6 +303,25 @@
     </div>
   </div>
 </div>
+
+@if (coinFlipData()) {
+  <div class="coin-overlay">
+    <div class="coin-blur"></div>
+    <div class="coin-flash"></div>
+    <div class="coin-bar-top"></div>
+    <div class="coin-bar-bottom"></div>
+    <div class="coin-content">
+      <div class="coin-spin-wrap">
+        <span class="coin-emoji">🪙</span>
+      </div>
+      <p class="coin-label">PRIMER TURNO</p>
+      <div class="coin-player">
+        <span class="coin-avatar" [style.color]="coinFlipData()!.color">{{ coinFlipData()!.avatar }}</span>
+        <span class="coin-name" [style.color]="coinFlipData()!.color">{{ coinFlipData()!.name }}</span>
+      </div>
+    </div>
+  </div>
+}
 
 @if (colorSwapRequest()) {
   <div class="abandon-overlay">

@@ -302,17 +302,20 @@
 
 @if (invitingFriend()) {
   <div class="overlay" (click)="cancelFriendInvite()">
-    <div class="invite-picker card" (click)="$event.stopPropagation()">
-      <h3>Invitar a jugar — elige el juego</h3>
+    <div class="invite-picker card rainbow-border" (click)="$event.stopPropagation()">
+      <div class="invite-picker-header">
+        <h3><i class="fa-solid fa-gamepad"></i> Elige el juego</h3>
+        <button class="invite-close-btn" (click)="cancelFriendInvite()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
       <div class="invite-games">
         @for (game of games(); track game.id) {
-          <button class="invite-game-btn" (click)="inviteFriendToGame(game)">
-            <span class="ig-thumb">{{ game.thumbnail }}</span>
+          <button class="invite-game-btn" (click)="inviteFriendToGame(game)"
+            [style.--ig-color]="gameColor(game.id)">
+            <div class="ig-icon"><i [class]="gameIcon(game.id)"></i></div>
             <span class="ig-name">{{ game.name }}</span>
           </button>
         }
       </div>
-      <button class="btn btn--ghost" (click)="cancelFriendInvite()">Cancelar</button>
     </div>
   </div>
 }

@@ -27,6 +27,8 @@ class ClientEvent(str, Enum):
     KICK_PLAYER = "kick_player"
     REQUEST_COLOR_SWAP = "request_color_swap"
     RESPOND_COLOR_SWAP = "respond_color_swap"
+    TRANSFER_LEADER = "transfer_leader"
+    SET_TTT_PATTERN = "set_ttt_pattern"
 
 
 # ── Outgoing event types (server → client) ──────────────

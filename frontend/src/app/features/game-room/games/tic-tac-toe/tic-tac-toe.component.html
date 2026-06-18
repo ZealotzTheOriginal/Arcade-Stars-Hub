@@ -6,8 +6,10 @@
       @for (row of size; track row) {
         <div class="row">
           @for (col of size; track col) {
-            <div [class]="cellClass(row, col)" (click)="play(row, col)">
-              <span class="symbol">{{ cellSymbol(row, col) }}</span>
+            <div [class]="cellClass(row, col)" [ngStyle]="cellStyle(row, col)" (click)="play(row, col)">
+              @if (board[row][col] !== 0) {
+                <div class="piece" [ngStyle]="pieceStyle(board[row][col])"></div>
+              }
             </div>
           }
         </div>
