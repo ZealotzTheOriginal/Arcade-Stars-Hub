@@ -2,7 +2,9 @@
   <!-- Players -->
   <div class="hud-players">
     @for (player of players; track player.uid; let i = $index) {
-      <div class="hud-player" [class.active]="player.uid === currentTurn">
+      <div class="hud-player"
+           [class.active]="player.uid === currentTurn"
+           [class.active-mine]="player.uid === currentTurn && player.uid === myUid && status === 'playing'">
         <span class="avatar">{{ player.avatar }}</span>
         <div class="player-details">
           <span class="player-name">{{ player.display_name }}</span>

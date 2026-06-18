@@ -37,6 +37,10 @@ export class AuthService {
   async register(email: string, password: string, displayName: string) {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(cred.user, { displayName });
+    // Force token refresh so the 'name' claim reflects the chosen displayName.
+    // Without this, the cached token (generated before updateProfile) has name=""
+    // and the backend would fall back to a random "User1234" username.
+    await cred.user.getIdToken(true);
     return cred;
   }
 

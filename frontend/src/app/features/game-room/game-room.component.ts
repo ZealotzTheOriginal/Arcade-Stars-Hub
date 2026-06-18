@@ -89,6 +89,15 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     { id: 'intermediate', label: 'Intermedio', detail: '16×16 · 40 minas' },
     { id: 'expert',       label: 'Experto',    detail: '30×16 · 99 minas' },
   ];
+  isMyTurn = computed(() =>
+    this.roomStatus() === 'playing' &&
+    !this.isSpectator() &&
+    !!this.myUid &&
+    this.gameState()?.current_turn === this.myUid &&
+    !this.gameOverData() &&
+    !this.abandonedData()
+  );
+
   isWinner = computed(() => {
     const winner = this.gameOverData()?.winner;
     if (!winner) return false;

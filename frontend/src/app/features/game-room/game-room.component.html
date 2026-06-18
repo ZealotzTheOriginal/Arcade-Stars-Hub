@@ -53,6 +53,7 @@
     [players]="players()"
     [scores]="scores"
     [currentTurn]="gameState()?.current_turn ?? ''"
+    [myUid]="myUid"
     [level]="currentLevel"
     [elapsedSeconds]="elapsedSeconds()"
     [status]="roomStatus()"
@@ -289,6 +290,14 @@
             </app-minesweeper>
           }
         }
+      }
+
+      <!-- Your turn pill -->
+      @if (isMyTurn()) {
+        <div class="your-turn-pill">
+          <span class="your-turn-dot"></span>
+          ¡Tu turno!
+        </div>
       }
 
       <!-- Abandoned bar -->

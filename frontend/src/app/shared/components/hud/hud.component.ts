@@ -14,6 +14,7 @@ export class HudComponent {
   @Input() players: PlayerInfo[] = [];
   @Input() scores: Record<string, number> = {};
   @Input() currentTurn: string = '';
+  @Input() myUid: string = '';
   @Input() level: number = 1;
   @Input() elapsedSeconds: number = 0;
   @Input() status: string = 'waiting';

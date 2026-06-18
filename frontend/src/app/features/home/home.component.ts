@@ -253,9 +253,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   gameImage(id: string): string {
     const map: Record<string, string> = {
-      connect_four: '/conecta%20cuatro.png',
-      minesweeper: '/buscaminas.jpg',
-      tic_tac_toe: '/tres%20en%20raya.jpg',
+      connect_four: '/home/connect4.jpg',
+      minesweeper: '/home/minesweeper.jpg',
+      tic_tac_toe: '/home/tictactoe.jpg',
     };
     return map[id] ?? '';
   }

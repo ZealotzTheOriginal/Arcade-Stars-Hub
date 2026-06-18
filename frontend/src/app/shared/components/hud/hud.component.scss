@@ -30,6 +30,12 @@
     background: rgba(69, 246, 215, 0.06);
   }
 
+  &.active-mine {
+    border-color: var(--rainbow-green, #4ade80);
+    background: rgba(74, 222, 128, 0.10);
+    animation: hud-my-turn 1.4s ease-in-out infinite;
+  }
+
   .avatar { font-size: 1.5rem; }
 
   .player-details {
@@ -40,6 +46,8 @@
   }
 
   .turn-indicator { color: var(--rainbow-teal); font-size: 0.7rem; }
+
+  &.active-mine .turn-indicator { color: #4ade80; }
 
   .ai-badge {
     font-size: 0.65rem;
@@ -95,4 +103,9 @@
   &.status-waiting { background: rgba(255, 199, 0, 0.15); color: var(--rainbow-yellow); }
   &.status-playing { background: rgba(69, 246, 215, 0.15); color: var(--rainbow-teal); }
   &.status-finished { background: rgba(255, 0, 214, 0.15); color: var(--rainbow-pink); }
+}
+
+@keyframes hud-my-turn {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); border-color: #4ade80; }
+  50%       { box-shadow: 0 0 0 5px rgba(74, 222, 128, 0.20); border-color: #86efac; }
 }
