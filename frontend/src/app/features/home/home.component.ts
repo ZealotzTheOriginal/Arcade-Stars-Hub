@@ -87,7 +87,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       .catch(() => {});
 
     this._fetchLive();
-    this.pollInterval = setInterval(() => this._fetchLive(), 15_000);
+    // Polling is now a fallback only — real-time updates arrive via lobby_update WS event
+    this.pollInterval = setInterval(() => this._fetchLive(), 60_000);
 
     this.wsSub = this.ws.messages$.subscribe((msg) => {
       if (msg.event === 'global_chat_message') {
@@ -96,6 +97,12 @@ export class HomeComponent implements OnInit, OnDestroy {
           const el = this.chatMessagesEl?.nativeElement;
           if (el) el.scrollTop = el.scrollHeight;
         }, 0);
+      }
+      if (msg.event === 'lobby_update') {
+        this.activeRooms.set(msg.data.rooms ?? []);
+        this.onlineUsers.set(msg.data.online_users ?? []);
+        this.loadingRooms.set(false);
+        this._checkReconnectable();
       }
     });
   }

@@ -56,26 +56,21 @@
   cursor: pointer;
   transition: border-color 0.15s;
 
-  &.hover { border-color: var(--rainbow-yellow); }
+  &.hover { border-color: rgba(255, 220, 0, 0.4); }
 
   &.filled {
     border-color: transparent;
-    transition: box-shadow 0.15s;
+    border-radius: 0;
+    background: transparent;
+    transition: filter 0.15s;
+  }
+
+  &.win {
+    animation: win-pulse 0.65s ease-in-out infinite alternate;
   }
 }
 
-.result-banner {
-  margin-top: 0.5rem;
-  padding: 0.75rem 2rem;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  font-size: 1.2rem;
-  font-weight: 700;
-  border: 1px solid var(--text-muted);
-  animation: pop 0.3s ease;
-}
-
-@keyframes pop {
-  from { transform: scale(0.8); opacity: 0; }
-  to   { transform: scale(1); opacity: 1; }
+@keyframes win-pulse {
+  from { transform: scale(1); }
+  to   { transform: scale(1.14); }
 }

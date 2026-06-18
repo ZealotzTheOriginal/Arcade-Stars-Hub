@@ -199,6 +199,14 @@ def unregister_presence(uid: str):
     _presence.pop(uid, None)
 
 
+async def broadcast_lobby_update():
+    """Push current room list + online users to every connected client."""
+    await manager.broadcast_global(ServerEvent.LOBBY_UPDATE, {
+        "rooms": get_active_rooms(),
+        "online_users": get_online_users(),
+    })
+
+
 async def cleanup_stale_rooms():
     """Close rooms that are stale or abandoned."""
     now = time.time()
@@ -229,6 +237,7 @@ async def _close_room(room_id: str, reason: str = "Sala cerrada"):
         task.cancel()
     await manager.broadcast(room_id, ServerEvent.ROOM_CLOSED, {"reason": reason})
     del _rooms[room_id]
+    await broadcast_lobby_update()
 
 
 # ── Main dispatcher ───────────────────────────────────────
@@ -347,6 +356,7 @@ async def _handle_join(ws: WebSocket, uid: str, data: dict):
 
     manager.add(room_id, uid, ws)
     await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+    await broadcast_lobby_update()
 
 
 async def _handle_leave(ws: WebSocket, uid: str, data: dict):
@@ -388,6 +398,7 @@ async def _handle_leave(ws: WebSocket, uid: str, data: dict):
     # If the room now has zero WS connections, decide what to do with it
     if left_room_id:
         await _auto_close_if_empty(left_room_id)
+    await broadcast_lobby_update()
 
 
 async def _auto_close_if_empty(room_id: str):
@@ -650,6 +661,7 @@ async def _handle_register_presence(ws: WebSocket, uid: str, data: dict):
     avatar = data.get("avatar", "⭐")
     register_presence(uid, display_name, avatar)
     manager.register_direct(uid, ws)
+    await broadcast_lobby_update()
 
 
 async def _handle_abandon(ws: WebSocket, uid: str, data: dict):
@@ -1003,6 +1015,7 @@ async def _start_game(room_id: str):
         "players": room["players"],
         "player_colors": room.get("player_colors", {}),
     })
+    await broadcast_lobby_update()
 
     turn_uid = room["game_state"].get("current_turn")
     if turn_uid and _is_ai_uid(room, turn_uid):

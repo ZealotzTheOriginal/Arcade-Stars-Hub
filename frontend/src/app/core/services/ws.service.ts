@@ -15,13 +15,23 @@ export class WsService {
   private heartbeatInterval?: ReturnType<typeof setInterval>;
   private pongTimeout?: ReturnType<typeof setTimeout>;
 
-  private readonly MAX_RECONNECT = 6;
+  private readonly MAX_RECONNECT = 8;
   private readonly HEARTBEAT_MS = 20_000;
   private readonly PONG_TIMEOUT_MS = 5_000;
 
   readonly connected = signal(false);
+  readonly fatalError = signal(false);
   readonly messages$ = new Subject<WSMessage>();
   readonly reconnected$ = new Subject<void>();
+
+  constructor() {
+    // Reconnect when tab becomes visible again after being backgrounded
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.shouldReconnect && !this.connected()) {
+        this._scheduleReconnect(0);
+      }
+    });
+  }
 
   async connect(): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN) return;
@@ -29,6 +39,7 @@ export class WsService {
     if (!this.token) throw new Error('Not authenticated');
     this.shouldReconnect = true;
     this.reconnectAttempts = 0;
+    this.fatalError.set(false);
     return this._open();
   }
 
@@ -38,6 +49,7 @@ export class WsService {
 
       this.ws.onopen = () => {
         this.connected.set(true);
+        this.fatalError.set(false);
         if (this.reconnectAttempts > 0) {
           this.reconnected$.next();
         }
@@ -60,13 +72,14 @@ export class WsService {
       this.ws.onclose = () => {
         this.connected.set(false);
         this._stopHeartbeat();
-        if (this.shouldReconnect && this.reconnectAttempts < this.MAX_RECONNECT) {
-          this.reconnectAttempts++;
-          const delay = Math.min(1000 * this.reconnectAttempts, 8000);
-          this.reconnectTimer = setTimeout(async () => {
-            this.token = await this.auth.getToken();
-            this._open().catch(() => {});
-          }, delay);
+        if (this.shouldReconnect) {
+          if (this.reconnectAttempts < this.MAX_RECONNECT) {
+            this.reconnectAttempts++;
+            const delay = Math.min(1000 * this.reconnectAttempts, 8000);
+            this._scheduleReconnect(delay);
+          } else {
+            this.fatalError.set(true);
+          }
         }
       };
 
@@ -74,12 +87,19 @@ export class WsService {
     });
   }
 
+  private _scheduleReconnect(delay: number) {
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(async () => {
+      this.token = await this.auth.getToken();
+      this._open().catch(() => {});
+    }, delay);
+  }
+
   private _startHeartbeat() {
     this._stopHeartbeat();
     this.heartbeatInterval = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({ event: 'ping', data: {} }));
-        // If pong doesn't arrive, close and let onclose trigger reconnect
         this.pongTimeout = setTimeout(() => {
           this.ws?.close();
         }, this.PONG_TIMEOUT_MS);
@@ -96,6 +116,13 @@ export class WsService {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ event, data }));
     }
+  }
+
+  /** Try to reconnect manually after a fatal error. */
+  manualReconnect() {
+    this.reconnectAttempts = 0;
+    this.fatalError.set(false);
+    this._scheduleReconnect(0);
   }
 
   disconnect() {

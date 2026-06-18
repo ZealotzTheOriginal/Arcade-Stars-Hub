@@ -23,7 +23,8 @@ export type ServerEvent =
   | 'global_chat_message'
   | 'friend_request'
   | 'friend_request_rejected'
-  | 'friend_removed';
+  | 'friend_removed'
+  | 'lobby_update';
 
 export interface WSMessage {
   event: ServerEvent;

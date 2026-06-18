@@ -1,5 +1,28 @@
 <div class="room-layout">
 
+  <!-- Dark overlay when game ends (sits below game-area via z-index) -->
+  @if (gameOverData() || abandonedData()) {
+    <div class="game-ended-bg"></div>
+  }
+
+  <!-- Reconnecting overlay -->
+  @if (!ws.connected()) {
+    <div class="reconnecting-overlay">
+      <div class="reconnecting-box">
+        @if (ws.fatalError()) {
+          <i class="fa-solid fa-wifi" style="color: var(--rainbow-red)"></i>
+          <span>Sin conexión</span>
+          <button class="btn btn--primary btn--xs" (click)="ws.manualReconnect()">
+            <i class="fa-solid fa-rotate"></i> Reintentar
+          </button>
+        } @else {
+          <span class="reconnecting-spinner"></span>
+          <span>Reconectando...</span>
+        }
+      </div>
+    </div>
+  }
+
   <!-- Header -->
   <header class="room-header">
     <a routerLink="/home" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Salir</a>
@@ -268,40 +291,42 @@
         }
       }
 
-      <!-- Abandoned overlay -->
+      <!-- Abandoned bar -->
       @if (abandonedData()) {
         <div class="game-over-banner">
-          <span class="result loss"><i class="fa-solid fa-flag"></i> Partida abandonada</span>
-          <p class="abandon-msg">{{ abandonedData()!.display_name }} abandonó la partida. Nadie recibe puntos.</p>
-          <p class="abandon-msg">La sala se cerrará en {{ abandonCountdown() }}s...</p>
-          <a class="btn btn--ghost" routerLink="/home">Volver al inicio</a>
+          <span class="result result--loss"><i class="fa-solid fa-flag"></i> Abandonada</span>
+          <span class="banner-detail">{{ abandonedData()!.display_name }} se fue · cierra en {{ abandonCountdown() }}s</span>
+          <span class="banner-spacer"></span>
+          <a class="btn btn--ghost btn--xs" routerLink="/home"><i class="fa-solid fa-house"></i> Salir</a>
         </div>
       }
 
-      <!-- Game over overlay -->
+      <!-- Game over bar -->
       @if (gameOverData()) {
         <div class="game-over-banner">
           @if (isWinner()) {
-            <span class="result win"><i class="fa-solid fa-trophy"></i> ¡Victoria!</span>
+            <span class="result result--win"><i class="fa-solid fa-trophy"></i> ¡Victoria!</span>
           } @else if (!gameOverData().winner) {
-            <span class="result draw"><i class="fa-solid fa-handshake"></i> Empate</span>
+            <span class="result result--draw"><i class="fa-solid fa-handshake"></i> Empate</span>
           } @else {
-            <span class="result loss"><i class="fa-solid fa-skull"></i> Derrota</span>
+            <span class="result result--loss"><i class="fa-solid fa-skull"></i> Derrota</span>
           }
-
-          @if (!isSpectator()) {
-            <div class="rematch-area">
+          <span class="banner-spacer"></span>
+          <div class="banner-actions">
+            @if (!isSpectator()) {
               @if (!hasVotedRematch()) {
-                <button class="btn btn--primary" (click)="requestRematch()"><i class="fa-solid fa-rotate"></i> Revancha</button>
+                <button class="btn btn--primary btn--xs" (click)="requestRematch()">
+                  <i class="fa-solid fa-rotate"></i> Revancha
+                </button>
               } @else {
-                <p class="rematch-waiting">
-                  Esperando revancha... ({{ rematchVotes().length }}/{{ humanPlayers().length }})
-                </p>
+                <span class="banner-waiting">
+                  <i class="fa-solid fa-hourglass-half"></i>
+                  {{ rematchVotes().length }}/{{ humanPlayers().length }}
+                </span>
               }
-            </div>
-          }
-
-          <a class="btn btn--ghost" routerLink="/home">Volver al inicio</a>
+            }
+            <a class="btn btn--ghost btn--xs" routerLink="/home"><i class="fa-solid fa-house"></i> Salir</a>
+          </div>
         </div>
       }
     </div>

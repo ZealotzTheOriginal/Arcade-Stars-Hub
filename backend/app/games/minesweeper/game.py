@@ -131,50 +131,129 @@ class MinesweeperGame(BaseGame):
         ]
 
     def get_best_move(self, state: dict) -> Any:
-        board    = state.get("board")
-        rows, cols = state["rows"], state["cols"]
-        revealed = state["revealed"]
-        flagged  = state.get("flagged", [[False] * cols for _ in range(rows)])
+        board       = state.get("board")
+        rows, cols  = state["rows"], state["cols"]
+        revealed    = state["revealed"]
+        flagged     = state.get("flagged", [[False] * cols for _ in range(rows)])
+        total_mines = state["mines"]
 
         if board is None:
             return {"row": rows // 2, "col": cols // 2, "action": "reveal"}
 
-        known_safe: set = set()
-        known_mines: set = set()
+        known_safe: set[tuple[int, int]] = set()
+        known_mines: set[tuple[int, int]] = set()
 
-        for r in range(rows):
-            for c in range(cols):
-                if not revealed[r][c] or board[r][c] <= 0:
-                    continue
-                number    = board[r][c]
-                neighbors = [
-                    (r + dr, c + dc)
-                    for dr in range(-1, 2) for dc in range(-1, 2)
-                    if (dr, dc) != (0, 0) and 0 <= r + dr < rows and 0 <= c + dc < cols
-                ]
-                flagged_n = sum(1 for nr, nc in neighbors if flagged[nr][nc])
-                unknown   = [(nr, nc) for nr, nc in neighbors
-                             if not revealed[nr][nc] and not flagged[nr][nc]]
-                remaining = number - flagged_n
-                if remaining == 0:
-                    known_safe.update(unknown)
-                elif remaining == len(unknown) and unknown:
-                    known_mines.update(unknown)
+        def _constraints() -> list[tuple[frozenset, int]]:
+            """Constraints from all revealed numbered cells, adjusted for known deductions."""
+            result = []
+            for r in range(rows):
+                for c in range(cols):
+                    if not revealed[r][c] or board[r][c] <= 0:
+                        continue
+                    nbrs = [
+                        (r + dr, c + dc)
+                        for dr in range(-1, 2) for dc in range(-1, 2)
+                        if (dr, dc) != (0, 0) and 0 <= r + dr < rows and 0 <= c + dc < cols
+                    ]
+                    fl  = sum(1 for nr, nc in nbrs if flagged[nr][nc])
+                    km  = sum(1 for nr, nc in nbrs if (nr, nc) in known_mines and not flagged[nr][nc])
+                    unk = frozenset(
+                        (nr, nc) for nr, nc in nbrs
+                        if not revealed[nr][nc]
+                        and not flagged[nr][nc]
+                        and (nr, nc) not in known_mines
+                        and (nr, nc) not in known_safe
+                    )
+                    rem = board[r][c] - fl - km
+                    if unk and 0 <= rem <= len(unk):
+                        result.append((unk, rem))
+            return result
 
-        safe_choices = list(known_safe - known_mines)
-        if safe_choices:
-            row, col = safe_choices[0]
-            return {"row": row, "col": col, "action": "reveal"}
+        # ── Iterative constraint deduction ───────────────────
+        for _ in range(50):
+            changed = False
+            cons = _constraints()
 
-        candidates = [
+            # Pass 1: saturation (rem==0 → all safe) and completeness (rem==|cells| → all mines)
+            for cells, rem in cons:
+                if rem == 0 and (cells - known_safe):
+                    known_safe.update(cells)
+                    changed = True
+                if rem == len(cells) and (cells - known_mines):
+                    known_mines.update(cells)
+                    changed = True
+
+            # Pass 2: subset deduction — if A ⊂ B then (B\A) contains exactly (B.rem − A.rem) mines
+            for i, (ca, ra) in enumerate(cons):
+                for j, (cb, rb) in enumerate(cons):
+                    if i == j or not ca or not cb:
+                        continue
+                    if ca < cb:                    # strict subset
+                        diff   = cb - ca
+                        diff_r = rb - ra
+                        if not (0 <= diff_r <= len(diff)):
+                            continue
+                        if diff_r == 0 and (diff - known_safe):
+                            known_safe.update(diff)
+                            changed = True
+                        if diff_r == len(diff) and (diff - known_mines):
+                            known_mines.update(diff)
+                            changed = True
+
+            if not changed:
+                break
+
+        cons = _constraints()    # rebuild after all deductions
+
+        # ── Priority 1: flag a known mine ────────────────────
+        for r, c in known_mines:
+            if not flagged[r][c]:
+                return {"row": r, "col": c, "action": "flag"}
+
+        # ── Priority 2: reveal a known safe cell ─────────────
+        if known_safe:
+            r, c = next(iter(known_safe))
+            return {"row": r, "col": c, "action": "reveal"}
+
+        # ── Priority 3: probability-based guess ──────────────
+        flagged_count = sum(flagged[r][c] for r in range(rows) for c in range(cols))
+        mines_left    = total_mines - flagged_count - len(known_mines)
+
+        all_unknown = [
             (r, c) for r in range(rows) for c in range(cols)
             if not revealed[r][c] and not flagged[r][c] and (r, c) not in known_mines
         ]
-        if candidates:
-            row, col = random.choice(candidates)
-            return {"row": row, "col": col, "action": "reveal"}
+        if not all_unknown:
+            return None
 
-        return None
+        # Mine-probability samples from each constraint
+        samples: dict[tuple, list[float]] = {}
+        constrained: set[tuple] = set()
+        for cells, rem in cons:
+            if not cells:
+                continue
+            p = rem / len(cells)
+            constrained.update(cells)
+            for cell in cells:
+                samples.setdefault(cell, []).append(p)
+
+        frontier_prob = {cell: sum(ps) / len(ps) for cell, ps in samples.items()}
+
+        # Global probability for cells not adjacent to any revealed cell
+        unknown_set    = set(all_unknown)
+        n_interior     = sum(1 for c in all_unknown if c not in constrained)
+        expected_fm    = sum(frontier_prob.get(c, 0) for c in constrained if c in unknown_set)
+        interior_mines = max(0.0, mines_left - expected_fm)
+        global_prob    = min(1.0, interior_mines / max(1, n_interior)) if n_interior else 1.0
+
+        prob_map = {
+            cell: frontier_prob.get(cell, global_prob)
+            for cell in all_unknown
+        }
+
+        best = min(prob_map, key=prob_map.get)
+        r, c = best
+        return {"row": r, "col": c, "action": "reveal"}
 
     def board_to_prompt(self, state: dict) -> str:
         board    = state["board"]

@@ -24,7 +24,7 @@
           @for (col of cols; track col) {
             <div
               [class]="cellClass(r, col)"
-              [ngStyle]="cellStyle(r, col)"
+              [ngStyle]="board[r]?.[col] ? cellStyle(r, col) : hoverCellStyle(r, col)"
               (mouseenter)="hoveredCol = col"
               (mouseleave)="hoveredCol = null"
               (click)="drop(col)">
@@ -33,17 +33,5 @@
         </div>
       }
     </div>
-
-    @if (isTerminal()) {
-      <div class="result-banner">
-        @if (gameState.draw) {
-          <span><i class="fa-solid fa-handshake"></i> ¡Empate!</span>
-        } @else if (isWinner) {
-          <span><i class="fa-solid fa-trophy"></i> ¡Ganaste!</span>
-        } @else {
-          <span><i class="fa-solid fa-skull"></i> Perdiste</span>
-        }
-      </div>
-    }
   }
 </div>

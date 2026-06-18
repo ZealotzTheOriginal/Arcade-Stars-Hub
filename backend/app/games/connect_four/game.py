@@ -10,7 +10,7 @@ class ConnectFourGame(BaseGame):
     def get_initial_state(self, player_uids: list[str]) -> dict:
         return {
             "board": [[0] * COLS for _ in range(ROWS)],
-            "players": player_uids,          # [uid_p1, uid_p2]
+            "players": player_uids,
             "current_turn": player_uids[0],
             "winner": None,
             "draw": False,
@@ -35,6 +35,7 @@ class ConnectFourGame(BaseGame):
         winner = None
         draw = False
 
+        win_cells: list[list[int]] = []
         if state.get("game_mode") == "teams":
             teams = state.get("teams", {"a": [], "b": []})
             piece_team: dict[int, str] = {}
@@ -44,11 +45,15 @@ class ConnectFourGame(BaseGame):
                     piece_team[p] = "a"
                 elif p_uid in teams.get("b", []):
                     piece_team[p] = "b"
-            if self._check_win_team(board, row, col, piece, piece_team):
+            cells = self._find_win_cells_team(board, row, col, piece, piece_team)
+            if cells:
                 winner = uid
+                win_cells = cells
         else:
-            if self._check_win(board, row, col, piece):
+            cells = self._find_win_cells(board, row, col, piece)
+            if cells:
                 winner = uid
+                win_cells = cells
 
         if not winner and all(board[0][c] != 0 for c in range(COLS)):
             draw = True
@@ -63,6 +68,7 @@ class ConnectFourGame(BaseGame):
             "board": board,
             "current_turn": next_turn if not winner and not draw else uid,
             "winner": winner,
+            "win_cells": win_cells,
             "draw": draw,
             "move_count": state["move_count"] + 1,
         }
@@ -243,15 +249,39 @@ class ConnectFourGame(BaseGame):
         return -1
 
     def _check_win(self, board: list, row: int, col: int, piece: int) -> bool:
+        return self._find_win_cells(board, row, col, piece) is not None
+
+    def _find_win_cells(self, board: list, row: int, col: int, piece: int) -> list[list[int]] | None:
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         for dr, dc in directions:
-            count = 1
+            cells = [[row, col]]
             for sign in (1, -1):
                 r, c = row + sign * dr, col + sign * dc
                 while 0 <= r < ROWS and 0 <= c < COLS and board[r][c] == piece:
-                    count += 1
+                    cells.append([r, c])
                     r += sign * dr
                     c += sign * dc
-            if count >= WIN_LEN:
-                return True
-        return False
+            if len(cells) >= WIN_LEN:
+                return cells
+        return None
+
+    def _find_win_cells_team(self, board: list, row: int, col: int, piece: int, piece_team: dict) -> list[list[int]] | None:
+        team = piece_team.get(piece)
+        if team is None:
+            return self._find_win_cells(board, row, col, piece)
+        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        for dr, dc in directions:
+            cells = [[row, col]]
+            for sign in (1, -1):
+                r, c = row + sign * dr, col + sign * dc
+                while 0 <= r < ROWS and 0 <= c < COLS:
+                    cell = board[r][c]
+                    if cell != 0 and piece_team.get(cell) == team:
+                        cells.append([r, c])
+                        r += sign * dr
+                        c += sign * dc
+                    else:
+                        break
+            if len(cells) >= WIN_LEN:
+                return cells
+        return None

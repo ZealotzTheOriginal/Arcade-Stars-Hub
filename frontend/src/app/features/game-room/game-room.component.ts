@@ -32,7 +32,7 @@ import { MinesweeperComponent } from './games/minesweeper/minesweeper.component'
 export class GameRoomComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private ws = inject(WsService);
+  readonly ws = inject(WsService);
   private auth = inject(AuthService);
   private api = inject(ApiService);
   private challengeAnim = inject(ChallengeAnimService);

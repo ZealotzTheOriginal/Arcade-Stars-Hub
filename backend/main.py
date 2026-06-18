@@ -7,7 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.firebase_client import verify_token
 from app.websocket.manager import manager
-from app.websocket.handler import handle_message, unregister_presence, cleanup_stale_rooms
+import logging
+from app.websocket.handler import handle_message, unregister_presence, cleanup_stale_rooms, broadcast_lobby_update
+
+logger = logging.getLogger("arcade.ws")
 from app.api.routes import users, games, leaderboard
 
 # ── Game registry bootstrap ───────────────────────────────
@@ -133,9 +136,10 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
             await handle_message(ws, uid, raw)
     except WebSocketDisconnect:
         pass
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("WebSocket error uid=%s: %s", uid, exc)
     finally:
         await handle_message(ws, uid, json.dumps({"event": "leave_room", "data": {}}))
         manager.unregister_direct(uid)
         unregister_presence(uid)
+        await broadcast_lobby_update()

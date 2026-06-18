@@ -2,7 +2,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_user
 from app.games.registry import list_games, get_definition
-from app.websocket.handler import get_room, create_room, get_active_rooms
+from app.websocket.handler import get_room, create_room, get_active_rooms, broadcast_lobby_update
 
 router = APIRouter(prefix="/games", tags=["games"])
 
@@ -28,6 +28,7 @@ async def create_game_room(body: dict, user: dict = Depends(get_current_user)):
 
     room_id = str(uuid.uuid4())[:8].upper()
     room = create_room(room_id, game_id, user["uid"])
+    await broadcast_lobby_update()
     return {"room_id": room_id, "name": room["name"], "room": room}
 
 
