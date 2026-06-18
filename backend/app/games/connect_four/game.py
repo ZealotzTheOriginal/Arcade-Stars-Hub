@@ -34,9 +34,23 @@ class ConnectFourGame(BaseGame):
         board[row][col] = piece
         winner = None
         draw = False
-        if self._check_win(board, row, col, piece):
-            winner = uid
-        elif all(board[0][c] != 0 for c in range(COLS)):
+
+        if state.get("game_mode") == "teams":
+            teams = state.get("teams", {"a": [], "b": []})
+            piece_team: dict[int, str] = {}
+            for i, p_uid in enumerate(state["players"]):
+                p = i + 1
+                if p_uid in teams.get("a", []):
+                    piece_team[p] = "a"
+                elif p_uid in teams.get("b", []):
+                    piece_team[p] = "b"
+            if self._check_win_team(board, row, col, piece, piece_team):
+                winner = uid
+        else:
+            if self._check_win(board, row, col, piece):
+                winner = uid
+
+        if not winner and all(board[0][c] != 0 for c in range(COLS)):
             draw = True
 
         players = state["players"]
@@ -62,6 +76,11 @@ class ConnectFourGame(BaseGame):
     def get_scores(self, state: dict) -> dict[str, int]:
         winner = state.get("winner")
         players = state["players"]
+        if winner and state.get("game_mode") == "teams":
+            teams = state.get("teams", {"a": [], "b": []})
+            winning_team = "a" if winner in teams.get("a", []) else ("b" if winner in teams.get("b", []) else None)
+            if winning_team:
+                return {p: (100 if p in teams.get(winning_team, []) else 10) for p in players}
         if winner:
             return {p: (100 if p == winner else 10) for p in players}
         return {p: 25 for p in players}  # draw
@@ -73,11 +92,11 @@ class ConnectFourGame(BaseGame):
         return [c for c in range(COLS) if board[0][c] == 0]
 
     def get_best_move(self, state: dict) -> Any:
-        _AI_UID = "AI_PLAYER"
         players = state["players"]
-        if _AI_UID not in players:
-            return None
-        ai_piece = players.index(_AI_UID) + 1
+        ai_uids = [p for p in players if p.startswith("AI_")]
+        if len(ai_uids) != 1 or len(players) != 2:
+            return None  # minimax only for classic 1v1
+        ai_piece = players.index(ai_uids[0]) + 1
         human_piece = 3 - ai_piece
         board = [row[:] for row in state["board"]]
         col_order = sorted(range(COLS), key=lambda c: abs(c - COLS // 2))
@@ -186,14 +205,36 @@ class ConnectFourGame(BaseGame):
 
     def board_to_prompt(self, state: dict) -> str:
         board = state["board"]
-        symbols = {0: ".", 1: "X", 2: "O"}
+        piece_chars = [".", "X", "O", "A", "B"]  # supports up to 4 players
         lines = ["Connect Four board (rows top→bottom, cols 0-6):"]
         for row in board:
-            lines.append(" ".join(symbols[cell] for cell in row))
+            lines.append(" ".join(piece_chars[cell] if cell < len(piece_chars) else str(cell) for cell in row))
         lines.append("Column indices: 0 1 2 3 4 5 6")
         return "\n".join(lines)
 
     # ── helpers ──────────────────────────────────────────
+
+    def _check_win_team(self, board: list, row: int, col: int, piece: int, piece_team: dict) -> bool:
+        """Win check that treats same-team pieces as equivalent."""
+        team = piece_team.get(piece)
+        if team is None:
+            return self._check_win(board, row, col, piece)
+        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        for dr, dc in directions:
+            count = 1
+            for sign in (1, -1):
+                r, c = row + sign * dr, col + sign * dc
+                while 0 <= r < ROWS and 0 <= c < COLS:
+                    cell = board[r][c]
+                    if cell != 0 and piece_team.get(cell) == team:
+                        count += 1
+                        r += sign * dr
+                        c += sign * dc
+                    else:
+                        break
+            if count >= WIN_LEN:
+                return True
+        return False
 
     def _drop_row(self, board: list, col: int) -> int:
         for r in range(ROWS - 1, -1, -1):

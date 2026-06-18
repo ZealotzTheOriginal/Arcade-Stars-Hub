@@ -55,6 +55,9 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   disconnectedUids = signal<Set<string>>(new Set());
   toast = signal<string | null>(null);
   abandonedData = signal<{ uid: string; display_name: string } | null>(null);
+  abandonCountdown = signal(5);
+  maxPlayersShake = signal<number | null>(null);
+  colorSwapRequest = signal<{ requester_uid: string; requester_name: string; requester_color: string; target_color: string } | null>(null);
   showAbandonConfirm = signal(false);
   roomName = signal('');
   isInvited = signal(false);
@@ -70,8 +73,21 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   teams = signal<{ a: string[]; b: string[] }>({ a: [], b: [] });
 
   isLeader = computed(() => !!this.myUid && this.myUid === this.leaderUid());
-  canStart = computed(() => this.players().length >= this.minPlayers());
+  canStart = computed(() => this.players().length >= this.maxPlayers());
+  canAddAI = computed(() => this.players().length < this.maxPlayers());
   myColor = computed(() => this.playerColors()[this.myUid] ?? '');
+  isWinner = computed(() => {
+    const winner = this.gameOverData()?.winner;
+    if (!winner) return false;
+    if (winner === this.myUid) return true;
+    if (this.gameMode() === 'teams') {
+      const t = this.teams();
+      const myTeam = t.a?.includes(this.myUid) ? 'a' : t.b?.includes(this.myUid) ? 'b' : null;
+      const winTeam = t.a?.includes(winner) ? 'a' : t.b?.includes(winner) ? 'b' : null;
+      return myTeam !== null && winTeam === myTeam;
+    }
+    return false;
+  });
   playerSlots = computed<(PlayerInfo | null)[]>(() =>
     Array.from({ length: this.maxPlayers() }, (_, i) => this.players()[i] ?? null)
   );
@@ -84,6 +100,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   private subs: Subscription[] = [];
   private timerSub?: Subscription;
   private toastTimer?: ReturnType<typeof setTimeout>;
+  private abandonCdRef?: ReturnType<typeof setInterval>;
 
   async ngOnInit() {
     this.roomId = this.route.snapshot.paramMap.get('roomId') ?? '';
@@ -119,6 +136,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.subs.forEach((s) => s.unsubscribe());
     this.timerSub?.unsubscribe();
     clearTimeout(this.toastTimer);
+    clearInterval(this.abandonCdRef);
     // WS stays alive — managed at app level for invites
   }
 
@@ -229,13 +247,29 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         this.showToast(`${msg.data.display_name} se reconectó`);
         break;
 
-      case 'game_abandoned':
+      case 'game_abandoned': {
         this.abandonedData.set({ uid: msg.data.uid, display_name: msg.data.display_name });
         this.roomStatus.set('finished');
         this.stopTimer();
+        this.abandonCountdown.set(5);
+        clearInterval(this.abandonCdRef);
+        this.abandonCdRef = setInterval(() => this.abandonCountdown.update(n => Math.max(0, n - 1)), 1000);
+        break;
+      }
+
+      case 'color_swap_request':
+        this.colorSwapRequest.set(msg.data);
+        break;
+
+      case 'color_swap_declined':
+        this.showToast(`${msg.data.target_name} rechazó el cambio de color`);
         break;
 
       case 'room_closed':
+        this.router.navigate(['/home']);
+        break;
+
+      case 'kicked':
         this.router.navigate(['/home']);
         break;
     }
@@ -284,8 +318,20 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   }
 
   setPlayerColor(hex: string) {
-    if (this.isColorTaken(hex)) return;
-    this.ws.send('set_player_color', { room_id: this.roomId, color: hex });
+    const blocker = this.colorBlocker(hex);
+    if (!blocker || (blocker as any).is_ai) {
+      this.ws.send('set_player_color', { room_id: this.roomId, color: hex });
+      return;
+    }
+    this.ws.send('request_color_swap', { room_id: this.roomId, target_uid: blocker.uid });
+    this.showToast('Solicitud de cambio de color enviada...');
+  }
+
+  respondColorSwap(accept: boolean) {
+    const req = this.colorSwapRequest();
+    if (!req) return;
+    this.ws.send('respond_color_swap', { room_id: this.roomId, requester_uid: req.requester_uid, accept });
+    this.colorSwapRequest.set(null);
   }
 
   setGameMode(mode: 'ffa' | 'teams') {
@@ -293,16 +339,47 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   }
 
   setMaxPlayers(n: number) {
+    const humanCount = this.humanPlayers().length;
+    if (humanCount > n) {
+      this.showToast(`Hay ${humanCount} jugadores humanos en la sala. Expulsa a uno para reducir el límite.`);
+      this.maxPlayersShake.set(n);
+      setTimeout(() => this.maxPlayersShake.set(null), 500);
+      return;
+    }
     this.ws.send('set_max_players', { room_id: this.roomId, max_players: n });
+  }
+
+  kickPlayer(uid: string) {
+    this.ws.send('kick_player', { room_id: this.roomId, uid });
+  }
+
+  joinAsPlayer() {
+    this.isSpectator.set(false);
+    this._joinRoom();
   }
 
   assignTeam(targetUid: string, team: 'a' | 'b') {
     this.ws.send('assign_team', { room_id: this.roomId, uid: targetUid, team });
   }
 
+  colorBlocker(hex: string): PlayerInfo | null {
+    const myTeam = this.gameMode() === 'teams' ? this.playerTeam(this.myUid) : null;
+    const entry = Object.entries(this.playerColors()).find(([uid, color]) => {
+      if (color !== hex || uid === this.myUid) return false;
+      if (myTeam !== null) return this.playerTeam(uid) !== myTeam;
+      return true;
+    });
+    if (!entry) return null;
+    return this.players().find(p => p.uid === entry[0]) ?? null;
+  }
+
   isColorTaken(hex: string): boolean {
-    return Object.entries(this.playerColors())
-      .some(([uid, color]) => color === hex && uid !== this.myUid);
+    const blocker = this.colorBlocker(hex);
+    return blocker !== null && !(blocker as any).is_ai;
+  }
+
+  isInRoom(uid: string): boolean {
+    return this.players().some(p => p.uid === uid);
   }
 
   playerTeam(uid: string): 'a' | 'b' | null {

@@ -303,8 +303,12 @@ export class App implements OnInit, OnDestroy {
           this._clearInvite();
           const data = msg.data as InviteAcceptedData;
           this.challengeAnim.show();
-          // Navigate immediately — animation overlays the transition.
-          // Go through /home first to force Angular to destroy any active
+          // If already in the target room (inviter redirected back to their own room),
+          // skip navigation — leaving would destroy the room via leave_room.
+          if (this.router.url.startsWith(`/room/${data.room_id}`)) {
+            return;
+          }
+          // Navigate through /home first to force Angular to destroy any active
           // GameRoomComponent (same-pattern routes are reused without destroy).
           this.router.navigate(['/home']).then(() => {
             this.router.navigate(['/room', data.room_id], {

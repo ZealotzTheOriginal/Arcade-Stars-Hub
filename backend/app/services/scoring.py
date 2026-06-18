@@ -19,7 +19,7 @@ async def award_points(scores: dict[str, int], game_id: str):
     batch = db.batch()
 
     for uid, pts in scores.items():
-        if uid == "AI_PLAYER" or pts <= 0:
+        if uid.startswith("AI_") or pts <= 0:
             continue
         user_ref = db.collection("users").document(uid)
         batch.update(user_ref, {
@@ -32,7 +32,7 @@ async def award_points(scores: dict[str, int], game_id: str):
 
     # Update levels (separate pass — reads after batch commit)
     for uid in scores:
-        if uid == "AI_PLAYER":
+        if uid.startswith("AI_"):
             continue
         user_ref = db.collection("users").document(uid)
         snap = user_ref.get()
@@ -43,7 +43,7 @@ async def award_points(scores: dict[str, int], game_id: str):
 
 
 async def mark_win(uid: str, game_id: str):
-    if uid == "AI_PLAYER":
+    if uid.startswith("AI_"):
         return
     db = get_db()
     db.collection("users").document(uid).update({

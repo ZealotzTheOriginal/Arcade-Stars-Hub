@@ -48,6 +48,18 @@ export class ConnectFourComponent {
     return classes.join(' ');
   }
 
+  get isWinner(): boolean {
+    const winner = this.gameState?.winner;
+    if (!winner || !this.myUid) return false;
+    if (winner === this.myUid) return true;
+    if (this.gameMode === 'teams') {
+      const myTeam = this.teams.a?.includes(this.myUid) ? 'a' : this.teams.b?.includes(this.myUid) ? 'b' : null;
+      const winTeam = this.teams.a?.includes(winner) ? 'a' : this.teams.b?.includes(winner) ? 'b' : null;
+      return myTeam !== null && winTeam === myTeam;
+    }
+    return false;
+  }
+
   cellStyle(row: number, col: number): { [key: string]: string } {
     const cell = this.board[row]?.[col] ?? 0;
     if (cell === 0) return {};
@@ -57,9 +69,13 @@ export class ConnectFourComponent {
     if (!uid) return {};
 
     const colors = this._chipColors(uid);
+    const isSplit = colors.length > 1;
     return {
       background: this._chipBackground(colors),
-      'box-shadow': `0 0 10px ${colors[0]}99`,
+      // Inner ring masks aliasing artifacts at the circle edge for split chips
+      'box-shadow': isSplit
+        ? `inset 0 0 0 1.5px rgba(0,0,0,0.4), 0 0 10px ${colors[0]}99`
+        : `0 0 10px ${colors[0]}99`,
       'border-color': 'transparent',
     };
   }
@@ -84,8 +100,10 @@ export class ConnectFourComponent {
     if (colors.length === 1) {
       return `${sheen}, ${colors[0]}`;
     }
-    // diagonal / cut: bottom-left = colors[0], top-right = colors[1]
-    const split = `linear-gradient(45deg, ${colors[0]} 50%, ${colors[1]} 50%)`;
+    // Starting at 225deg places the 0°/360° seam in the middle of a solid color zone,
+    // so the two hard color stops (at 90° and 270°) don't coincide with the gradient
+    // wrap-around — eliminating the aliasing bleed at the circle edge tips.
+    const split = `conic-gradient(from 225deg at 50% 50%, ${colors[0]} 0deg 90deg, ${colors[1]} 90deg 270deg, ${colors[0]} 270deg 360deg)`;
     return `${sheen}, ${split}`;
   }
 }

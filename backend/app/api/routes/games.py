@@ -27,12 +27,7 @@ async def create_game_room(body: dict, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Game not found")
 
     room_id = str(uuid.uuid4())[:8].upper()
-    player_info = {
-        "uid": user["uid"],
-        "display_name": body.get("display_name", "Player"),
-        "avatar": body.get("avatar", "⭐"),
-    }
-    room = create_room(room_id, game_id, user["uid"], player_info)
+    room = create_room(room_id, game_id, user["uid"])
     return {"room_id": room_id, "name": room["name"], "room": room}
 
 

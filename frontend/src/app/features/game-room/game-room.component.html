@@ -63,6 +63,7 @@
                       <span class="tag tag--leader"><i class="fa-solid fa-crown"></i> Líder</span>
                     }
                     @if (slot.is_ai) { <span class="tag tag--ai">IA</span> }
+                    @if (!slot.is_ai && slot.uid !== leaderUid()) { <span class="tag tag--guest"><i class="fa-solid fa-user"></i> Invitado</span> }
                     @if (disconnectedUids().has(slot.uid)) { <span class="tag tag--dc">DC</span> }
                   </div>
                   @if (gameMode() === 'teams') {
@@ -76,6 +77,11 @@
                         Equipo {{ playerTeam(slot.uid)!.toUpperCase() }}
                       </span>
                     }
+                  }
+                  @if (isLeader() && !isSpectator() && slot.uid !== myUid) {
+                    <button class="slot-kick-btn" (click)="kickPlayer(slot.uid)" title="Expulsar">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
                   }
                 </div>
               } @else {
@@ -98,9 +104,9 @@
                     [style.background]="hex"
                     [class.selected]="myColor() === hex"
                     [class.taken]="isColorTaken(hex)"
-                    [disabled]="isColorTaken(hex)"
                     (click)="setPlayerColor(hex)">
                     @if (myColor() === hex) { <i class="fa-solid fa-check"></i> }
+                    @else if (isColorTaken(hex)) { <i class="fa-solid fa-right-left"></i> }
                   </button>
                 }
               </div>
@@ -115,7 +121,10 @@
                   <p class="leader-section-label"><i class="fa-solid fa-user-group"></i> Jugadores en sala</p>
                   <div class="mode-toggle">
                     @for (n of [2, 3, 4]; track n) {
-                      <button class="mode-btn" [class.active]="maxPlayers() === n" (click)="setMaxPlayers(n)">
+                      <button class="mode-btn"
+                        [class.active]="maxPlayers() === n"
+                        [class.shake-error]="maxPlayersShake() === n"
+                        (click)="setMaxPlayers(n)">
                         {{ n }}
                       </button>
                     }
@@ -123,7 +132,7 @@
                 </div>
               }
 
-              @if (maxPlayers() > 2) {
+              @if (maxPlayers() === 4) {
                 <div class="mode-section">
                   <p class="leader-section-label"><i class="fa-solid fa-sliders"></i> Modo de juego</p>
                   <div class="mode-toggle">
@@ -138,10 +147,10 @@
               }
 
               <div class="lobby-actions">
-                @if (!hasAI()) {
+                @if (canAddAI()) {
                   <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> Añadir IA</button>
                 }
-                @if (friends().length > 0) {
+                @if (friends().length > 0 && players().length < maxPlayers()) {
                   <button class="btn btn--ghost" (click)="showFriendsModal.set(true)"><i class="fa-solid fa-user-group"></i> Invitar amigo</button>
                 }
               </div>
@@ -159,7 +168,7 @@
               } @else {
                 <p class="waiting-players-hint">
                   <i class="fa-solid fa-hourglass-half"></i>
-                  Esperando jugadores... ({{ players().length }}/{{ minPlayers() }})
+                  Esperando jugadores... ({{ players().length }}/{{ maxPlayers() }})
                 </p>
               }
             } @else {
@@ -169,7 +178,14 @@
               </p>
             }
           } @else {
-            <p class="hint">Estás como espectador</p>
+            <div class="spectator-join">
+              <p class="hint">Estás como espectador</p>
+              @if (players().length < maxPlayers()) {
+                <button class="btn btn--primary" (click)="joinAsPlayer()">
+                  <i class="fa-solid fa-right-to-bracket"></i> Unirse a la partida
+                </button>
+              }
+            </div>
           }
 
         </div>
@@ -210,6 +226,7 @@
         <div class="game-over-banner">
           <span class="result loss"><i class="fa-solid fa-flag"></i> Partida abandonada</span>
           <p class="abandon-msg">{{ abandonedData()!.display_name }} abandonó la partida. Nadie recibe puntos.</p>
+          <p class="abandon-msg">La sala se cerrará en {{ abandonCountdown() }}s...</p>
           <a class="btn btn--ghost" routerLink="/home">Volver al inicio</a>
         </div>
       }
@@ -217,7 +234,7 @@
       <!-- Game over overlay -->
       @if (gameOverData()) {
         <div class="game-over-banner">
-          @if (gameOverData().winner === myUid) {
+          @if (isWinner()) {
             <span class="result win"><i class="fa-solid fa-trophy"></i> ¡Victoria!</span>
           } @else if (!gameOverData().winner) {
             <span class="result draw"><i class="fa-solid fa-handshake"></i> Empate</span>
@@ -255,6 +272,24 @@
   </div>
 </div>
 
+@if (colorSwapRequest()) {
+  <div class="abandon-overlay">
+    <div class="abandon-dialog card" (click)="$event.stopPropagation()">
+      <span class="abandon-dialog-icon">
+        <span class="swap-color-dot" [style.background]="colorSwapRequest()!.requester_color"></span>
+        <i class="fa-solid fa-right-left" style="font-size:1rem; color: var(--text-muted)"></i>
+        <span class="swap-color-dot" [style.background]="colorSwapRequest()!.target_color"></span>
+      </span>
+      <h3>Cambio de color</h3>
+      <p><strong>{{ colorSwapRequest()!.requester_name }}</strong> quiere intercambiar su color por el tuyo.</p>
+      <div class="abandon-dialog-actions">
+        <button class="btn btn--ghost" (click)="respondColorSwap(false)">Rechazar</button>
+        <button class="btn btn--primary" (click)="respondColorSwap(true)">Aceptar</button>
+      </div>
+    </div>
+  </div>
+}
+
 @if (showFriendsModal()) {
   <div class="abandon-overlay" (click)="showFriendsModal.set(false)">
     <div class="friends-modal card" (click)="$event.stopPropagation()">
@@ -264,7 +299,9 @@
           <div class="friend-invite-row" [class.fi-offline]="!isFriendOnline(f.uid)">
             <span class="fi-avatar">{{ f.avatar }}</span>
             <span class="fi-name">{{ f.display_name }}</span>
-            @if (isFriendOnline(f.uid)) {
+            @if (isInRoom(f.uid)) {
+              <span class="fi-status">En sala</span>
+            } @else if (isFriendOnline(f.uid)) {
               <button class="btn btn--primary btn--xs" (click)="inviteFriend(f.uid)">Invitar</button>
             } @else {
               <span class="fi-status">Sin conexión</span>

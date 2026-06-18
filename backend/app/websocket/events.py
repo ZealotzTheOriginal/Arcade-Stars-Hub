@@ -24,6 +24,9 @@ class ClientEvent(str, Enum):
     SET_GAME_MODE = "set_game_mode"
     ASSIGN_TEAM = "assign_team"
     SET_MAX_PLAYERS = "set_max_players"
+    KICK_PLAYER = "kick_player"
+    REQUEST_COLOR_SWAP = "request_color_swap"
+    RESPOND_COLOR_SWAP = "respond_color_swap"
 
 
 # ── Outgoing event types (server → client) ──────────────
@@ -53,6 +56,9 @@ class ServerEvent(str, Enum):
     FRIEND_REQUEST = "friend_request"
     FRIEND_REQUEST_REJECTED = "friend_request_rejected"
     FRIEND_REMOVED = "friend_removed"
+    KICKED = "kicked"
+    COLOR_SWAP_REQUEST = "color_swap_request"
+    COLOR_SWAP_DECLINED = "color_swap_declined"
 
 
 class WSMessage(BaseModel):

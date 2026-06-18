@@ -13,9 +13,9 @@ containing your chosen move in the format specified. No explanation, no markdown
 """
 
 
-async def get_ai_move(game: BaseGame, state: dict) -> dict:
+async def get_ai_move(game: BaseGame, state: dict, ai_uid: str = AI_UID) -> dict:
     """Use game-specific algorithm first; fall back to DeepSeek LLM, then random."""
-    valid_moves = game.get_valid_moves(state, AI_UID)
+    valid_moves = game.get_valid_moves(state, ai_uid)
     if not valid_moves:
         raise ValueError("No valid moves for AI")
 
@@ -24,7 +24,10 @@ async def get_ai_move(game: BaseGame, state: dict) -> dict:
     if best is not None:
         return best
 
-    board_text = game.board_to_prompt(state)
+    try:
+        board_text = game.board_to_prompt(state)
+    except Exception:
+        return random.choice(valid_moves)
     user_msg = f"{board_text}\n\nYou are player O (piece 2). Pick your best move from the valid options: {json.dumps(valid_moves)}"
 
     try:

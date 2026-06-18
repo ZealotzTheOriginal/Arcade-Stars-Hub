@@ -38,7 +38,7 @@
       <div class="result-banner">
         @if (gameState.draw) {
           <span><i class="fa-solid fa-handshake"></i> ¡Empate!</span>
-        } @else if (gameState.winner === myUid) {
+        } @else if (isWinner) {
           <span><i class="fa-solid fa-trophy"></i> ¡Ganaste!</span>
         } @else {
           <span><i class="fa-solid fa-skull"></i> Perdiste</span>

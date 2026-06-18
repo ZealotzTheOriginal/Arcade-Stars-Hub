@@ -67,11 +67,11 @@ class TicTacToeGame(BaseGame):
         return [{"row": r, "col": c} for r in range(SIZE) for c in range(SIZE) if board[r][c] == 0]
 
     def get_best_move(self, state: dict) -> Any:
-        _AI_UID = "AI_PLAYER"
         players = state["players"]
-        if _AI_UID not in players:
-            return None
-        ai_piece = players.index(_AI_UID) + 1
+        ai_uids = [p for p in players if p.startswith("AI_")]
+        if len(ai_uids) != 1 or len(players) != 2:
+            return None  # minimax only for classic 1v1
+        ai_piece = players.index(ai_uids[0]) + 1
         human_piece = 3 - ai_piece
         board = [r[:] for r in state["board"]]
 
