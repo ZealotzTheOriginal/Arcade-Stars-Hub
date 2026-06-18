@@ -16,6 +16,9 @@
           <div class="user-badges">
             <span class="badge">Nivel {{ p.level }}</span>
             <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ p.total_points }} pts</span>
+            @if (p.is_admin) {
+              <span class="badge badge--admin"><i class="fa-solid fa-shield-halved"></i> Admin</span>
+            }
           </div>
         </div>
       </div>
@@ -35,6 +38,11 @@
           <span class="tab-badge">{{ pendingRequests().length + notifService.items().length }}</span>
         }
       </button>
+      @if (profile()?.is_admin) {
+        <button class="tab tab--admin" [class.active]="activeTab() === 'admin'" (click)="setTab('admin')">
+          <i class="fa-solid fa-shield-halved"></i> Admin
+        </button>
+      }
     </div>
 
     <!-- Content -->
@@ -296,9 +304,72 @@
         </section>
       }
 
+      <!-- Admin panel -->
+      @if (activeTab() === 'admin') {
+        <section class="admin-section">
+          <h2><i class="fa-solid fa-shield-halved"></i> Panel de Administración</h2>
+          @if (adminLoading()) {
+            <p class="empty">Cargando usuarios...</p>
+          } @else {
+            <div class="admin-user-list">
+              @for (u of adminUsers(); track u.uid) {
+                <div class="admin-user-row" [class.admin-user-row--admin]="u.is_admin">
+                  <div class="admin-user-menu-wrap">
+                    <button class="friend-menu-btn" (click)="toggleAdminMenu(u.uid)" title="Acciones">
+                      <i class="fa-solid fa-ellipsis-vertical"></i>
+                    </button>
+                    @if (openAdminMenuUid() === u.uid) {
+                      <div class="friend-menu-dropdown admin-dropdown">
+                        @if (u.is_admin) {
+                          <button class="friend-menu-item" (click)="adminSetAdmin(u.uid, false)">
+                            <i class="fa-solid fa-shield-halved"></i> Quitar admin
+                          </button>
+                        } @else {
+                          <button class="friend-menu-item" (click)="adminSetAdmin(u.uid, true)">
+                            <i class="fa-solid fa-shield-halved"></i> Hacer admin
+                          </button>
+                        }
+                        <button class="friend-menu-item" (click)="openAddPoints(u.uid)">
+                          <i class="fa-solid fa-plus"></i> Añadir puntos
+                        </button>
+                        <button class="friend-menu-item friend-menu-item--danger" (click)="adminResetPoints(u.uid)">
+                          <i class="fa-solid fa-rotate-left"></i> Resetear puntos
+                        </button>
+                      </div>
+                    }
+                  </div>
+                  <span class="admin-user-avatar">{{ u.avatar }}</span>
+                  <div class="admin-user-info">
+                    <span class="admin-user-name">{{ u.display_name }}</span>
+                    @if (u.is_admin) {
+                      <span class="badge badge--admin badge--xs"><i class="fa-solid fa-shield-halved"></i> Admin</span>
+                    }
+                  </div>
+                  <span class="admin-user-pts"><i class="fa-solid fa-star"></i> {{ u.total_points }} pts</span>
+                </div>
+              }
+            </div>
+          }
+        </section>
+      }
+
     </div>
   </div>
 </div>
+
+<!-- Add points modal -->
+@if (addPointsTarget()) {
+  <div class="overlay" (click)="addPointsTarget.set(null)">
+    <div class="add-points-modal card" (click)="$event.stopPropagation()">
+      <h3><i class="fa-solid fa-plus"></i> Añadir puntos</h3>
+      <input class="input" type="number" min="1" [(ngModel)]="addPointsAmount" placeholder="Cantidad de puntos" />
+      <div class="add-points-actions">
+        <button class="btn btn--primary" (click)="confirmAddPoints()">Confirmar</button>
+        <button class="btn btn--ghost" (click)="addPointsTarget.set(null)">Cancelar</button>
+      </div>
+    </div>
+  </div>
+}
 
 @if (invitingFriend()) {
   <div class="overlay" (click)="cancelFriendInvite()">

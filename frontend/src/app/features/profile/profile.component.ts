@@ -10,7 +10,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { UserProfile } from '../../core/models/user.model';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
 
-type Tab = 'stats' | 'games' | 'friends' | 'ranking' | 'notifs';
+type Tab = 'stats' | 'games' | 'friends' | 'ranking' | 'notifs' | 'admin';
 
 const AVATARS = [
   '🐉', '🦎', '🐀', '🦅', '🐺', '🦁', '🦂', '🦈',
@@ -45,6 +45,13 @@ export class ProfileComponent implements OnInit, OnDestroy {
   invitingFriend = signal<string | null>(null);
   openMenuUid = signal<string | null>(null);
   editName = '';
+
+  // Admin
+  adminUsers = signal<any[]>([]);
+  adminLoading = signal(false);
+  openAdminMenuUid = signal<string | null>(null);
+  addPointsTarget = signal<string | null>(null);
+  addPointsAmount = 0;
 
   readonly avatars = AVATARS;
 
@@ -92,6 +99,53 @@ export class ProfileComponent implements OnInit, OnDestroy {
     if (tab === 'notifs') {
       this.notifService.markAllRead();
     }
+    if (tab === 'admin') {
+      this._loadAdminUsers();
+    }
+  }
+
+  private async _loadAdminUsers() {
+    this.adminLoading.set(true);
+    try {
+      this.adminUsers.set(await this.api.adminGetAllUsers());
+    } catch { /* ignore */ } finally {
+      this.adminLoading.set(false);
+    }
+  }
+
+  toggleAdminMenu(uid: string) {
+    this.openAdminMenuUid.set(this.openAdminMenuUid() === uid ? null : uid);
+  }
+
+  async adminSetAdmin(uid: string, isAdmin: boolean) {
+    this.openAdminMenuUid.set(null);
+    await this.api.adminSetAdmin(uid, isAdmin);
+    this.adminUsers.update(list => list.map(u => u.uid === uid ? { ...u, is_admin: isAdmin } : u));
+    // Re-sort: admins first
+    this.adminUsers.update(list => [...list].sort((a, b) =>
+      (a.is_admin === b.is_admin ? 0 : a.is_admin ? -1 : 1) || b.total_points - a.total_points
+    ));
+  }
+
+  async adminResetPoints(uid: string) {
+    this.openAdminMenuUid.set(null);
+    await this.api.adminResetPoints(uid);
+    this.adminUsers.update(list => list.map(u => u.uid === uid ? { ...u, total_points: 0 } : u));
+  }
+
+  openAddPoints(uid: string) {
+    this.openAdminMenuUid.set(null);
+    this.addPointsAmount = 0;
+    this.addPointsTarget.set(uid);
+  }
+
+  async confirmAddPoints() {
+    const uid = this.addPointsTarget();
+    const pts = Number(this.addPointsAmount);
+    if (!uid || pts <= 0) return;
+    await this.api.adminAddPoints(uid, pts);
+    this.adminUsers.update(list => list.map(u => u.uid === uid ? { ...u, total_points: u.total_points + pts } : u));
+    this.addPointsTarget.set(null);
   }
 
   private async _loadFriends() {

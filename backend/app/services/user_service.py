@@ -21,6 +21,7 @@ async def get_or_create_user(uid: str, email: str, display_name: str) -> UserPro
             friends=data.get("friends", []),
             friend_requests=data.get("friend_requests", []),
             ttt_pattern=data.get("ttt_pattern", None),
+            is_admin=data.get("is_admin", False),
         )
 
     if not display_name:
@@ -112,6 +113,53 @@ async def reject_friend_request(uid: str, friend_uid: str):
     db.collection("users").document(uid).update({"friend_requests": ArrayRemove([friend_uid])})
     # Remove uid from friend_uid's friends (undo the one-sided add)
     db.collection("users").document(friend_uid).update({"friends": ArrayRemove([uid])})
+
+
+async def is_admin_user(uid: str) -> bool:
+    db = get_db()
+    snap = db.collection("users").document(uid).get()
+    return snap.exists and snap.to_dict().get("is_admin", False)
+
+
+async def get_all_users() -> list[dict]:
+    db = get_db()
+    users = []
+    for doc in db.collection("users").stream():
+        d = doc.to_dict()
+        users.append({
+            "uid": doc.id,
+            "display_name": d.get("display_name", "Unknown"),
+            "avatar": d.get("avatar", "⭐"),
+            "total_points": d.get("total_points", 0),
+            "level": d.get("level", 1),
+            "is_admin": d.get("is_admin", False),
+        })
+    users.sort(key=lambda u: (0 if u["is_admin"] else 1, -u["total_points"]))
+    return users
+
+
+async def set_admin(uid: str, is_admin: bool):
+    db = get_db()
+    db.collection("users").document(uid).update({"is_admin": is_admin})
+
+
+async def reset_user_points(uid: str):
+    db = get_db()
+    ref = db.collection("users").document(uid)
+    snap = ref.get()
+    if not snap.exists:
+        return
+    data = snap.to_dict()
+    game_stats = data.get("game_stats", {})
+    for game in game_stats:
+        game_stats[game]["points"] = 0
+    ref.update({"total_points": 0, "game_stats": game_stats})
+
+
+async def add_user_points(uid: str, points: int):
+    from google.cloud.firestore_v1.transforms import Increment
+    db = get_db()
+    db.collection("users").document(uid).update({"total_points": Increment(points)})
 
 
 async def remove_friend(uid: str, friend_uid: str):

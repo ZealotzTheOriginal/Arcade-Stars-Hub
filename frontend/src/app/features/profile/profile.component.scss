@@ -79,6 +79,14 @@
     background: rgba(255, 199, 0, 0.15);
     color: var(--rainbow-yellow);
   }
+
+  &--admin {
+    background: rgba(168, 85, 247, 0.18);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.35);
+  }
+
+  &--xs { font-size: 0.65rem; padding: 0.1rem 0.4rem; }
 }
 
 /* Profile body */
@@ -603,6 +611,83 @@
 }
 
 .empty { color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0; }
+
+/* Admin tab */
+.tab--admin {
+  color: #c084fc;
+  &.active { color: #c084fc; border-bottom-color: #c084fc; }
+}
+
+.admin-section h2 { margin-bottom: 1rem; }
+
+.admin-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.admin-user-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+
+  &--admin {
+    border-color: rgba(168, 85, 247, 0.25);
+    background: rgba(168, 85, 247, 0.06);
+  }
+}
+
+.admin-user-menu-wrap { position: relative; }
+
+.admin-dropdown { min-width: 170px; }
+
+.admin-user-avatar { font-size: 1.4rem; }
+
+.admin-user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-user-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-user-pts {
+  font-size: 0.8rem;
+  color: var(--rainbow-yellow);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+/* Add points modal */
+.add-points-modal {
+  padding: 1.5rem;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  h3 { margin: 0; font-size: 1rem; }
+
+  .input { width: 100%; }
+}
+
+.add-points-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
 
 .btn--sm { padding: 0.4rem 0.875rem; font-size: 0.82rem; }
 

@@ -14,6 +14,7 @@ export interface UserProfile {
   game_stats: Record<string, GameStats>;
   friends: string[];
   ttt_pattern?: string;
+  is_admin?: boolean;
 }
 
 export interface UserUpdate {

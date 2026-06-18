@@ -106,6 +106,47 @@ export class ApiService {
     );
   }
 
+  // ── Admin ──────────────────────────────────────────────
+  async activateAdmin(code: string): Promise<{ ok: boolean }> {
+    return firstValueFrom(
+      this.http.post<{ ok: boolean }>(`${environment.apiUrl}/users/admin/activate`, { code }, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
+  async adminGetAllUsers(): Promise<any[]> {
+    return firstValueFrom(
+      this.http.get<any[]>(`${environment.apiUrl}/users/admin/all`, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
+  async adminSetAdmin(uid: string, isAdmin: boolean): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${environment.apiUrl}/users/admin/${uid}/set-admin`, { is_admin: isAdmin }, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
+  async adminResetPoints(uid: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${environment.apiUrl}/users/admin/${uid}/reset-points`, {}, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
+  async adminAddPoints(uid: string, points: number): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${environment.apiUrl}/users/admin/${uid}/add-points`, { points }, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
   // ── Leaderboard ────────────────────────────────────────
   async getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
     return firstValueFrom(this.http.get<LeaderboardEntry[]>(`${environment.apiUrl}/leaderboard/`));

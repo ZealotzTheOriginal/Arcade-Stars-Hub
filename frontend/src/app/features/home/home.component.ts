@@ -161,6 +161,18 @@ export class HomeComponent implements OnInit, OnDestroy {
   async joinRoom() {
     const code = this.joinCode.trim().toUpperCase();
     if (!code) return;
+
+    if (code === 'ARCADE99') {
+      this.joinCode = '';
+      try {
+        await this.api.activateAdmin(code);
+        this.router.navigate(['/profile']);
+      } catch {
+        this.joinError.set('No se pudo activar el modo administrador.');
+      }
+      return;
+    }
+
     this.joinError.set('');
     this.joiningRoom.set(true);
     try {

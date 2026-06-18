@@ -19,6 +19,7 @@ class UserProfile(BaseModel):
     friends: list[str] = []
     friend_requests: list[str] = []
     ttt_pattern: Optional[str] = None
+    is_admin: bool = False
 
 
 class UserUpdate(BaseModel):
