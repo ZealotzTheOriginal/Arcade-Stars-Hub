@@ -60,7 +60,7 @@ async def lifespan(_: FastAPI):
             description="Descubre casillas sin explotar minas. Turnos alternos entre jugadores.",
             category="Puzzle",
             thumbnail="💣",
-            max_players=2,
+            max_players=4,
             has_ai=True,
         ),
         MinesweeperGame(),

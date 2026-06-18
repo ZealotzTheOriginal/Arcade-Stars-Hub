@@ -11,6 +11,7 @@ import { CommonModule } from '@angular/common';
 export class MinesweeperComponent {
   @Input() gameState: any = null;
   @Input() myUid: string = '';
+  @Input() players: any[] = [];
   @Output() moveMade = new EventEmitter<{ row: number; col: number; action: string }>();
 
   get rows(): number { return this.gameState?.rows ?? 9; }
@@ -18,27 +19,37 @@ export class MinesweeperComponent {
   get rowRange(): number[] { return Array.from({ length: this.rows }, (_, i) => i); }
   get colRange(): number[] { return Array.from({ length: this.cols }, (_, i) => i); }
 
-  get isMyTurn(): boolean {
-    return this.gameState?.current_turn === this.myUid;
+  get isMyTurn(): boolean { return this.gameState?.current_turn === this.myUid; }
+
+  get currentTurnPlayer(): any {
+    const uid = this.gameState?.current_turn;
+    return this.players.find(p => p.uid === uid) ?? null;
   }
 
-  isRevealed(r: number, c: number): boolean {
-    return this.gameState?.revealed?.[r]?.[c] ?? false;
+  get scoreboard(): { uid: string; name: string; avatar: string; score: number; isCurrent: boolean }[] {
+    const playerUids: string[] = this.gameState?.players ?? [];
+    const scores: Record<string, number> = this.gameState?.scores ?? {};
+    return playerUids.map(uid => {
+      const p = this.players.find(pl => pl.uid === uid);
+      return {
+        uid,
+        name: p?.display_name ?? uid,
+        avatar: p?.avatar ?? '⭐',
+        score: scores[uid] ?? 0,
+        isCurrent: uid === this.gameState?.current_turn,
+      };
+    }).sort((a, b) => b.score - a.score);
   }
 
-  isFlagged(r: number, c: number): boolean {
-    return this.gameState?.flagged?.[r]?.[c] ?? false;
-  }
-
-  cellValue(r: number, c: number): number {
-    return this.gameState?.board?.[r]?.[c] ?? -2;
-  }
+  isRevealed(r: number, c: number): boolean { return this.gameState?.revealed?.[r]?.[c] ?? false; }
+  isFlagged(r: number, c: number): boolean  { return this.gameState?.flagged?.[r]?.[c] ?? false; }
+  cellValue(r: number, c: number): number   { return this.gameState?.board?.[r]?.[c] ?? -2; }
 
   cellLabel(r: number, c: number): string {
     if (!this.isRevealed(r, c)) return this.isFlagged(r, c) ? '🚩' : '';
     const v = this.cellValue(r, c);
     if (v === -1) return '💥';
-    if (v === 0) return '';
+    if (v === 0)  return '';
     return v.toString();
   }
 

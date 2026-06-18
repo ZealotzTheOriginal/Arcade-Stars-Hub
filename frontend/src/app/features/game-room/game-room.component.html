@@ -131,8 +131,8 @@
             </div>
           }
 
-          <!-- Color picker -->
-          @if (!isSpectator()) {
+          <!-- Color picker (not used in minesweeper) -->
+          @if (!isSpectator() && gameId !== 'minesweeper') {
             <div class="color-picker-section">
               <p class="color-picker-label">Tu color de ficha</p>
               <div class="color-swatches">
@@ -154,7 +154,7 @@
           @if (isLeader() && !isSpectator()) {
             <div class="leader-panel">
 
-              @if (gameId === 'connect_four') {
+              @if (gameId === 'connect_four' || gameId === 'minesweeper') {
                 <div class="mode-section">
                   <p class="leader-section-label"><i class="fa-solid fa-user-group"></i> Jugadores en sala</p>
                   <div class="mode-toggle">
@@ -170,7 +170,21 @@
                 </div>
               }
 
-              @if (maxPlayers() === 4) {
+              @if (gameId === 'minesweeper') {
+                <div class="mode-section">
+                  <p class="leader-section-label"><i class="fa-solid fa-bomb"></i> Tamaño del tablero</p>
+                  <div class="mode-toggle mode-toggle--col">
+                    @for (s of MS_BOARD_SIZES; track s.id) {
+                      <button class="mode-btn mode-btn--board" [class.active]="msBoardSize() === s.id" (click)="setMsBoardSize(s.id)">
+                        <span>{{ s.label }}</span>
+                        <small>{{ s.detail }}</small>
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+
+              @if (maxPlayers() === 4 && gameId !== 'minesweeper') {
                 <div class="mode-section">
                   <p class="leader-section-label"><i class="fa-solid fa-sliders"></i> Modo de juego</p>
                   <div class="mode-toggle">
@@ -247,6 +261,7 @@
             <app-minesweeper
               [gameState]="gameState()"
               [myUid]="isSpectator() ? '' : myUid"
+              [players]="players()"
               (moveMade)="makeMove($event)">
             </app-minesweeper>
           }

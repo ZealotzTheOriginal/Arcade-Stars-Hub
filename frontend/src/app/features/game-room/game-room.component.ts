@@ -82,6 +82,13 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   readonly TTT_PATTERNS = ['Classic', 'Modern', 'Cyberpunk', 'Abstract', 'Squishy'];
   previewPiece = signal<'X' | 'O'>('X');
+
+  msBoardSize = signal<string>('normal');
+  readonly MS_BOARD_SIZES = [
+    { id: 'normal',       label: 'Normal',     detail: '9×9 · 10 minas' },
+    { id: 'intermediate', label: 'Intermedio', detail: '16×16 · 40 minas' },
+    { id: 'expert',       label: 'Experto',    detail: '30×16 · 99 minas' },
+  ];
   isWinner = computed(() => {
     const winner = this.gameOverData()?.winner;
     if (!winner) return false;
@@ -168,6 +175,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         if (msg.data.min_players) this.minPlayers.set(msg.data.min_players);
         if (msg.data.max_players) this.maxPlayers.set(msg.data.max_players);
         if (msg.data.player_colors) this.playerColors.set(msg.data.player_colors);
+        if (msg.data.ms_board_size) this.msBoardSize.set(msg.data.ms_board_size);
         if (msg.data.ttt_patterns !== undefined) {
           const patterns: Record<string, string> = { ...msg.data.ttt_patterns };
           if (this.gameId === 'tic_tac_toe' && !patterns[this.myUid] && this.myProfile?.ttt_pattern) {
@@ -392,6 +400,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   transferLeader(uid: string) {
     this.ws.send('transfer_leader', { room_id: this.roomId, target_uid: uid });
+  }
+
+  setMsBoardSize(size: string) {
+    this.ws.send('set_ms_board_size', { room_id: this.roomId, board_size: size });
   }
 
   setTttPattern(pattern: string) {

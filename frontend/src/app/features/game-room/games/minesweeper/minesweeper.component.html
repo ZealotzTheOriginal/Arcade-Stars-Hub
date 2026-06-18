@@ -2,17 +2,35 @@
   @if (!gameState) {
     <p class="waiting">Esperando que el juego comience...</p>
   } @else {
+
+    <!-- Scoreboard -->
+    @if (scoreboard.length > 1) {
+      <div class="ms-scoreboard">
+        @for (entry of scoreboard; track entry.uid) {
+          <div class="ms-score-entry" [class.current]="entry.isCurrent">
+            <span class="ms-score-avatar">{{ entry.avatar }}</span>
+            <span class="ms-score-name">{{ entry.name }}</span>
+            <span class="ms-score-pts">{{ entry.score }} pts</span>
+            @if (entry.isCurrent && !gameState.game_over) {
+              <span class="ms-turn-dot"></span>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Turn info -->
     <p class="turn-info">
       @if (gameState.game_over) {
         Juego terminado
       } @else if (isMyTurn) {
         ¡Tu turno! Haz clic para revelar · Clic derecho para marcar
       } @else {
-        Turno del oponente...
+        Turno de {{ currentTurnPlayer?.display_name ?? 'otro jugador' }}...
       }
     </p>
 
-    <div class="board" [style.grid-template-columns]="'repeat(' + cols + ', 32px)'">
+    <div class="board" [style.grid-template-columns]="'repeat(' + cols + ', var(--cell-size))'">
       @for (r of rowRange; track r) {
         @for (c of colRange; track c) {
           <div

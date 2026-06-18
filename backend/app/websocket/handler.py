@@ -136,6 +136,7 @@ def create_room(room_id: str, game_id: str, host_uid: str) -> dict:
         "rematch_votes": [],
         "player_colors": {},
         "ttt_patterns": {},
+        "ms_board_size": "normal",
         "game_mode": "ffa",
         "teams": {"a": [], "b": []},
     }
@@ -265,6 +266,7 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.RESPOND_COLOR_SWAP: _handle_respond_color_swap,
         ClientEvent.TRANSFER_LEADER: _handle_transfer_leader,
         ClientEvent.SET_TTT_PATTERN: _handle_set_ttt_pattern,
+        ClientEvent.SET_MS_BOARD_SIZE: _handle_set_ms_board_size,
     }
     handler = handlers.get(event)
     if handler:
@@ -901,6 +903,25 @@ async def _handle_set_ttt_pattern(ws: WebSocket, uid: str, data: dict):
     await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
 
 
+_MS_BOARD_SIZES = {"normal", "intermediate", "expert"}
+
+
+async def _handle_set_ms_board_size(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    board_size = data.get("board_size", "normal")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("leader_uid") != uid:
+        return
+    if room.get("game_id") != "minesweeper":
+        return
+    if board_size not in _MS_BOARD_SIZES:
+        return
+    room["ms_board_size"] = board_size
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+
+
 async def _handle_transfer_leader(ws: WebSocket, uid: str, data: dict):
     room_id = data.get("room_id")
     target_uid = data.get("target_uid")
@@ -968,7 +989,10 @@ async def _start_game(room_id: str):
         start = random.randrange(len(player_uids))
         player_uids = player_uids[start:] + player_uids[:start]
 
-    state = game.get_initial_state(player_uids)
+    if room["game_id"] == "minesweeper":
+        state = game.get_initial_state(player_uids, board_size=room.get("ms_board_size", "normal"))
+    else:
+        state = game.get_initial_state(player_uids)
     state["game_mode"] = room.get("game_mode", "ffa")
     state["teams"] = room.get("teams", {"a": [], "b": []})
     room["game_state"] = state

@@ -29,6 +29,7 @@ class ClientEvent(str, Enum):
     RESPOND_COLOR_SWAP = "respond_color_swap"
     TRANSFER_LEADER = "transfer_leader"
     SET_TTT_PATTERN = "set_ttt_pattern"
+    SET_MS_BOARD_SIZE = "set_ms_board_size"
 
 
 # ── Outgoing event types (server → client) ──────────────
