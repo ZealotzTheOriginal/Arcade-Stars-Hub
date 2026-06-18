@@ -6,6 +6,7 @@ from app.services.user_service import (
     add_friend, remove_friend, get_friend_profiles,
     accept_friend_request, reject_friend_request, get_user_info,
     is_admin_user, get_all_users, set_admin, reset_user_points, add_user_points,
+    reset_all_users_points,
 )
 from app.websocket.handler import get_online_users
 from app.websocket.manager import manager
@@ -116,6 +117,14 @@ async def admin_set_admin(uid: str, body: dict, _: dict = Depends(require_admin)
 @router.post("/admin/{uid}/reset-points")
 async def admin_reset_points(uid: str, _: dict = Depends(require_admin)):
     await reset_user_points(uid)
+    await manager.broadcast_global(ServerEvent.LEADERBOARD_UPDATED, {})
+    return {"ok": True}
+
+
+@router.post("/admin/reset-all-points")
+async def admin_reset_all_points(_: dict = Depends(require_admin)):
+    await reset_all_users_points()
+    await manager.broadcast_global(ServerEvent.LEADERBOARD_UPDATED, {})
     return {"ok": True}
 
 
@@ -125,4 +134,5 @@ async def admin_add_points(uid: str, body: dict, _: dict = Depends(require_admin
     if points <= 0:
         raise HTTPException(status_code=400, detail="points must be positive")
     await add_user_points(uid, points)
+    await manager.broadcast_global(ServerEvent.LEADERBOARD_UPDATED, {})
     return {"ok": True}

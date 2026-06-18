@@ -63,6 +63,7 @@ class ServerEvent(str, Enum):
     COLOR_SWAP_REQUEST = "color_swap_request"
     COLOR_SWAP_DECLINED = "color_swap_declined"
     LOBBY_UPDATE = "lobby_update"
+    LEADERBOARD_UPDATED = "leaderboard_updated"
 
 
 class WSMessage(BaseModel):

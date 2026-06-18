@@ -52,6 +52,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   openAdminMenuUid = signal<string | null>(null);
   addPointsTarget = signal<string | null>(null);
   addPointsAmount = 0;
+  resetAllConfirm = signal(false);
 
   readonly avatars = AVATARS;
 
@@ -79,10 +80,15 @@ export class ProfileComponent implements OnInit, OnDestroy {
     // Always load friends on init so notifications tab and pending count work immediately
     this._loadFriends();
 
-    // Listen for live friend requests while profile is open
+    // Listen for live events while profile is open
     this.wsSub = this.ws.messages$.subscribe((msg) => {
       if (msg.event === 'friend_request') {
         this._loadFriends();
+      }
+      if (msg.event === 'leaderboard_updated') {
+        this.api.getGlobalLeaderboard()
+          .then((lb) => this.leaderboard.set(lb))
+          .catch(() => {});
       }
     });
   }
@@ -137,6 +143,12 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.openAdminMenuUid.set(null);
     this.addPointsAmount = 0;
     this.addPointsTarget.set(uid);
+  }
+
+  async adminResetAllPoints() {
+    this.resetAllConfirm.set(false);
+    await this.api.adminResetAllPoints();
+    this.adminUsers.update(list => list.map(u => ({ ...u, total_points: 0 })));
   }
 
   async confirmAddPoints() {

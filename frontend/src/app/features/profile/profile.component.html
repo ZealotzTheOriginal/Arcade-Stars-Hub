@@ -291,12 +291,14 @@
           <div class="lb-list">
             @for (entry of leaderboard(); track entry.uid; let i = $index) {
               <div class="lb-row"
-                [class.lb-gold]="i === 0"
-                [class.lb-silver]="i === 1"
-                [class.lb-bronze]="i === 2"
+                [class.lb-gold]="i === 0 && entry.points > 0"
+                [class.lb-silver]="i === 1 && entry.points > 0"
+                [class.lb-bronze]="i === 2 && entry.points > 0"
                 [class.me]="entry.uid === profile()?.uid">
                 <span class="lb-rank">{{ entry.rank }}</span>
-                <span class="lb-name">{{ entry.display_name }}</span>
+                <span class="lb-name" [class.lb-name--empty]="entry.points === 0">
+                  {{ entry.points > 0 ? entry.display_name : '- - - | - - -' }}
+                </span>
                 <span class="lb-pts">{{ entry.points }}</span>
               </div>
             }
@@ -308,6 +310,21 @@
       @if (activeTab() === 'admin') {
         <section class="admin-section">
           <h2><i class="fa-solid fa-shield-halved"></i> Panel de Administración</h2>
+
+          <div class="admin-danger-bar">
+            @if (!resetAllConfirm()) {
+              <button class="btn btn--danger btn--sm" (click)="resetAllConfirm.set(true)">
+                <i class="fa-solid fa-rotate-left"></i> Resetear todos los puntos
+              </button>
+            } @else {
+              <span class="admin-danger-label">¿Confirmar reset global?</span>
+              <button class="btn btn--danger btn--sm" (click)="adminResetAllPoints()">
+                <i class="fa-solid fa-check"></i> Sí, resetear todo
+              </button>
+              <button class="btn btn--ghost btn--sm" (click)="resetAllConfirm.set(false)">Cancelar</button>
+            }
+          </div>
+
           @if (adminLoading()) {
             <p class="empty">Cargando usuarios...</p>
           } @else {

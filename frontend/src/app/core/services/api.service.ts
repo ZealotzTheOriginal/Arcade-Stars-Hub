@@ -147,6 +147,14 @@ export class ApiService {
     );
   }
 
+  async adminResetAllPoints(): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${environment.apiUrl}/users/admin/reset-all-points`, {}, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
   // ── Leaderboard ────────────────────────────────────────
   async getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
     return firstValueFrom(this.http.get<LeaderboardEntry[]>(`${environment.apiUrl}/leaderboard/`));

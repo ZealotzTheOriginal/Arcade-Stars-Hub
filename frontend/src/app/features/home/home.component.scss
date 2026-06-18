@@ -791,6 +791,14 @@
     color: transparent;
     -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.75);
     word-break: break-word;
+
+    &--empty {
+      color: var(--text-muted);
+      -webkit-text-stroke: 0;
+      font-style: italic;
+      opacity: 0.4;
+      letter-spacing: 0.04em;
+    }
   }
   .lb-pts { color: var(--text-muted); font-weight: 400; white-space: nowrap; text-align: right; }
 

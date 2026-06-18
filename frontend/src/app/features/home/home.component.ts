@@ -104,6 +104,11 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.loadingRooms.set(false);
         this._checkReconnectable();
       }
+      if (msg.event === 'leaderboard_updated') {
+        this.api.getGlobalLeaderboard()
+          .then((lb) => this.leaderboard.set(lb))
+          .catch(() => {});
+      }
     });
   }
 

@@ -230,6 +230,14 @@
     color: transparent;
     -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.75);
     word-break: break-word;
+
+    &--empty {
+      color: var(--text-muted);
+      -webkit-text-stroke: 0;
+      font-style: italic;
+      opacity: 0.4;
+      letter-spacing: 0.04em;
+    }
   }
   .lb-pts { color: var(--text-muted); font-weight: 400; white-space: nowrap; text-align: right; }
 
@@ -612,84 +620,25 @@
 
 .empty { color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0; }
 
-/* Admin tab */
-.tab--admin {
-  color: #c084fc;
-  &.active { color: #c084fc; border-bottom-color: #c084fc; }
-}
+.btn--sm { padding: 0.4rem 0.875rem; font-size: 0.82rem; }
 
-.admin-section h2 { margin-bottom: 1rem; }
-
-.admin-user-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.admin-user-row {
+.admin-danger-bar {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.6rem 0.85rem;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-
-  &--admin {
-    border-color: rgba(168, 85, 247, 0.25);
-    background: rgba(168, 85, 247, 0.06);
-  }
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
 }
 
-.admin-user-menu-wrap { position: relative; }
-
-.admin-dropdown { min-width: 170px; }
-
-.admin-user-avatar { font-size: 1.4rem; }
-
-.admin-user-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.admin-user-name {
+.admin-danger-label {
+  font-size: 0.85rem;
+  color: #f87171;
   font-weight: 600;
-  font-size: 0.88rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 1;
 }
-
-.admin-user-pts {
-  font-size: 0.8rem;
-  color: var(--rainbow-yellow);
-  white-space: nowrap;
-  margin-left: auto;
-}
-
-/* Add points modal */
-.add-points-modal {
-  padding: 1.5rem;
-  min-width: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-
-  h3 { margin: 0; font-size: 1rem; }
-
-  .input { width: 100%; }
-}
-
-.add-points-actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-}
-
-.btn--sm { padding: 0.4rem 0.875rem; font-size: 0.82rem; }
 
 @keyframes rainbow-text {
   0%   { color: var(--rainbow-red); }

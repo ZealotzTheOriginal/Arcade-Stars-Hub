@@ -1,6 +1,7 @@
-from google.cloud.firestore_v1 import AsyncClient
 from google.cloud.firestore_v1.transforms import Increment
 from app.core.firebase_client import get_db
+from app.websocket.manager import manager
+from app.websocket.events import ServerEvent
 
 
 LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 4000, 8000]
@@ -40,6 +41,8 @@ async def award_points(scores: dict[str, int], game_id: str):
             total = snap.to_dict().get("total_points", 0)
             new_level = _calc_level(total)
             user_ref.update({"level": new_level})
+
+    await manager.broadcast_global(ServerEvent.LEADERBOARD_UPDATED, {})
 
 
 async def mark_win(uid: str, game_id: str):

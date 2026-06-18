@@ -156,6 +156,16 @@ async def reset_user_points(uid: str):
     ref.update({"total_points": 0, "game_stats": game_stats})
 
 
+async def reset_all_users_points():
+    db = get_db()
+    for doc in db.collection("users").stream():
+        data = doc.to_dict()
+        game_stats = data.get("game_stats", {})
+        for game in game_stats:
+            game_stats[game]["points"] = 0
+        doc.reference.update({"total_points": 0, "level": 1, "game_stats": game_stats})
+
+
 async def add_user_points(uid: str, points: int):
     from google.cloud.firestore_v1.transforms import Increment
     db = get_db()
