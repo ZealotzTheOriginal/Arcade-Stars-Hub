@@ -18,6 +18,7 @@ import { ConnectFourComponent } from './games/connect-four/connect-four.componen
 import { TicTacToeComponent } from './games/tic-tac-toe/tic-tac-toe.component';
 import { MinesweeperComponent } from './games/minesweeper/minesweeper.component';
 import { SnakeComponent } from './games/snake/snake.component';
+import { PongComponent } from './games/pong/pong.component';
 
 @Component({
   selector: 'app-game-room',
@@ -25,7 +26,8 @@ import { SnakeComponent } from './games/snake/snake.component';
   imports: [
     CommonModule, RouterLink,
     HudComponent, ChatComponent,
-    ConnectFourComponent, TicTacToeComponent, MinesweeperComponent, SnakeComponent,
+    ConnectFourComponent, TicTacToeComponent, MinesweeperComponent,
+    SnakeComponent, PongComponent,
   ],
   templateUrl: './game-room.component.html',
   styleUrls: ['./game-room.component.scss'],
@@ -85,6 +87,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   previewPiece = signal<'X' | 'O'>('X');
 
   msBoardSize = signal<string>('normal');
+  pongWinScore = signal<number>(15);
   readonly MS_BOARD_SIZES = [
     { id: 'normal',       label: 'Normal',     detail: '9×9 · 10 minas' },
     { id: 'intermediate', label: 'Intermedio', detail: '16×16 · 40 minas' },
@@ -186,6 +189,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         if (msg.data.max_players) this.maxPlayers.set(msg.data.max_players);
         if (msg.data.player_colors) this.playerColors.set(msg.data.player_colors);
         if (msg.data.ms_board_size) this.msBoardSize.set(msg.data.ms_board_size);
+        if (msg.data.pong_win_score != null) this.pongWinScore.set(msg.data.pong_win_score);
         if (msg.data.ttt_patterns !== undefined) {
           const patterns: Record<string, string> = { ...msg.data.ttt_patterns };
           if (this.gameId === 'tic_tac_toe' && !patterns[this.myUid] && this.myProfile?.ttt_pattern) {
@@ -370,6 +374,11 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.ws.send('snake_direction', { room_id: this.roomId, direction });
   }
 
+  doPongPaddle(e: { action: string; direction: string | null }) {
+    if (this.isSpectator()) return;
+    this.ws.send('pong_paddle', { room_id: this.roomId, ...e });
+  }
+
   startGame() {
     this.ws.send('start_game', { room_id: this.roomId });
   }
@@ -420,6 +429,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   setMsBoardSize(size: string) {
     this.ws.send('set_ms_board_size', { room_id: this.roomId, board_size: size });
+  }
+
+  setPongWinScore(n: number) {
+    this.ws.send('pong_set_win_score', { room_id: this.roomId, win_score: n });
   }
 
   setTttPattern(pattern: string) {

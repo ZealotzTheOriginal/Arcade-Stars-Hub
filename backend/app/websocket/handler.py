@@ -23,6 +23,9 @@ _presence: dict[str, dict] = {}
 # Per-room snake tick tasks
 _snake_tasks: dict[str, "asyncio.Task[None]"] = {}
 
+# Per-room pong tick tasks
+_pong_tasks: dict[str, "asyncio.Task[None]"] = {}
+
 ROOM_TIMEOUT_SECONDS = 600  # 10 minutes
 
 _DEFAULT_COLORS = ["#ef4444", "#3b82f6", "#eab308", "#22c55e", "#a855f7", "#f97316", "#ec4899", "#06b6d4"]
@@ -141,6 +144,7 @@ def create_room(room_id: str, game_id: str, host_uid: str) -> dict:
         "player_colors": {},
         "ttt_patterns": {},
         "ms_board_size": "normal",
+        "pong_win_score": 15,
         "game_mode": "ffa",
         "teams": {"a": [], "b": []},
     }
@@ -246,6 +250,9 @@ async def _close_room(room_id: str, reason: str = "Sala cerrada"):
     snake_task = _snake_tasks.pop(room_id, None)
     if snake_task:
         snake_task.cancel()
+    pong_task = _pong_tasks.pop(room_id, None)
+    if pong_task:
+        pong_task.cancel()
     await manager.broadcast(room_id, ServerEvent.ROOM_CLOSED, {"reason": reason})
     del _rooms[room_id]
     await broadcast_lobby_update()
@@ -288,6 +295,8 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.SET_TTT_PATTERN: _handle_set_ttt_pattern,
         ClientEvent.SET_MS_BOARD_SIZE: _handle_set_ms_board_size,
         ClientEvent.SNAKE_DIRECTION: _handle_snake_direction,
+        ClientEvent.PONG_PADDLE: _handle_pong_paddle,
+        ClientEvent.PONG_SET_WIN_SCORE: _handle_pong_set_win_score,
     }
     handler = handlers.get(event)
     if handler:
@@ -703,6 +712,9 @@ async def _handle_abandon(ws: WebSocket, uid: str, data: dict):
     snake_task = _snake_tasks.pop(room_id, None)
     if snake_task:
         snake_task.cancel()
+    pong_task = _pong_tasks.pop(room_id, None)
+    if pong_task:
+        pong_task.cancel()
     await manager.broadcast(room_id, ServerEvent.GAME_ABANDONED, {
         "uid": uid,
         "display_name": player_info.get("display_name", "Jugador"),
@@ -1064,6 +1076,83 @@ async def _snake_tick_loop(room_id: str):
             return
 
 
+async def _handle_pong_set_win_score(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    win_score = data.get("win_score")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("leader_uid") != uid:
+        return
+    if room.get("game_id") != "pong":
+        return
+    if win_score not in (5, 10, 15):
+        return
+    room["pong_win_score"] = win_score
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+
+
+async def _handle_pong_paddle(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    action = data.get("action", "")    # "start" | "stop"
+    direction = data.get("direction")  # "up" | "down" | None
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "playing" or room["game_id"] != "pong":
+        return
+    state = room.get("game_state")
+    if not state:
+        return
+    paddle = state.get("paddles", {}).get(uid)
+    if paddle is None:
+        return
+    if action == "start" and direction in ("up", "down"):
+        paddle["moving"] = direction
+    elif action == "stop":
+        paddle["moving"] = None
+
+
+async def _pong_tick_loop(room_id: str):
+    """Advances Pong physics at 30 fps until the game ends."""
+    from app.games.pong.game import PongGame
+    TICK_S = 1 / 30
+    while True:
+        await asyncio.sleep(TICK_S)
+        room = _rooms.get(room_id)
+        if not room or room["status"] != "playing" or room["game_id"] != "pong":
+            _pong_tasks.pop(room_id, None)
+            return
+
+        game: PongGame = get_game("pong")  # type: ignore[assignment]
+        state = room["game_state"]
+
+        # AI paddle direction
+        for player in room.get("players", []):
+            if player.get("is_ai"):
+                ai_uid = player["uid"]
+                direction = game.get_ai_direction(state, ai_uid)
+                paddle = state.get("paddles", {}).get(ai_uid)
+                if paddle is not None:
+                    paddle["moving"] = direction
+
+        try:
+            new_state = game.tick(state)
+        except Exception:
+            _pong_tasks.pop(room_id, None)
+            return
+
+        room["game_state"] = new_state
+        room["last_activity"] = time.time()
+
+        await manager.broadcast(room_id, ServerEvent.MOVE_MADE, {
+            "game_state": new_state,
+        })
+
+        if game.is_terminal(new_state):
+            _pong_tasks.pop(room_id, None)
+            await _end_game(room_id, room, game, new_state)
+            return
+
+
 async def _start_game(room_id: str):
     room = _rooms[room_id]
     game = get_game(room["game_id"])
@@ -1119,6 +1208,8 @@ async def _start_game(room_id: str):
 
     if room["game_id"] == "minesweeper":
         state = game.get_initial_state(player_uids, board_size=room.get("ms_board_size", "normal"))
+    elif room["game_id"] == "pong":
+        state = game.get_initial_state(player_uids, win_score=room.get("pong_win_score", 15))
     else:
         state = game.get_initial_state(player_uids)
     state["game_mode"] = room.get("game_mode", "ffa")
@@ -1135,6 +1226,12 @@ async def _start_game(room_id: str):
 
     if room["game_id"] == "snake":
         _snake_tasks[room_id] = asyncio.create_task(_snake_tick_loop(room_id))
+        if any(p.get("is_ai") for p in room["players"]):
+            asyncio.create_task(_ai_chat(room_id, random.choice(_AI_POOL_START), delay=1.5))
+        return
+
+    if room["game_id"] == "pong":
+        _pong_tasks[room_id] = asyncio.create_task(_pong_tick_loop(room_id))
         if any(p.get("is_ai") for p in room["players"]):
             asyncio.create_task(_ai_chat(room_id, random.choice(_AI_POOL_START), delay=1.5))
         return
@@ -1210,6 +1307,9 @@ async def _end_game(room_id: str, room: dict, game, state: dict):
     snake_task = _snake_tasks.pop(room_id, None)
     if snake_task:
         snake_task.cancel()
+    pong_task = _pong_tasks.pop(room_id, None)
+    if pong_task:
+        pong_task.cancel()
     room["status"] = "finished"
     room["last_activity"] = time.time()
     scores = game.get_scores(state)

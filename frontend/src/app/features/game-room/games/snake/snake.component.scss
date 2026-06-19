@@ -10,13 +10,11 @@
   display: block;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 32px rgba(0, 0, 0, 0.6);
   outline: none;
   cursor: default;
-  /* Scale down on small screens while keeping pixel-perfect rendering */
   width: min(480px, calc(100vw - 64px));
   height: min(480px, calc(100vw - 64px));
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 
 .snake-scores {

@@ -224,6 +224,16 @@
                 </div>
               }
 
+              @if (gameId === 'pong') {
+                <div class="mode-section">
+                  <p class="leader-section-label"><i class="fa-solid fa-trophy"></i> Puntos para ganar</p>
+                  <div class="mode-toggle">
+                    @for (n of [5, 10, 15]; track n) {
+                      <button class="mode-btn" [class.active]="pongWinScore() === n" (click)="setPongWinScore(n)">{{ n }}</button>
+                    }
+                  </div>
+                </div>
+              }
 
             </div>
           }
@@ -298,6 +308,14 @@
               [playerColors]="playerColors()"
               (directionChanged)="changeSnakeDir($event)">
             </app-snake>
+          }
+          @case ('pong') {
+            <app-pong
+              [gameState]="gameState()"
+              [myUid]="isSpectator() ? '' : myUid"
+              [playerColors]="playerColors()"
+              (paddleAction)="doPongPaddle($event)">
+            </app-pong>
           }
         }
       }

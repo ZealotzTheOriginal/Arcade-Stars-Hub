@@ -31,6 +31,8 @@ class ClientEvent(str, Enum):
     SET_TTT_PATTERN = "set_ttt_pattern"
     SET_MS_BOARD_SIZE = "set_ms_board_size"
     SNAKE_DIRECTION = "snake_direction"
+    PONG_PADDLE = "pong_paddle"
+    PONG_SET_WIN_SCORE = "pong_set_win_score"
 
 
 # ── Outgoing event types (server → client) ──────────────

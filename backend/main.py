@@ -20,6 +20,7 @@ from app.games.connect_four.game import ConnectFourGame
 from app.games.tic_tac_toe.game import TicTacToeGame
 from app.games.minesweeper.game import MinesweeperGame
 from app.games.snake.game import SnakeGame
+from app.games.pong.game import PongGame
 
 
 async def _room_cleanup_loop():
@@ -69,6 +70,19 @@ async def lifespan(_: FastAPI):
             has_ai=True,
         ),
         MinesweeperGame(),
+    )
+    register(
+        GameDefinition(
+            id="pong",
+            name="Pong",
+            description="Clásico Pong retro. Mueve tu paleta y llega primero a 15 puntos.",
+            category="Arcade",
+            thumbnail="🏓",
+            min_players=2,
+            max_players=2,
+            has_ai=True,
+        ),
+        PongGame(),
     )
     register(
         GameDefinition(

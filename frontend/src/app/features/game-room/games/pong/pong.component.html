@@ -1,0 +1,21 @@
+<div class="pong-wrapper">
+  <canvas
+    #canvasEl
+    [width]="W"
+    [height]="H"
+    class="pong-canvas"
+    tabindex="0">
+  </canvas>
+
+  <div class="pong-controls-hint">
+    @if (myUid) {
+      @if (myPaddleSide() === 'left') {
+        <span>Tu paleta · <kbd>W</kbd> arriba · <kbd>S</kbd> abajo</span>
+      } @else {
+        <span>Tu paleta · <kbd>↑</kbd> arriba · <kbd>↓</kbd> abajo</span>
+      }
+    }
+    <span class="pong-hint-sep">·</span>
+    <span class="pong-hint-muted">También sirven las flechas y W/S</span>
+  </div>
+</div>

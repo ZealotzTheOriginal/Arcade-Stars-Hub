@@ -254,6 +254,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       tic_tac_toe:  'fa-solid fa-hashtag',
       minesweeper:  'fa-solid fa-bomb',
       snake:        'fa-solid fa-worm',
+      pong:         'fa-solid fa-table-tennis-paddle-ball',
     };
     return map[id] ?? 'fa-solid fa-gamepad';
   }
@@ -264,6 +265,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       tic_tac_toe:  '#3b82f6',
       minesweeper:  '#f97316',
       snake:        '#22c55e',
+      pong:         '#a855f7',
     };
     return map[id] ?? '#a855f7';
   }
@@ -287,6 +289,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       minesweeper: '/home/minesweeper.jpg',
       tic_tac_toe: '/home/tictactoe.jpg',
       snake:        '/home/snake.jpg',
+      pong:         '/home/pong.jpg',
     };
     return map[id] ?? '';
   }
@@ -297,6 +300,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       minesweeper: '/home/minesweeperLogo.svg',
       tic_tac_toe: '/home/tictactoeLogo.svg',
       snake:        '/home/snakeLogo.svg',
+      pong:         '/home/PongLogo.svg',
     };
     return map[id] ?? '';
   }
@@ -307,6 +311,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       minesweeper: 'Buscaminas',
       tic_tac_toe: 'Tres en Raya',
       snake:       'Serpiente',
+      pong:        'Pong',
     };
     return map[id] ?? id;
   }
