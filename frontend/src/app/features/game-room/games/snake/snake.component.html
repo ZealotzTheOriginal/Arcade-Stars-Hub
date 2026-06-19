@@ -1,0 +1,27 @@
+<div class="snake-wrapper">
+  <canvas
+    #canvasEl
+    [width]="CANVAS_PX"
+    [height]="CANVAS_PX"
+    class="snake-canvas"
+    tabindex="0">
+  </canvas>
+
+  <div class="snake-scores">
+    @for (uid of (gameState?.players ?? []); track uid) {
+      @if (gameState?.snakes?.[uid]; as snake) {
+        <div class="snake-score-row" [class.dead]="!snake.alive">
+          <span class="snake-dot" [style.background]="playerColors[uid] ?? '#888'"></span>
+          <span class="snake-pts">{{ snake.score ?? 0 }} pts</span>
+          @if (!snake.alive) {
+            <span class="snake-dead-tag">☠</span>
+          }
+        </div>
+      }
+    }
+  </div>
+
+  <div class="snake-controls-hint">
+    <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span>
+  </div>
+</div>

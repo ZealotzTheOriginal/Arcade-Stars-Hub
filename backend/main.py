@@ -19,6 +19,7 @@ from app.models.game_room import GameDefinition
 from app.games.connect_four.game import ConnectFourGame
 from app.games.tic_tac_toe.game import TicTacToeGame
 from app.games.minesweeper.game import MinesweeperGame
+from app.games.snake.game import SnakeGame
 
 
 async def _room_cleanup_loop():
@@ -68,6 +69,19 @@ async def lifespan(_: FastAPI):
             has_ai=True,
         ),
         MinesweeperGame(),
+    )
+    register(
+        GameDefinition(
+            id="snake",
+            name="Serpiente",
+            description="Guía tu serpiente para comer puntos. ¡La estrella multicolor vale 3! No choques con los bordes ni con tu rival.",
+            category="Arcade",
+            thumbnail="🐍",
+            min_players=2,
+            max_players=2,
+            has_ai=True,
+        ),
+        SnakeGame(),
     )
 
     cleanup_task = asyncio.create_task(_room_cleanup_loop())

@@ -17,6 +17,7 @@ import { ChatComponent } from '../../shared/components/chat/chat.component';
 import { ConnectFourComponent } from './games/connect-four/connect-four.component';
 import { TicTacToeComponent } from './games/tic-tac-toe/tic-tac-toe.component';
 import { MinesweeperComponent } from './games/minesweeper/minesweeper.component';
+import { SnakeComponent } from './games/snake/snake.component';
 
 @Component({
   selector: 'app-game-room',
@@ -24,7 +25,7 @@ import { MinesweeperComponent } from './games/minesweeper/minesweeper.component'
   imports: [
     CommonModule, RouterLink,
     HudComponent, ChatComponent,
-    ConnectFourComponent, TicTacToeComponent, MinesweeperComponent,
+    ConnectFourComponent, TicTacToeComponent, MinesweeperComponent, SnakeComponent,
   ],
   templateUrl: './game-room.component.html',
   styleUrls: ['./game-room.component.scss'],
@@ -362,6 +363,11 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   makeMove(move: any) {
     if (this.isSpectator()) return;
     this.ws.send('make_move', { room_id: this.roomId, move });
+  }
+
+  changeSnakeDir(direction: string) {
+    if (this.isSpectator()) return;
+    this.ws.send('snake_direction', { room_id: this.roomId, direction });
   }
 
   startGame() {

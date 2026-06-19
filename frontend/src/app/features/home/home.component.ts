@@ -253,6 +253,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       connect_four: 'fa-solid fa-circle',
       tic_tac_toe:  'fa-solid fa-hashtag',
       minesweeper:  'fa-solid fa-bomb',
+      snake:        'fa-solid fa-worm',
     };
     return map[id] ?? 'fa-solid fa-gamepad';
   }
@@ -262,6 +263,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       connect_four: '#ef4444',
       tic_tac_toe:  '#3b82f6',
       minesweeper:  '#f97316',
+      snake:        '#22c55e',
     };
     return map[id] ?? '#a855f7';
   }
@@ -284,6 +286,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       connect_four: '/home/connect4.jpg',
       minesweeper: '/home/minesweeper.jpg',
       tic_tac_toe: '/home/tictactoe.jpg',
+      snake:        '/home/snake.jpg',
     };
     return map[id] ?? '';
   }
@@ -293,6 +296,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       connect_four: '/home/connect4Logo.svg',
       minesweeper: '/home/minesweeperLogo.svg',
       tic_tac_toe: '/home/tictactoeLogo.svg',
+      snake:        '/home/snakeLogo.svg',
     };
     return map[id] ?? '';
   }
@@ -302,6 +306,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       connect_four: 'Conecta 4',
       minesweeper: 'Buscaminas',
       tic_tac_toe: 'Tres en Raya',
+      snake:       'Serpiente',
     };
     return map[id] ?? id;
   }

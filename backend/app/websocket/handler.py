@@ -20,6 +20,9 @@ _rooms: dict[str, dict] = {}
 # Global presence: uid -> {display_name, avatar, room_id}
 _presence: dict[str, dict] = {}
 
+# Per-room snake tick tasks
+_snake_tasks: dict[str, "asyncio.Task[None]"] = {}
+
 ROOM_TIMEOUT_SECONDS = 600  # 10 minutes
 
 _DEFAULT_COLORS = ["#ef4444", "#3b82f6", "#eab308", "#22c55e", "#a855f7", "#f97316", "#ec4899", "#06b6d4"]
@@ -240,6 +243,9 @@ async def _close_room(room_id: str, reason: str = "Sala cerrada"):
     task = _boredom_tasks.pop(room_id, None)
     if task:
         task.cancel()
+    snake_task = _snake_tasks.pop(room_id, None)
+    if snake_task:
+        snake_task.cancel()
     await manager.broadcast(room_id, ServerEvent.ROOM_CLOSED, {"reason": reason})
     del _rooms[room_id]
     await broadcast_lobby_update()
@@ -281,6 +287,7 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.TRANSFER_LEADER: _handle_transfer_leader,
         ClientEvent.SET_TTT_PATTERN: _handle_set_ttt_pattern,
         ClientEvent.SET_MS_BOARD_SIZE: _handle_set_ms_board_size,
+        ClientEvent.SNAKE_DIRECTION: _handle_snake_direction,
     }
     handler = handlers.get(event)
     if handler:
@@ -693,6 +700,9 @@ async def _handle_abandon(ws: WebSocket, uid: str, data: dict):
     task = _boredom_tasks.pop(room_id, None)
     if task:
         task.cancel()
+    snake_task = _snake_tasks.pop(room_id, None)
+    if snake_task:
+        snake_task.cancel()
     await manager.broadcast(room_id, ServerEvent.GAME_ABANDONED, {
         "uid": uid,
         "display_name": player_info.get("display_name", "Jugador"),
@@ -993,6 +1003,67 @@ async def _handle_set_max_players(ws: WebSocket, uid: str, data: dict):
     await broadcast_lobby_update()
 
 
+async def _handle_snake_direction(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    direction = data.get("direction", "")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "playing" or room["game_id"] != "snake":
+        return
+    state = room.get("game_state")
+    if not state:
+        return
+    snake = state.get("snakes", {}).get(uid)
+    if not snake or not snake.get("alive"):
+        return
+    if direction not in ("up", "down", "left", "right"):
+        return
+    opp = {"up": "down", "down": "up", "left": "right", "right": "left"}
+    if direction != opp.get(snake.get("direction", "")):
+        snake["pending_dir"] = direction
+
+
+async def _snake_tick_loop(room_id: str):
+    """Advances the Snake game at a fixed interval until the game ends."""
+    from app.games.snake.game import SnakeGame
+    TICK_MS = 0.15
+    while True:
+        await asyncio.sleep(TICK_MS)
+        room = _rooms.get(room_id)
+        if not room or room["status"] != "playing" or room["game_id"] != "snake":
+            _snake_tasks.pop(room_id, None)
+            return
+
+        game: SnakeGame = get_game("snake")  # type: ignore[assignment]
+        state = room["game_state"]
+
+        # Let AI snakes pick their direction before the tick
+        for player in room.get("players", []):
+            if player.get("is_ai"):
+                ai_uid = player["uid"]
+                ai_snake = state.get("snakes", {}).get(ai_uid)
+                if ai_snake and ai_snake.get("alive"):
+                    direction = game.get_ai_direction(state, ai_uid)
+                    ai_snake["pending_dir"] = direction
+
+        try:
+            new_state = game.tick(state)
+        except Exception:
+            _snake_tasks.pop(room_id, None)
+            return
+
+        room["game_state"] = new_state
+        room["last_activity"] = time.time()
+
+        await manager.broadcast(room_id, ServerEvent.MOVE_MADE, {
+            "game_state": new_state,
+        })
+
+        if game.is_terminal(new_state):
+            _snake_tasks.pop(room_id, None)
+            await _end_game(room_id, room, game, new_state)
+            return
+
+
 async def _start_game(room_id: str):
     room = _rooms[room_id]
     game = get_game(room["game_id"])
@@ -1062,6 +1133,12 @@ async def _start_game(room_id: str):
     })
     await broadcast_lobby_update()
 
+    if room["game_id"] == "snake":
+        _snake_tasks[room_id] = asyncio.create_task(_snake_tick_loop(room_id))
+        if any(p.get("is_ai") for p in room["players"]):
+            asyncio.create_task(_ai_chat(room_id, random.choice(_AI_POOL_START), delay=1.5))
+        return
+
     turn_uid = room["game_state"].get("current_turn")
     if turn_uid and _is_ai_uid(room, turn_uid):
         # Delay first AI move so the coin-flip animation can finish on the client
@@ -1130,6 +1207,9 @@ async def _do_ai_move(room_id: str):
 
 
 async def _end_game(room_id: str, room: dict, game, state: dict):
+    snake_task = _snake_tasks.pop(room_id, None)
+    if snake_task:
+        snake_task.cancel()
     room["status"] = "finished"
     room["last_activity"] = time.time()
     scores = game.get_scores(state)

@@ -291,6 +291,14 @@
               (moveMade)="makeMove($event)">
             </app-minesweeper>
           }
+          @case ('snake') {
+            <app-snake
+              [gameState]="gameState()"
+              [myUid]="isSpectator() ? '' : myUid"
+              [playerColors]="playerColors()"
+              (directionChanged)="changeSnakeDir($event)">
+            </app-snake>
+          }
         }
       }
 

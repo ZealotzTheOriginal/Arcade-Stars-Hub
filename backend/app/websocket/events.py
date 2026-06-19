@@ -30,6 +30,7 @@ class ClientEvent(str, Enum):
     TRANSFER_LEADER = "transfer_leader"
     SET_TTT_PATTERN = "set_ttt_pattern"
     SET_MS_BOARD_SIZE = "set_ms_board_size"
+    SNAKE_DIRECTION = "snake_direction"
 
 
 # ── Outgoing event types (server → client) ──────────────
