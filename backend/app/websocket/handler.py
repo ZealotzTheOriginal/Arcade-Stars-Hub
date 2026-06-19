@@ -1,5 +1,6 @@
 """WebSocket message handler — routes events from connected clients."""
 import json
+import re
 import time
 import uuid
 import asyncio
@@ -167,11 +168,15 @@ def get_active_rooms() -> list[dict]:
             "name": r.get("name", r["room_id"]),
             "game_id": r["game_id"],
             "status": r["status"],
+            "max_players": r.get("max_players", 2),
             "players": [
-                {"uid": p["uid"], "display_name": p.get("display_name", ""), "avatar": p.get("avatar", "⭐")}
+                {"uid": p["uid"], "display_name": p.get("display_name", ""), "avatar": p.get("avatar", "⭐"), "is_ai": p.get("is_ai", False)}
                 for p in r["players"]
             ],
-            "spectators_count": len(r.get("spectators", [])),
+            "spectators": [
+                {"uid": s["uid"], "display_name": s.get("display_name", "Espectador"), "avatar": s.get("avatar", "👁️")}
+                for s in r.get("spectators", [])
+            ],
             "last_activity": r.get("last_activity", 0),
         }
         for r in _rooms.values()
@@ -330,7 +335,7 @@ async def _handle_join(ws: WebSocket, uid: str, data: dict):
         return
 
     # ── Room full → auto-spectate ─────────────────────────
-    player_count = len([p for p in room["players"] if not p.get("is_ai")])
+    player_count = len(room["players"])  # AI slots count as occupied
     max_p = room.get("max_players", 2)
     if player_count >= max_p and uid not in uids_in_room:
         await _spectate_room(ws, uid, room_id, player_info)
@@ -522,6 +527,7 @@ async def _handle_add_ai(ws: WebSocket, uid: str, data: dict):
         else:
             teams.setdefault("b", []).append(ai_uid)
     await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+    await broadcast_lobby_update()
 
 
 async def _handle_spectate(ws: WebSocket, uid: str, data: dict):
@@ -543,6 +549,7 @@ async def _spectate_room(ws: WebSocket, uid: str, room_id: str, spectator_info: 
     manager.add(room_id, uid, ws)
     await manager.send(ws, ServerEvent.ROOM_STATE, _safe_room(room))
     await manager.broadcast(room_id, ServerEvent.SPECTATOR_JOINED, {"spectator": spec_info, "uid": uid}, exclude_uid=uid)
+    await broadcast_lobby_update()
 
     if room["status"] == "playing" and room["game_state"]:
         await manager.send(ws, ServerEvent.GAME_STARTED, {
@@ -627,6 +634,11 @@ async def _handle_respond_invite(ws: WebSocket, uid: str, data: dict):
     # If inviting into an existing waiting room, skip room creation
     if existing_room_id and existing_room_id in _rooms:
         room = _rooms[existing_room_id]
+        if room["status"] != "waiting" or len(room["players"]) >= room.get("max_players", 2):
+            await manager.send(ws, ServerEvent.INVITE_FAILED, {
+                "message": "La sala ya no está disponible: está llena o la partida ha comenzado."
+            })
+            return
         payload = {"room_id": existing_room_id, "game_id": room["game_id"], "room_name": room.get("name", "")}
         await manager.send_direct(to_uid, ServerEvent.INVITE_ACCEPTED, payload)
         await manager.send_direct(uid, ServerEvent.INVITE_ACCEPTED, payload)
@@ -647,13 +659,17 @@ async def _handle_global_chat(ws: WebSocket, uid: str, data: dict):
     if not text or len(text) > 200:
         return
     presence = _presence.get(uid, {})
-    await manager.broadcast_global(ServerEvent.GLOBAL_CHAT_MESSAGE, {
+    payload: dict = {
         "uid": uid,
         "display_name": presence.get("display_name", "Jugador"),
         "avatar": presence.get("avatar", "⭐"),
         "text": text,
         "ts": int(time.time() * 1000),
-    })
+    }
+    raw_room_id = data.get("room_id", "")
+    if raw_room_id and re.match(r"^[A-Z0-9]{8}$", str(raw_room_id)):
+        payload["room_id"] = str(raw_room_id)
+    await manager.broadcast_global(ServerEvent.GLOBAL_CHAT_MESSAGE, payload)
 
 
 async def _handle_register_presence(ws: WebSocket, uid: str, data: dict):
@@ -897,6 +913,7 @@ async def _handle_kick_player(ws: WebSocket, uid: str, data: dict):
         manager.remove(room_id, target_uid)
 
     await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+    await broadcast_lobby_update()
 
 
 async def _handle_set_ttt_pattern(ws: WebSocket, uid: str, data: dict):
@@ -973,6 +990,7 @@ async def _handle_set_max_players(ws: WebSocket, uid: str, data: dict):
             room["players"] = [p for p in room["players"] if p["uid"] != ai["uid"]]
     room["max_players"] = max_players
     await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+    await broadcast_lobby_update()
 
 
 async def _start_game(room_id: str):
@@ -996,8 +1014,35 @@ async def _start_game(room_id: str):
         interleaved.extend(u for u in player_uids if u not in assigned)
         player_uids = interleaved
 
-    # Random starting player — rotate the list by a random offset
-    if player_uids:
+    # Fair first-turn rotation: each human player gets to start once before cycling
+    human_uids = [uid for uid in player_uids if not uid.startswith("AI_")]
+    if human_uids:
+        if "first_turn_order" not in room:
+            # First game — random order establishes the cycle
+            shuffled = human_uids[:]
+            random.shuffle(shuffled)
+            room["first_turn_order"] = shuffled
+            chosen = shuffled[0]
+            room["first_turn_queue"] = shuffled[1:]
+        else:
+            # Rematch — advance the queue; filter out players who may have left
+            queue = [uid for uid in room.get("first_turn_queue", []) if uid in human_uids]
+            if not queue:
+                # Cycle complete — restart from the established order
+                order = [uid for uid in room.get("first_turn_order", []) if uid in human_uids]
+                if not order:
+                    order = human_uids[:]
+                chosen = order[0]
+                room["first_turn_queue"] = order[1:]
+            else:
+                chosen = queue[0]
+                room["first_turn_queue"] = queue[1:]
+
+        if chosen in player_uids:
+            idx = player_uids.index(chosen)
+            player_uids = player_uids[idx:] + player_uids[:idx]
+    elif player_uids:
+        # All-AI room — random start
         start = random.randrange(len(player_uids))
         player_uids = player_uids[start:] + player_uids[:start]
 

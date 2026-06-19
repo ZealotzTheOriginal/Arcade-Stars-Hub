@@ -43,6 +43,13 @@ import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
       </div>
     }
 
+    @if (inviteError()) {
+      <div class="invite-error-toast">
+        <i class="fa-solid fa-door-closed invite-error-icon"></i>
+        <span>{{ inviteError() }}</span>
+      </div>
+    }
+
     @if (friendRequest()) {
       <div class="friend-request-toast">
         <span class="fr-avatar">{{ friendRequest()!.avatar }}</span>
@@ -114,6 +121,28 @@ import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
       animation: slideIn 0.3s cubic-bezier(.22,1,.36,1);
     }
     .rejected-icon { color: #dc4646; font-size: 1.2rem; flex-shrink: 0; }
+
+    /* ── Invite failed toast ─────────────────────────────── */
+    .invite-error-toast {
+      position: fixed;
+      top: 1.25rem;
+      right: 1.25rem;
+      z-index: 9999;
+      background: #13131f;
+      border: 1px solid rgba(251, 146, 60, 0.6);
+      border-radius: 14px;
+      padding: 0.85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-width: 260px;
+      max-width: 380px;
+      color: #e0e0e0;
+      font-size: 0.875rem;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+      animation: slideIn 0.3s cubic-bezier(.22,1,.36,1);
+    }
+    .invite-error-icon { color: #fb923c; font-size: 1.2rem; flex-shrink: 0; }
 
     /* ── Friend request toast ───────────────────────────────── */
     .friend-request-toast {
@@ -251,10 +280,12 @@ export class App implements OnInit, OnDestroy {
   timerPercent = signal(100);
   rejectedBy = signal<string | null>(null);
   friendRequest = signal<{ name: string; avatar: string } | null>(null);
+  inviteError = signal<string | null>(null);
 
   private inviteTimer?: ReturnType<typeof setInterval>;
   private rejectedTimer?: ReturnType<typeof setTimeout>;
   private frTimer?: ReturnType<typeof setTimeout>;
+  private inviteErrorTimer?: ReturnType<typeof setTimeout>;
   private subs: Subscription[] = [];
   private readonly INVITE_SECONDS = 15;
 
@@ -299,6 +330,11 @@ export class App implements OnInit, OnDestroy {
         if (msg.event === 'friend_removed') {
           this.notifService.addFriendRemoved(msg.data.from_name, msg.data.from_avatar);
         }
+        if (msg.event === 'invite_failed') {
+          clearTimeout(this.inviteErrorTimer);
+          this.inviteError.set(msg.data?.message ?? 'La sala ya no está disponible.');
+          this.inviteErrorTimer = setTimeout(() => this.inviteError.set(null), 5000);
+        }
         if (msg.event === 'invite_accepted') {
           this._clearInvite();
           const data = msg.data as InviteAcceptedData;
@@ -334,6 +370,7 @@ export class App implements OnInit, OnDestroy {
     clearInterval(this.inviteTimer);
     clearTimeout(this.rejectedTimer);
     clearTimeout(this.frTimer);
+    clearTimeout(this.inviteErrorTimer);
   }
 
   private _showInvite(data: InviteData) {

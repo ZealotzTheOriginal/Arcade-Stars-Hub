@@ -6,7 +6,7 @@ from app.services.user_service import (
     add_friend, remove_friend, get_friend_profiles,
     accept_friend_request, reject_friend_request, get_user_info,
     is_admin_user, get_all_users, set_admin, reset_user_points, add_user_points,
-    reset_all_users_points,
+    reset_all_users_points, set_user_avatar, set_user_badges,
 )
 from app.websocket.handler import get_online_users
 from app.websocket.manager import manager
@@ -135,4 +135,22 @@ async def admin_add_points(uid: str, body: dict, _: dict = Depends(require_admin
         raise HTTPException(status_code=400, detail="points must be positive")
     await add_user_points(uid, points)
     await manager.broadcast_global(ServerEvent.LEADERBOARD_UPDATED, {})
+    return {"ok": True}
+
+
+@router.post("/admin/{uid}/set-avatar")
+async def admin_set_avatar(uid: str, body: dict, _: dict = Depends(require_admin)):
+    avatar = str(body.get("avatar", "")).strip()
+    if not avatar:
+        raise HTTPException(status_code=400, detail="avatar required")
+    await set_user_avatar(uid, avatar)
+    return {"ok": True}
+
+
+@router.post("/admin/{uid}/set-badges")
+async def admin_set_badges(uid: str, body: dict, _: dict = Depends(require_admin)):
+    badges = body.get("badges", [])
+    if not isinstance(badges, list):
+        raise HTTPException(status_code=400, detail="badges must be a list")
+    await set_user_badges(uid, badges)
     return {"ok": True}

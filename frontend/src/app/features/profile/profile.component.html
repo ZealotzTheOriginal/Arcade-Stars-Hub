@@ -19,6 +19,12 @@
             @if (p.is_admin) {
               <span class="badge badge--admin"><i class="fa-solid fa-shield-halved"></i> Admin</span>
             }
+            @for (b of (p.badges ?? []); track b) {
+              @if (b === 'beta') { <span class="badge badge--beta"><i class="fa-solid fa-flask"></i> Beta</span> }
+              @if (b === 'payaso') { <span class="badge badge--payaso"><i class="fa-solid fa-face-grin-squint-tears"></i> Payaso</span> }
+              @if (b === 'eminencia') { <span class="badge badge--eminencia"><i class="fa-solid fa-crown"></i> Eminencia</span> }
+              @if (b === 'hardcore') { <span class="badge badge--hardcore"><i class="fa-solid fa-skull"></i> Hardcore</span> }
+            }
           </div>
         </div>
       </div>
@@ -352,15 +358,29 @@
                         <button class="friend-menu-item friend-menu-item--danger" (click)="adminResetPoints(u.uid)">
                           <i class="fa-solid fa-rotate-left"></i> Resetear puntos
                         </button>
+                        <button class="friend-menu-item" (click)="openAvatarPicker(u.uid)">
+                          <i class="fa-solid fa-face-smile"></i> Cambiar avatar
+                        </button>
+                        <button class="friend-menu-item" (click)="openBadgeManager(u.uid)">
+                          <i class="fa-solid fa-tags"></i> Insignias
+                        </button>
                       </div>
                     }
                   </div>
                   <span class="admin-user-avatar">{{ u.avatar }}</span>
                   <div class="admin-user-info">
                     <span class="admin-user-name">{{ u.display_name }}</span>
-                    @if (u.is_admin) {
-                      <span class="badge badge--admin badge--xs"><i class="fa-solid fa-shield-halved"></i> Admin</span>
-                    }
+                    <div class="admin-user-badges">
+                      @if (u.is_admin) {
+                        <span class="badge badge--admin badge--xs"><i class="fa-solid fa-shield-halved"></i> Admin</span>
+                      }
+                      @for (b of (u.badges ?? []); track b) {
+                        @if (b === 'beta') { <span class="badge badge--beta badge--xs"><i class="fa-solid fa-flask"></i> Beta</span> }
+                        @if (b === 'payaso') { <span class="badge badge--payaso badge--xs"><i class="fa-solid fa-face-grin-squint-tears"></i> Payaso</span> }
+                        @if (b === 'eminencia') { <span class="badge badge--eminencia badge--xs"><i class="fa-solid fa-crown"></i> Eminencia</span> }
+                        @if (b === 'hardcore') { <span class="badge badge--hardcore badge--xs"><i class="fa-solid fa-skull"></i> Hardcore</span> }
+                      }
+                    </div>
                   </div>
                   <span class="admin-user-pts"><i class="fa-solid fa-star"></i> {{ u.total_points }} pts</span>
                 </div>
@@ -383,6 +403,46 @@
       <div class="add-points-actions">
         <button class="btn btn--primary" (click)="confirmAddPoints()">Confirmar</button>
         <button class="btn btn--ghost" (click)="addPointsTarget.set(null)">Cancelar</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (avatarPickerUid()) {
+  <div class="overlay" (click)="avatarPickerUid.set(null)">
+    <div class="add-points-modal card" (click)="$event.stopPropagation()">
+      <h3><i class="fa-solid fa-face-smile"></i> Cambiar avatar</h3>
+      <div class="avatar-grid">
+        @for (av of avatars; track av) {
+          <button class="avatar-btn" (click)="adminConfirmAvatar(av)">{{ av }}</button>
+        }
+      </div>
+      <div class="add-points-actions">
+        <button class="btn btn--ghost" (click)="avatarPickerUid.set(null)">Cancelar</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (badgesTargetUid()) {
+  <div class="overlay" (click)="badgesTargetUid.set(null)">
+    <div class="add-points-modal card" (click)="$event.stopPropagation()">
+      <h3><i class="fa-solid fa-tags"></i> Gestionar insignias</h3>
+      <div class="badge-picker">
+        @for (def of badgeDefs; track def.id) {
+          <button
+            class="badge-toggle"
+            [class.badge-toggle--active]="badgesEditing().includes(def.id)"
+            [style.--badge-color]="def.color"
+            (click)="toggleBadgeEdit(def.id)">
+            <i [class]="'fa-solid ' + def.icon"></i>
+            {{ def.label }}
+          </button>
+        }
+      </div>
+      <div class="add-points-actions">
+        <button class="btn btn--primary" (click)="adminSaveBadges()"><i class="fa-solid fa-check"></i> Guardar</button>
+        <button class="btn btn--ghost" (click)="badgesTargetUid.set(null)">Cancelar</button>
       </div>
     </div>
   </div>

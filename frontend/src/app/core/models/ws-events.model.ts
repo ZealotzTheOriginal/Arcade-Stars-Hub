@@ -25,7 +25,8 @@ export type ServerEvent =
   | 'friend_request_rejected'
   | 'friend_removed'
   | 'lobby_update'
-  | 'leaderboard_updated';
+  | 'leaderboard_updated'
+  | 'invite_failed';
 
 export interface WSMessage {
   event: ServerEvent;

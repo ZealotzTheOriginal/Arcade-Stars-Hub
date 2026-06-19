@@ -38,9 +38,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   onlineUsers = signal<any[]>([]);
   loadingRooms = signal(true);
   invitingUser = signal<string | null>(null);
-  activePanel = signal<'main' | 'sidebar' | 'leaderboard'>('main');
+  spectTooltipRoom = signal<string | null>(null);
+  activePanel = signal<'main' | 'sidebar' | 'leaderboard' | 'chat' | 'notifs'>('main');
   reconnectableRoom = signal<any>(null);
-  globalMessages = signal<{ uid: string; display_name: string; avatar: string; text: string; ts: number }[]>([]);
+  globalMessages = signal<{ uid: string; display_name: string; avatar: string; text: string; ts: number; room_id?: string }[]>([]);
   globalChatInput = '';
 
   @ViewChild('chatMessages') private chatMessagesEl?: ElementRef;
@@ -87,8 +88,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       .catch(() => {});
 
     this._fetchLive();
-    // Polling is now a fallback only — real-time updates arrive via lobby_update WS event
-    this.pollInterval = setInterval(() => this._fetchLive(), 60_000);
+    // Polling is a fallback for missed WS events; primary updates come via lobby_update
+    this.pollInterval = setInterval(() => this._fetchLive(), 15_000);
 
     this.wsSub = this.ws.messages$.subscribe((msg) => {
       if (msg.event === 'global_chat_message') {
@@ -163,6 +164,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     return !!uid && room.players.some((p: any) => p.uid === uid);
   }
 
+  isRoomFull(room: any): boolean {
+    return (room.players ?? []).length >= (room.max_players ?? 2);
+  }
+
   async joinRoom() {
     const code = this.joinCode.trim().toUpperCase();
     if (!code) return;
@@ -182,7 +187,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.joiningRoom.set(true);
     try {
       const room = await this.api.getRoom(code);
-      this.router.navigate(['/room', code], { queryParams: { game: room.game_id } });
+      const myUid = this.profile()?.uid;
+      const alreadyIn = myUid && (room.players ?? []).some((p: any) => p.uid === myUid);
+      const playerCount = (room.players ?? []).length;
+      const isFull = !alreadyIn && playerCount >= (room.max_players ?? 2);
+      const params: Record<string, string> = { game: room.game_id };
+      if (isFull) params['spectate'] = '1';
+      this.router.navigate(['/room', code], { queryParams: params });
     } catch (e: any) {
       this.joinError.set(e?.status === 404 ? 'Sala no encontrada.' : 'Error al unirse a la sala.');
     } finally {
@@ -277,6 +288,15 @@ export class HomeComponent implements OnInit, OnDestroy {
     return map[id] ?? '';
   }
 
+  gameLogo(id: string): string {
+    const map: Record<string, string> = {
+      connect_four: '/home/connect4Logo.svg',
+      minesweeper: '/home/minesweeperLogo.svg',
+      tic_tac_toe: '/home/tictactoeLogo.svg',
+    };
+    return map[id] ?? '';
+  }
+
   gameLabel(id: string): string {
     const map: Record<string, string> = {
       connect_four: 'Conecta 4',
@@ -291,6 +311,26 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (!text) return;
     this.ws.send('global_chat', { text });
     this.globalChatInput = '';
+  }
+
+  copyChatRoomCode(code: string) {
+    navigator.clipboard.writeText(code).catch(() => {});
+  }
+
+  openNotifs() {
+    this.notifService.markAllRead();
+    if (window.innerWidth <= 960) {
+      this.activePanel.set('notifs');
+    } else {
+      this.router.navigate(['/profile'], { queryParams: { tab: 'notifs' } });
+    }
+  }
+
+  notifLabel(type: string, game_id?: string): string {
+    if (type === 'missed_invite') return `Te invitó a jugar${game_id ? ' · ' + game_id.replace('_', ' ') : ''}`;
+    if (type === 'friend_request_rejected') return 'Rechazó tu solicitud de amistad';
+    if (type === 'friend_removed') return 'Te eliminó de amigos';
+    return '';
   }
 
   dotDelay(uid: string): string {

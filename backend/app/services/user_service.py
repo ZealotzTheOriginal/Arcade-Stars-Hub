@@ -22,6 +22,7 @@ async def get_or_create_user(uid: str, email: str, display_name: str) -> UserPro
             friend_requests=data.get("friend_requests", []),
             ttt_pattern=data.get("ttt_pattern", None),
             is_admin=data.get("is_admin", False),
+            badges=data.get("badges", []),
         )
 
     if not display_name:
@@ -133,6 +134,7 @@ async def get_all_users() -> list[dict]:
             "total_points": d.get("total_points", 0),
             "level": d.get("level", 1),
             "is_admin": d.get("is_admin", False),
+            "badges": d.get("badges", []),
         })
     users.sort(key=lambda u: (0 if u["is_admin"] else 1, -u["total_points"]))
     return users
@@ -141,6 +143,20 @@ async def get_all_users() -> list[dict]:
 async def set_admin(uid: str, is_admin: bool):
     db = get_db()
     db.collection("users").document(uid).update({"is_admin": is_admin})
+
+
+async def set_user_avatar(uid: str, avatar: str):
+    db = get_db()
+    db.collection("users").document(uid).update({"avatar": avatar})
+
+
+VALID_BADGES = {"beta", "payaso", "eminencia", "hardcore"}
+
+
+async def set_user_badges(uid: str, badges: list[str]):
+    clean = [b for b in badges if b in VALID_BADGES]
+    db = get_db()
+    db.collection("users").document(uid).update({"badges": clean})
 
 
 async def reset_user_points(uid: str):

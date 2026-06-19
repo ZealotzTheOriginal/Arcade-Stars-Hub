@@ -2,8 +2,7 @@
   <!-- Sidebar / nav -->
   <aside class="sidebar card" [class.mobile-hidden]="activePanel() !== 'sidebar'">
     <div class="sidebar-logo">
-      <img src="/ArcadeStar.svg" class="logo-star-svg" alt="Arcade Stars" />
-      <span class="logo-text">ARCADE</span>
+      <img src="/home/arcadeLogo.svg" class="logo-arcade-svg" alt="Arcade Stars" />
     </div>
 
     @if (profile(); as p) {
@@ -23,9 +22,34 @@
     }
 
     <nav class="nav">
-      <a class="nav-item active" (click)="activePanel.set('main')"><i class="fa-solid fa-gamepad"></i> Juegos</a>
+      <a class="nav-item" [class.active]="activePanel() === 'main'" (click)="activePanel.set('main')"><i class="fa-solid fa-gamepad"></i> Juegos</a>
       <a class="nav-item" routerLink="/profile"><i class="fa-solid fa-user"></i> Perfil</a>
     </nav>
+
+    <!-- Notifications (desktop sidebar) -->
+    <div class="sidebar-notifs mobile-hidden">
+      <h3 class="section-title">
+        <i class="fa-solid fa-bell sidebar-notif-bell"></i> Notificaciones
+        @if (notifService.unread() > 0) {
+          <span class="sidebar-notif-count">{{ notifService.unread() }}</span>
+        }
+      </h3>
+      @if (notifService.items().length === 0) {
+        <p class="notif-empty notif-empty--sm"><i class="fa-regular fa-bell-slash"></i> Sin notificaciones</p>
+      }
+      @for (n of notifService.items(); track n.id) {
+        <div class="notif-item notif-item--sm">
+          <span class="notif-avatar">{{ n.from_avatar }}</span>
+          <div class="notif-body">
+            <span class="notif-from">{{ n.from_name }}</span>
+            <span class="notif-desc">{{ notifLabel(n.type, n.game_id) }}</span>
+          </div>
+          <button class="notif-dismiss" (click)="notifService.dismiss(n.id)">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      }
+    </div>
 
     <!-- Online players -->
     <div class="online-section">
@@ -33,39 +57,49 @@
       @if (onlineUsers().length === 0) {
         <p class="empty-hint">Nadie más en línea</p>
       }
-      @for (u of onlineUsers(); track u.uid) {
-        <div class="online-user" [class.online-user--me]="u.is_me">
-          <span class="online-dot" [style.animation-delay]="dotDelay(u.uid)"></span>
-          <span class="ou-name">
-            {{ u.display_name }}
-            @if (u.is_me) { <span class="ou-me">(Tú)</span> }
-          </span>
-          @if (!u.is_me) {
-            <div class="ou-actions">
-              @if (isFriend(u.uid)) {
-                <span class="friend-heart" title="Amigo">
-                  <img src="/Heart.svg" class="action-icon icon-heart" alt="Amigo" />
-                </span>
-              } @else {
-                <button class="icon-btn" title="Añadir amigo" (click)="addFriend(u.uid)">
-                  <img src="/PlusCross.svg" class="action-icon" alt="Añadir amigo" />
+      <div class="online-users-grid">
+        @for (u of onlineUsers(); track u.uid) {
+          <div class="online-user" [class.online-user--me]="u.is_me">
+            <span class="online-dot" [style.animation-delay]="dotDelay(u.uid)"></span>
+            <span class="ou-name">
+              {{ u.display_name }}
+              @if (u.is_me) { <span class="ou-me">(Tú)</span> }
+            </span>
+            @if (!u.is_me) {
+              <div class="ou-actions">
+                @if (isFriend(u.uid)) {
+                  <span class="friend-heart" title="Amigo">
+                    <img src="/Heart.svg" class="action-icon icon-heart" alt="Amigo" />
+                  </span>
+                } @else {
+                  <button class="icon-btn" title="Añadir amigo" (click)="addFriend(u.uid)">
+                    <img src="/PlusCross.svg" class="action-icon" alt="Añadir amigo" />
+                  </button>
+                }
+                <button class="icon-btn" title="Invitar a partida" (click)="startInvite(u.uid)">
+                  <img src="/Play.svg" class="action-icon" alt="Invitar" />
                 </button>
-              }
-              <button class="icon-btn" title="Invitar a partida" (click)="startInvite(u.uid)">
-                <img src="/Play.svg" class="action-icon" alt="Invitar" />
-              </button>
-            </div>
-          }
-        </div>
-      }
+              </div>
+            }
+          </div>
+        }
+      </div>
     </div>
   </aside>
 
   <!-- Main content -->
   <main class="main-content" [class.mobile-hidden]="activePanel() !== 'main'">
     <header class="page-header">
-      <h1>Juegos Disponibles</h1>
-      <p class="subtitle">Selecciona un juego para jugar</p>
+      <div>
+        <h1>Juegos Disponibles</h1>
+        <p class="subtitle">Selecciona un juego para jugar</p>
+      </div>
+      <button class="page-header-bell mobile-hidden" (click)="openNotifs()" title="Notificaciones">
+        <i class="fa-solid fa-bell" [class.bell-active]="notifService.unread() > 0"></i>
+        @if (notifService.unread() > 0) {
+          <span class="notif-badge">{{ notifService.unread() }}</span>
+        }
+      </button>
     </header>
 
     <!-- Reconnect banner -->
@@ -129,21 +163,35 @@
                     <span class="room-status" [class.status--playing]="room.status === 'playing'">
                       {{ roomStatusLabel(room.status) }}
                     </span>
-                    · {{ room.players.length }} jugador{{ room.players.length !== 1 ? 'es' : '' }}:
+                    · {{ room.players.length }}/{{ room.max_players ?? 2 }} jugador{{ room.players.length !== 1 ? 'es' : '' }}:
                     @for (p of room.players; track p.uid) {
                       <span class="room-player-name">{{ p.display_name }}</span>
                     }
-                    @if (room.spectators_count > 0) {
-                      · {{ room.spectators_count }} esp.
+                    @if ((room.spectators ?? []).length > 0) {
+                      <span class="spec-chip"
+                        (mouseenter)="spectTooltipRoom.set(room.room_id)"
+                        (mouseleave)="spectTooltipRoom.set(null)">
+                        · <i class="fa-solid fa-eye"></i> {{ room.spectators.length }}
+                        @if (spectTooltipRoom() === room.room_id) {
+                          <div class="spec-tooltip">
+                            @for (s of room.spectators; track s.uid) {
+                              <div class="spec-tooltip-row">
+                                <span class="spec-av">{{ s.avatar }}</span>
+                                <span class="spec-nm">{{ s.display_name }}</span>
+                              </div>
+                            }
+                          </div>
+                        }
+                      </span>
                     }
                   </p>
                 </div>
               </div>
               <div class="room-actions">
-                @if (room.status === 'waiting') {
-                  <button class="btn btn--join btn--sm" (click)="joinActiveRoom(room)">Unirse</button>
-                } @else if (isMyRoom(room)) {
+                @if (isMyRoom(room)) {
                   <button class="btn btn--join btn--sm" (click)="joinActiveRoom(room)">Reconectar</button>
+                } @else if (room.status === 'waiting' && !isRoomFull(room)) {
+                  <button class="btn btn--join btn--sm" (click)="joinActiveRoom(room)">Unirse</button>
                 } @else {
                   <button class="btn btn--ghost btn--sm" (click)="spectateRoom(room)"><i class="fa-solid fa-eye"></i> Espectar</button>
                 }
@@ -164,19 +212,17 @@
           <div class="game-card" (click)="playGame(game)" [class.game-card--loading]="creatingRoom() === game.id">
             <img [src]="gameImage(game.id)" class="game-img" [alt]="game.name" />
             <div class="game-gradient"></div>
-            <div class="game-play-area">
+            <div class="game-logo-area">
               @if (creatingRoom() === game.id) {
                 <span class="game-loading-text">Creando...</span>
               } @else {
-                <img src="/Play.svg" class="game-play-icon" alt="Jugar" />
+                <img [src]="gameLogo(game.id)" class="game-logo-svg" [alt]="game.name" />
               }
             </div>
-            <div class="game-footer">
-              <h3>{{ game.name }}</h3>
-              <div class="game-tags">
-                <span class="tag">{{ game.category }}</span>
-                @if (game.has_ai) { <span class="tag tag--ai">IA</span> }
-              </div>
+            <div class="game-badges">
+              <span class="tag">{{ game.category }}</span>
+              @if (game.has_ai) { <span class="tag tag--ai">IA</span> }
+              <span class="tag tag--players"><i class="fa-solid fa-user"></i> {{ game.min_players === game.max_players ? game.max_players : game.min_players + '–' + game.max_players }}</span>
             </div>
           </div>
         }
@@ -184,44 +230,51 @@
     }
   </main>
 
-  <!-- Leaderboard + Chat -->
-  <aside class="leaderboard card" [class.mobile-hidden]="activePanel() !== 'leaderboard'">
-    <div class="lb-top-row">
-      <h2><i class="fa-solid fa-trophy"></i> Ranking Global</h2>
-      <a class="notif-bell" routerLink="/profile" [queryParams]="{tab: 'notifs'}" title="Notificaciones">
-        @if (notifService.unread() > 0) {
-          <i class="fa-solid fa-bell"></i>
-          <span class="notif-badge">{{ notifService.unread() }}</span>
-        } @else {
-          <i class="fa-regular fa-bell"></i>
+  <!-- Leaderboard + Chat + Notifs -->
+  <aside class="leaderboard card" [class.mobile-hidden]="activePanel() !== 'leaderboard' && activePanel() !== 'chat' && activePanel() !== 'notifs'">
+
+    <!-- Ranking section -->
+    <div class="lb-section" [class.mobile-hidden-inner]="activePanel() === 'chat' || activePanel() === 'notifs'">
+      <div class="lb-top-row">
+        <h2><i class="fa-solid fa-trophy"></i> Ranking Global</h2>
+      </div>
+      <div class="lb-list">
+        @for (entry of leaderboard(); track entry.uid; let i = $index) {
+          <div class="lb-row"
+            [class.lb-gold]="i === 0 && entry.points > 0"
+            [class.lb-silver]="i === 1 && entry.points > 0"
+            [class.lb-bronze]="i === 2 && entry.points > 0">
+            <span class="lb-rank">{{ entry.rank }}</span>
+            <span class="lb-name" [class.lb-name--empty]="entry.points === 0">
+              {{ entry.points > 0 ? entry.display_name : ' - - - | - - - ' }}
+            </span>
+            <span class="lb-pts">{{ entry.points }}</span>
+          </div>
         }
-      </a>
-    </div>
-    <div class="lb-list">
-      @for (entry of leaderboard(); track entry.uid; let i = $index) {
-        <div class="lb-row"
-          [class.lb-gold]="i === 0 && entry.points > 0"
-          [class.lb-silver]="i === 1 && entry.points > 0"
-          [class.lb-bronze]="i === 2 && entry.points > 0">
-          <span class="lb-rank">{{ entry.rank }}</span>
-          <span class="lb-name" [class.lb-name--empty]="entry.points === 0">
-            {{ entry.points > 0 ? entry.display_name : ' - - - | - - - ' }}
-          </span>
-          <span class="lb-pts">{{ entry.points }}</span>
-        </div>
-      }
+      </div>
     </div>
 
     <!-- Global chat -->
-    <div class="global-chat">
+    <div class="global-chat" [class.mobile-hidden-inner]="activePanel() === 'leaderboard' || activePanel() === 'notifs'">
       <h3 class="chat-title"><i class="fa-solid fa-comments"></i> Chat global</h3>
       <div class="chat-messages" #chatMessages>
         @for (m of globalMessages(); track m.ts; let i = $index) {
-          <div class="chat-msg" [class.chat-msg--continued]="!isFirstGlobalMsg(i)">
-            @if (isFirstGlobalMsg(i)) {
+          <div class="chat-msg" [class.chat-msg--continued]="!isFirstGlobalMsg(i) && !m.room_id">
+            @if (isFirstGlobalMsg(i) || m.room_id) {
               <span class="chat-name">{{ m.display_name }}</span>
             }
-            <span class="chat-text">{{ m.text }}</span>
+            @if (m.room_id) {
+              <div class="room-share-chip">
+                <i class="fa-solid fa-door-open room-share-icon"></i>
+                <span class="room-share-label">Invita a su sala</span>
+                <span class="room-share-code">{{ m.room_id }}</span>
+                <button class="room-share-copy" (click)="copyChatRoomCode(m.room_id)" title="Copiar código">
+                  <i class="fa-solid fa-copy"></i>
+                </button>
+              </div>
+            } @else {
+              <span class="chat-text">{{ m.text }}</span>
+            }
           </div>
         } @empty {
           <p class="chat-empty">Sin mensajes aún...</p>
@@ -238,14 +291,41 @@
         <button class="chat-send-btn" (click)="sendGlobalChat()" [disabled]="!globalChatInput.trim()"><i class="fa-solid fa-paper-plane"></i></button>
       </div>
     </div>
+
+    <!-- Notifications panel (mobile only) -->
+    <div class="notif-panel notif-panel--mobile" [class.mobile-hidden-inner]="activePanel() !== 'notifs'">
+      <div class="lb-top-row">
+        <h2><i class="fa-solid fa-bell"></i> Notificaciones</h2>
+      </div>
+      <div class="notif-list">
+        @if (notifService.items().length === 0) {
+          <p class="notif-empty">
+            <i class="fa-regular fa-bell-slash"></i>
+            Sin notificaciones
+          </p>
+        }
+        @for (n of notifService.items(); track n.id) {
+          <div class="notif-item">
+            <span class="notif-avatar">{{ n.from_avatar }}</span>
+            <div class="notif-body">
+              <span class="notif-from">{{ n.from_name }}</span>
+              <span class="notif-desc">{{ notifLabel(n.type, n.game_id) }}</span>
+            </div>
+            <button class="notif-dismiss" (click)="notifService.dismiss(n.id)" title="Descartar">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        }
+      </div>
+    </div>
   </aside>
 </div>
 
 <!-- Mobile bottom tab bar -->
 <nav class="mobile-tabs">
   <button class="mobile-tab" [class.active]="activePanel() === 'sidebar'" (click)="activePanel.set('sidebar')">
-    <span class="tab-icon"><i class="fa-solid fa-circle-dot"></i></span>
-    <span>En línea</span>
+    <span class="tab-icon"><i class="fa-solid fa-bars"></i></span>
+    <span>Menú</span>
   </button>
   <button class="mobile-tab" [class.active]="activePanel() === 'main'" (click)="activePanel.set('main')">
     <span class="tab-icon"><i class="fa-solid fa-gamepad"></i></span>
@@ -254,6 +334,19 @@
   <button class="mobile-tab" [class.active]="activePanel() === 'leaderboard'" (click)="activePanel.set('leaderboard')">
     <span class="tab-icon"><i class="fa-solid fa-trophy"></i></span>
     <span>Ranking</span>
+  </button>
+  <button class="mobile-tab" [class.active]="activePanel() === 'chat'" (click)="activePanel.set('chat')">
+    <span class="tab-icon"><i class="fa-solid fa-comments"></i></span>
+    <span>Chat</span>
+  </button>
+  <button class="mobile-tab" [class.active]="activePanel() === 'notifs'" (click)="openNotifs()">
+    <span class="tab-icon notif-tab-icon">
+      <i class="fa-solid fa-bell"></i>
+      @if (notifService.unread() > 0) {
+        <span class="notif-tab-badge">{{ notifService.unread() }}</span>
+      }
+    </span>
+    <span>Avisos</span>
   </button>
 </nav>
 

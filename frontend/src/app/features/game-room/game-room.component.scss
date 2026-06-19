@@ -805,7 +805,7 @@
   background: rgba(5, 5, 18, 0.88);
   backdrop-filter: blur(8px);
   opacity: 0;
-  animation: coin-fade-in 0.3s ease forwards, coin-fade-out 0.6s ease 2.9s forwards;
+  animation: coin-fade-in 0.3s ease forwards, coin-fade-out 0.6s ease 2.8s forwards;
 }
 
 .coin-flash {
@@ -827,7 +827,7 @@
   z-index: 2;
   animation:
     coin-bar-top-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.1s forwards,
-    coin-fade-out   0.5s ease 2.9s forwards;
+    coin-fade-out   0.5s ease 2.8s forwards;
 }
 
 .coin-bar-bottom {
@@ -840,7 +840,7 @@
   z-index: 2;
   animation:
     coin-bar-bottom-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.1s forwards,
-    coin-fade-out      0.5s ease 2.9s forwards;
+    coin-fade-out      0.5s ease 2.8s forwards;
 }
 
 .coin-content {
@@ -853,13 +853,52 @@
   gap: 0.6rem;
   z-index: 3;
   opacity: 0;
-  animation: coin-fade-in 0.2s ease 0.65s forwards, coin-fade-out 0.5s ease 2.9s forwards;
+  animation: coin-fade-in 0.2s ease 0.65s forwards, coin-fade-out 0.5s ease 2.8s forwards;
 }
 
-.coin-emoji {
-  font-size: clamp(3rem, 10vw, 5rem);
-  display: block;
-  animation: coin-flip 1.5s ease 0.65s forwards;
+.coin-rainbow-ring {
+  width: clamp(96px, 20vw, 136px);
+  height: clamp(96px, 20vw, 136px);
+  border-radius: 50%;
+  padding: 2px;
+  background: conic-gradient(
+    from 0deg,
+    #ff0000 0deg, #ff7700 45deg, #ffee00 90deg,
+    #22cc44 135deg, #00aaff 180deg, #5500ff 225deg,
+    #cc00ff 270deg, #ff0055 315deg, #ff0000 360deg
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: coin-flip 0.9s ease 0.65s forwards;
+}
+
+.coin-glass {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 8px 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coin-svg {
+  width: 52%;
+  height: 52%;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.85)) drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
+  animation: coin-svg-glow 0.9s ease-in-out 0.65s infinite alternate;
+}
+
+@keyframes coin-svg-glow {
+  from { filter: drop-shadow(0 0 6px rgba(255,255,255,0.5)); }
+  to   { filter: drop-shadow(0 0 16px rgba(255,255,255,0.95)) drop-shadow(0 0 6px rgba(200,200,255,0.5)); }
 }
 
 .coin-label {
@@ -867,13 +906,10 @@
   font-weight: 900;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, #ffc700 0%, #ff8c00 50%, #ffc700 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0.75rem 0 0;
   opacity: 0;
-  animation: coin-slide-in 0.35s ease 2.2s forwards;
+  animation: coin-slide-in 0.35s ease 1.65s forwards;
 }
 
 .coin-player {
@@ -881,18 +917,16 @@
   align-items: center;
   gap: 0.6rem;
   opacity: 0;
-  animation: coin-slide-in 0.35s ease 2.45s forwards;
+  animation: coin-slide-in 0.35s ease 1.85s forwards;
 }
 
 .coin-avatar {
   font-size: clamp(1.8rem, 6vw, 2.8rem);
-  filter: drop-shadow(0 0 12px currentColor);
 }
 
 .coin-name {
-  font-size: clamp(1.1rem, 3.5vw, 1.8rem);
+  font-size: clamp(1.8rem, 6vw, 2.8rem);
   font-weight: 800;
-  filter: drop-shadow(0 0 8px currentColor);
 }
 
 @keyframes coin-flash-anim    { 0% { opacity: 0.7; } 100% { opacity: 0; } }
@@ -906,14 +940,10 @@
 }
 @keyframes coin-flip {
   0%   { transform: scaleX(1)   scale(1); }
-  10%  { transform: scaleX(0)   scale(1.05); }
-  20%  { transform: scaleX(1)   scale(1); }
-  30%  { transform: scaleX(0)   scale(1.05); }
-  40%  { transform: scaleX(1)   scale(1); }
-  50%  { transform: scaleX(0)   scale(1.05); }
-  60%  { transform: scaleX(1)   scale(1); }
-  70%  { transform: scaleX(0)   scale(1.05); }
-  80%  { transform: scaleX(1)   scale(1.1); }
-  92%  { transform: scaleX(1)   scale(1.4); }
-  100% { transform: scaleX(1)   scale(1.25); }
+  18%  { transform: scaleX(0)   scale(1.05); }
+  36%  { transform: scaleX(1)   scale(1); }
+  54%  { transform: scaleX(0)   scale(1.05); }
+  70%  { transform: scaleX(1)   scale(1.05); }
+  84%  { transform: scaleX(1)   scale(1.35); }
+  100% { transform: scaleX(1)   scale(1.2); }
 }

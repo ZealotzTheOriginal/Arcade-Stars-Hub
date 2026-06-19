@@ -227,26 +227,17 @@
 
   .lb-rank { color: var(--text-muted); font-weight: 700; text-align: center; flex-shrink: 0; }
   .lb-name {
-    color: transparent;
-    -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.75);
+    color: rgba(255, 255, 255, 0.9);
     word-break: break-word;
 
     &--empty {
       color: var(--text-muted);
-      -webkit-text-stroke: 0;
       font-style: italic;
       opacity: 0.4;
       letter-spacing: 0.04em;
     }
   }
   .lb-pts { color: var(--text-muted); font-weight: 400; white-space: nowrap; text-align: right; }
-
-  &.lb-gold .lb-name,
-  &.lb-silver .lb-name,
-  &.lb-bronze .lb-name {
-    -webkit-text-stroke: 0.6px #ff0000;
-    animation: logo-stroke 4s linear infinite;
-  }
 }
 
 /* Games */
@@ -647,4 +638,139 @@
   60%  { color: var(--rainbow-blue); }
   80%  { color: var(--rainbow-pink); }
   100% { color: var(--rainbow-red); }
+}
+
+/* Admin panel */
+.admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+    i { color: #f5c518; }
+  }
+}
+
+.admin-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-user-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.875rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: background 0.15s;
+
+  &:hover { background: rgba(255, 255, 255, 0.06); }
+
+  &--admin {
+    border-color: rgba(245, 197, 24, 0.25);
+    background: rgba(245, 197, 24, 0.04);
+  }
+}
+
+.admin-user-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.admin-dropdown {
+  right: 0;
+  left: auto;
+  min-width: 160px;
+}
+
+.admin-user-avatar {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.admin-user-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.admin-user-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.admin-user-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-user-pts {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  i { color: #f5c518; margin-right: 0.2rem; }
+}
+
+/* ── Custom badges ─────────────────────────────────────── */
+.badge--beta      { background: rgba(99, 102, 241, 0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.35); }
+.badge--payaso    { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245,158,11,0.35); }
+.badge--eminencia { background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.35); }
+.badge--hardcore  { background: rgba(239, 68, 68, 0.18);  color: #f87171; border: 1px solid rgba(239,68,68,0.35);  }
+
+.badge--xs {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+}
+
+/* ── Badge picker modal ────────────────────────────────── */
+.badge-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+}
+
+.badge-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 20px;
+  border: 1.5px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    border-color: var(--badge-color, #888);
+    color: var(--badge-color, #fff);
+  }
+
+  &--active {
+    border-color: var(--badge-color, #888);
+    background: color-mix(in srgb, var(--badge-color, #888) 20%, transparent);
+    color: var(--badge-color, #fff);
+  }
 }

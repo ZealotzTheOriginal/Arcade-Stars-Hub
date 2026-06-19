@@ -231,7 +231,8 @@ export class GameRoomComponent implements OnInit, OnDestroy {
           this.startTimer();
           const firstUid: string = msg.data.game_state?.current_turn;
           const first = (msg.data.players ?? []).find((p: any) => p.uid === firstUid);
-          if (first) {
+          const humanCount = (msg.data.players ?? []).filter((p: any) => !p.is_ai).length;
+          if (first && humanCount > 1) {
             const colors: Record<string, string> = msg.data.player_colors ?? {};
             this.coinFlipData.set({
               name: (first as any).display_name,
@@ -239,7 +240,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
               color: colors[firstUid] ?? this.playerColors()[firstUid] ?? '#888',
             });
             clearTimeout(this.coinFlipTimer);
-            this.coinFlipTimer = setTimeout(() => this.coinFlipData.set(null), 3500);
+            this.coinFlipTimer = setTimeout(() => this.coinFlipData.set(null), 3600);
           }
         }
         this.roomStatus.set('playing');
@@ -468,6 +469,14 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   inviteFriend(uid: string) {
     this.ws.send('send_invite', { to_uid: uid, game_id: this.gameId, room_id: this.roomId });
     this.showFriendsModal.set(false);
+  }
+
+  shareRoomInGlobalChat() {
+    this.ws.send('global_chat', {
+      text: 'está compartiendo el código de su sala',
+      room_id: this.roomId,
+    });
+    this.showToast('Código compartido en el chat global');
   }
 
   requestRematch() {

@@ -79,6 +79,9 @@
               @if (friends().length > 0 && players().length < maxPlayers()) {
                 <button class="btn btn--ghost" (click)="showFriendsModal.set(true)"><i class="fa-solid fa-user-group"></i> Invitar amigo</button>
               }
+              @if (players().length < maxPlayers()) {
+                <button class="btn btn--ghost" (click)="shareRoomInGlobalChat()"><i class="fa-solid fa-share-nodes"></i> Compartir en chat</button>
+              }
             </div>
           }
 
@@ -148,7 +151,6 @@
                       'mask-image': 'url(/tres_en_raya/' + previewPiece() + '_' + p + '.svg)',
                       '-webkit-mask-image': 'url(/tres_en_raya/' + previewPiece() + '_' + p + '.svg)'
                     }"></div>
-                    <span>{{ p }}</span>
                   </button>
                 }
               </div>
@@ -361,7 +363,11 @@
     <div class="coin-bar-bottom"></div>
     <div class="coin-content">
       <div class="coin-spin-wrap">
-        <span class="coin-emoji">🪙</span>
+        <div class="coin-rainbow-ring">
+          <div class="coin-glass">
+            <img src="/rooms/Coin.svg" class="coin-svg" alt="moneda" />
+          </div>
+        </div>
       </div>
       <p class="coin-label">PRIMER TURNO</p>
       <div class="coin-player">

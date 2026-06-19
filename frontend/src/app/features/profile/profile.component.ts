@@ -20,6 +20,13 @@ const AVATARS = [
   '👑', '🏆', '⭐', '🎖️'
 ];
 
+const BADGE_DEFS = [
+  { id: 'beta',      label: 'Beta',      color: '#6366f1', icon: 'fa-flask' },
+  { id: 'payaso',    label: 'Payaso',    color: '#f59e0b', icon: 'fa-face-grin-squint-tears' },
+  { id: 'eminencia', label: 'Eminencia', color: '#10b981', icon: 'fa-crown' },
+  { id: 'hardcore',  label: 'Hardcore',  color: '#ef4444', icon: 'fa-skull' },
+];
+
 @Component({
   selector: 'app-profile',
   standalone: true,
@@ -53,8 +60,12 @@ export class ProfileComponent implements OnInit, OnDestroy {
   addPointsTarget = signal<string | null>(null);
   addPointsAmount = 0;
   resetAllConfirm = signal(false);
+  avatarPickerUid = signal<string | null>(null);
+  badgesTargetUid = signal<string | null>(null);
+  badgesEditing = signal<string[]>([]);
 
   readonly avatars = AVATARS;
+  readonly badgeDefs = BADGE_DEFS;
 
   readonly gameNames: Partial<Record<string, string>> = {
     connect_four: 'Conecta Cuatro',
@@ -262,6 +273,44 @@ export class ProfileComponent implements OnInit, OnDestroy {
       won: s.won,
       points: s.points,
     }));
+  }
+
+  openAvatarPicker(uid: string) {
+    this.openAdminMenuUid.set(null);
+    this.avatarPickerUid.set(uid);
+  }
+
+  async adminConfirmAvatar(avatar: string) {
+    const uid = this.avatarPickerUid();
+    if (!uid) return;
+    this.avatarPickerUid.set(null);
+    await this.api.adminSetAvatar(uid, avatar);
+    this.adminUsers.update(list => list.map(u => u.uid === uid ? { ...u, avatar } : u));
+  }
+
+  openBadgeManager(uid: string) {
+    this.openAdminMenuUid.set(null);
+    const user = this.adminUsers().find(u => u.uid === uid);
+    this.badgesEditing.set(user?.badges ? [...user.badges] : []);
+    this.badgesTargetUid.set(uid);
+  }
+
+  toggleBadgeEdit(badgeId: string) {
+    const current = this.badgesEditing();
+    if (current.includes(badgeId)) {
+      this.badgesEditing.set(current.filter(b => b !== badgeId));
+    } else {
+      this.badgesEditing.set([...current, badgeId]);
+    }
+  }
+
+  async adminSaveBadges() {
+    const uid = this.badgesTargetUid();
+    if (!uid) return;
+    const badges = this.badgesEditing();
+    this.badgesTargetUid.set(null);
+    await this.api.adminSetBadges(uid, badges);
+    this.adminUsers.update(list => list.map(u => u.uid === uid ? { ...u, badges } : u));
   }
 
   logout() { this.auth.logout(); }

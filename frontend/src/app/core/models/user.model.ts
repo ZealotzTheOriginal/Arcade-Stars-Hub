@@ -15,6 +15,7 @@ export interface UserProfile {
   friends: string[];
   ttt_pattern?: string;
   is_admin?: boolean;
+  badges?: string[];
 }
 
 export interface UserUpdate {

@@ -155,6 +155,22 @@ export class ApiService {
     );
   }
 
+  async adminSetAvatar(uid: string, avatar: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${environment.apiUrl}/users/admin/${uid}/set-avatar`, { avatar }, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
+  async adminSetBadges(uid: string, badges: string[]): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${environment.apiUrl}/users/admin/${uid}/set-badges`, { badges }, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
   // ── Leaderboard ────────────────────────────────────────
   async getGlobalLeaderboard(): Promise<LeaderboardEntry[]> {
     return firstValueFrom(this.http.get<LeaderboardEntry[]>(`${environment.apiUrl}/leaderboard/`));
