@@ -1,188 +1,176 @@
 import math
 import random
-import copy
 from typing import Any, Optional
 from app.games.base import BaseGame
 
+# ── Constants (all speeds in px/s) ────────────────────────────────────────────
 W, H = 800, 500
 PADDLE_W, PADDLE_H = 14, 90
 PADDLE_MARGIN = 24
-BALL_SIZE = 14
-PADDLE_SPEED = 8
-INITIAL_SPEED = 10.0
-MAX_SPEED = 20.0
-SPEED_INCREMENT = 0.5
-WALL_SPEED_INCREMENT = 0.3
-WIN_SCORE = 15
-SERVE_TICKS = 20       # ~0.67s pause after each point (at 30fps)
+BALL_SIZE = 20
+PADDLE_SPEED  = 240.0   # px/s
+INITIAL_SPEED = 300.0   # px/s
+MAX_SPEED     = 600.0   # px/s
+SPEED_INCREMENT      = 15.0  # px/s added per paddle hit
+WALL_SPEED_INCREMENT =  9.0  # px/s added per wall bounce
+WIN_SCORE  = 15
+SERVE_MS   = 667        # ms ball stays frozen after each point
 MAX_BOUNCE_ANGLE = 0.42 * math.pi  # ~75° max deflection
 
 
-def _new_ball(toward_loser: str | None = None, players: list[str] | None = None) -> dict:
-    vy_sign = random.choice([1, -1])
-    vy = random.uniform(INITIAL_SPEED * 0.3, INITIAL_SPEED * 0.55) * vy_sign
+# ── Serve trajectory ───────────────────────────────────────────────────────────
 
-    if toward_loser and players and toward_loser in players:
-        vx = INITIAL_SPEED if players.index(toward_loser) == 0 else -INITIAL_SPEED
+def get_serve_trajectory(toward_uid: str | None = None,
+                         players: list[str] | None = None) -> dict:
+    """Initial ball trajectory for a serve. Ball starts at centre, frozen for SERVE_MS."""
+    vy_sign = random.choice([1, -1])
+    vy = random.uniform(INITIAL_SPEED * 0.30, INITIAL_SPEED * 0.55) * vy_sign
+
+    if toward_uid and players and toward_uid in players:
+        vx = INITIAL_SPEED if players.index(toward_uid) == 0 else -INITIAL_SPEED
     else:
         vx = INITIAL_SPEED * random.choice([1, -1])
 
+    speed = math.sqrt(vx ** 2 + vy ** 2)
     return {
-        "x": W / 2 - BALL_SIZE / 2,
-        "y": H / 2 - BALL_SIZE / 2,
-        "vx": float(vx),
-        "vy": float(vy),
-        "speed": INITIAL_SPEED,
-        "serve": SERVE_TICKS,  # countdown before ball moves
+        "x":        float(W / 2 - BALL_SIZE / 2),
+        "y":        float(H / 2 - BALL_SIZE / 2),
+        "vx":       float(vx),
+        "vy":       float(vy),
+        "speed":    float(speed),
+        "serving":  True,
+        "serve_ms": SERVE_MS,
     }
 
+
+# ── Paddle-hit trajectory ──────────────────────────────────────────────────────
+
+def calculate_hit(hit_pos: float, paddle_dir: str | None,
+                  incoming_speed: float, side: str, ball_y: float) -> dict:
+    """
+    Compute new ball trajectory after a paddle hit.
+
+    hit_pos     : 0.0 = top of paddle, 1.0 = bottom
+    paddle_dir  : "up" | "down" | None
+    incoming_speed: ball speed (px/s) at moment of impact
+    side        : "left" | "right"
+    ball_y      : ball y at impact
+    """
+    speed = min(incoming_speed + SPEED_INCREMENT, MAX_SPEED)
+
+    hit_pos = max(0.0, min(1.0, float(hit_pos)))
+    angle   = (hit_pos - 0.5) * 2.0 * MAX_BOUNCE_ANGLE  # negative = upward
+
+    base_vy = math.sin(angle) * speed
+
+    # Paddle-direction effect adds extra vertical momentum
+    PADDLE_EFFECT = 30.0  # px/s
+    if paddle_dir == "up":
+        base_vy -= PADDLE_EFFECT
+    elif paddle_dir == "down":
+        base_vy += PADDLE_EFFECT
+
+    # Clamp vy and recalculate vx to maintain speed
+    max_vy  = speed * math.sin(MAX_BOUNCE_ANGLE)
+    base_vy = max(-max_vy, min(max_vy, base_vy))
+    vx_mag  = math.sqrt(max(speed ** 2 - base_vy ** 2, 1.0))
+
+    if side == "left":
+        vx    = vx_mag
+        ball_x = float(PADDLE_MARGIN + PADDLE_W)
+    else:
+        vx    = -vx_mag
+        ball_x = float(W - PADDLE_MARGIN - PADDLE_W - BALL_SIZE)
+
+    return {
+        "x":       ball_x,
+        "y":       float(ball_y),
+        "vx":      float(vx),
+        "vy":      float(base_vy),
+        "speed":   float(speed),
+        "serving": False,
+    }
+
+
+# ── Ball-arrival prediction (for AI) ──────────────────────────────────────────
+
+def calculate_ball_arrival(traj: dict, side: str) -> tuple[float, float]:
+    """
+    Return (t_arrival_s, ball_y_at_arrival) for a trajectory heading toward `side`.
+    Returns (999.0, 0) if ball is not heading toward that side.
+    """
+    x, y   = float(traj["x"]), float(traj["y"])
+    vx, vy = float(traj["vx"]), float(traj["vy"])
+    speed  = float(traj.get("speed", INITIAL_SPEED))
+
+    if side == "left":
+        target_x = float(PADDLE_MARGIN + PADDLE_W)
+        if vx >= 0:
+            return (999.0, y)
+    else:
+        target_x = float(W - PADDLE_MARGIN - PADDLE_W - BALL_SIZE)
+        if vx <= 0:
+            return (999.0, y)
+
+    t_total = (target_x - x) / vx   # positive: ball heading there
+
+    # Simulate y through wall bounces over t_total seconds
+    cur_y     = y
+    cur_vy    = vy
+    cur_speed = speed
+    remaining = t_total
+
+    while remaining > 0.001:
+        if cur_vy < 0:
+            t_wall = -cur_y / cur_vy if cur_vy != 0 else 999.0
+        elif cur_vy > 0:
+            t_wall = (H - BALL_SIZE - cur_y) / cur_vy if cur_vy != 0 else 999.0
+        else:
+            t_wall = 999.0
+
+        t_wall = max(t_wall, 0.001)
+
+        if t_wall < remaining:
+            cur_y     += cur_vy * t_wall
+            cur_y      = max(0.0, min(float(H - BALL_SIZE), cur_y))
+            cur_speed  = min(cur_speed + WALL_SPEED_INCREMENT, MAX_SPEED)
+            vy_mag     = abs(cur_vy) * 0.80
+            cur_vy     = vy_mag if cur_vy < 0 else -vy_mag
+            remaining -= t_wall
+        else:
+            cur_y += cur_vy * remaining
+            remaining = 0
+
+    return (float(t_total), float(cur_y))
+
+
+# ── Game class ─────────────────────────────────────────────────────────────────
 
 class PongGame(BaseGame):
 
     def get_initial_state(self, player_uids: list[str], win_score: int = 15) -> dict:
         p0, p1 = player_uids[0], player_uids[1]
         return {
-            "width": W,
-            "height": H,
+            "width":    W,
+            "height":   H,
             "paddle_w": PADDLE_W,
             "paddle_h": PADDLE_H,
             "ball_size": BALL_SIZE,
             "paddles": {
-                p0: {"y": float(H // 2 - PADDLE_H // 2), "moving": None, "side": "left"},
-                p1: {"y": float(H // 2 - PADDLE_H // 2), "moving": None, "side": "right"},
+                p0: {"y": float(H // 2 - PADDLE_H // 2), "side": "left"},
+                p1: {"y": float(H // 2 - PADDLE_H // 2), "side": "right"},
             },
-            "ball": _new_ball(),
-            "scores": {p0: 0, p1: 0},
-            "players": player_uids,
-            "winner": None,
-            "current_turn": None,
+            "ball":     {"x": float(W / 2), "y": float(H / 2), "vx": 0.0, "vy": 0.0, "speed": 0.0},
+            "scores":   {p0: 0, p1: 0},
+            "players":  player_uids,
+            "winner":   None,
             "win_score": win_score,
-            "tick": 0,
         }
 
-    # ── Physics tick ──────────────────────────────────────────────
-
-    def tick(self, state: dict) -> dict:
-        state = copy.deepcopy(state)
-        players: list[str] = state["players"]
-        paddles: dict = state["paddles"]
-        ball: dict = state["ball"]
-        scores: dict = state["scores"]
-
-        # Serving countdown: ball stays frozen
-        if ball.get("serve", 0) > 0:
-            ball["serve"] -= 1
-            state["tick"] = state.get("tick", 0) + 1
-            return state
-
-        # Move paddles
-        for uid, paddle in paddles.items():
-            mv = paddle.get("moving")
-            if mv == "up":
-                paddle["y"] = max(0.0, paddle["y"] - PADDLE_SPEED)
-            elif mv == "down":
-                paddle["y"] = min(float(H - PADDLE_H), paddle["y"] + PADDLE_SPEED)
-
-        bx = ball["x"] + ball["vx"]
-        by = ball["y"] + ball["vy"]
-        vx = ball["vx"]
-        vy = ball["vy"]
-        speed = ball["speed"]
-
-        # Top / bottom wall bounce — speed up and flatten trajectory each hit
-        if by <= 0:
-            by = 0.0
-            speed = min(speed + WALL_SPEED_INCREMENT, MAX_SPEED)
-            vy_mag = abs(vy) * 0.80
-            vx = math.copysign(math.sqrt(max(speed ** 2 - vy_mag ** 2, 1.0)), vx)
-            vy = vy_mag
-            ball["speed"] = speed
-        elif by + BALL_SIZE >= H:
-            by = float(H - BALL_SIZE)
-            speed = min(speed + WALL_SPEED_INCREMENT, MAX_SPEED)
-            vy_mag = abs(vy) * 0.80
-            vx = math.copysign(math.sqrt(max(speed ** 2 - vy_mag ** 2, 1.0)), vx)
-            vy = -vy_mag
-            ball["speed"] = speed
-
-        p0, p1 = players[0], players[1]
-        lp = paddles[p0]  # left
-        rp = paddles[p1]  # right
-
-        # Left paddle collision
-        lx = float(PADDLE_MARGIN)
-        lpx2 = lx + PADDLE_W
-        if (vx < 0
-                and bx <= lpx2
-                and ball["x"] + BALL_SIZE >= lx
-                and by + BALL_SIZE > lp["y"]
-                and by < lp["y"] + PADDLE_H):
-            bx = lpx2
-            hit = (by + BALL_SIZE / 2 - lp["y"]) / PADDLE_H
-            angle = (hit - 0.5) * 2 * MAX_BOUNCE_ANGLE
-            speed = min(speed + SPEED_INCREMENT, MAX_SPEED)
-            vx = abs(math.cos(angle)) * speed
-            vy = math.sin(angle) * speed
-            ball["speed"] = speed
-
-        # Right paddle collision
-        rx = float(W - PADDLE_MARGIN - PADDLE_W)
-        if (vx > 0
-                and bx + BALL_SIZE >= rx
-                and ball["x"] <= rx + PADDLE_W
-                and by + BALL_SIZE > rp["y"]
-                and by < rp["y"] + PADDLE_H):
-            bx = rx - BALL_SIZE
-            hit = (by + BALL_SIZE / 2 - rp["y"]) / PADDLE_H
-            angle = (hit - 0.5) * 2 * MAX_BOUNCE_ANGLE
-            speed = min(speed + SPEED_INCREMENT, MAX_SPEED)
-            vx = -abs(math.cos(angle)) * speed
-            vy = math.sin(angle) * speed
-            ball["speed"] = speed
-
-        # Scoring
-        scored_uid: str | None = None
-        if bx <= 0:
-            scores[p1] = scores.get(p1, 0) + 1
-            scored_uid = p1
-        elif bx + BALL_SIZE >= W:
-            scores[p0] = scores.get(p0, 0) + 1
-            scored_uid = p0
-
-        if scored_uid:
-            if max(scores.values()) >= state.get("win_score", WIN_SCORE):
-                state["winner"] = max(scores, key=lambda u: scores[u])
-            # Reset ball toward the player who just scored (they earned the attack)
-            state["ball"] = _new_ball(scored_uid, players)
-        else:
-            ball["x"] = float(bx)
-            ball["y"] = float(by)
-            ball["vx"] = float(vx)
-            ball["vy"] = float(vy)
-
-        state["scores"] = scores
-        state["tick"] = state.get("tick", 0) + 1
-        return state
-
-    # ── AI ────────────────────────────────────────────────────────
-
-    def get_ai_direction(self, state: dict, ai_uid: str) -> str | None:
-        paddle = state.get("paddles", {}).get(ai_uid)
-        ball = state.get("ball", {})
-        if not paddle or ball.get("serve", 0) > 0:
-            return None
-        pc = paddle["y"] + PADDLE_H / 2
-        bc = ball.get("y", H / 2) + BALL_SIZE / 2
-        if pc < bc - 4:
-            return "down"
-        if pc > bc + 4:
-            return "up"
-        return None
-
-    # ── BaseGame interface ─────────────────────────────────────────
+    # BaseGame interface ──────────────────────────────────────────────────────
 
     def apply_move(self, state: dict, uid: str, move: Any) -> dict:
-        return state  # pong uses direct paddle state mutation + tick
+        return state
 
     def is_terminal(self, state: dict) -> bool:
         return state.get("winner") is not None

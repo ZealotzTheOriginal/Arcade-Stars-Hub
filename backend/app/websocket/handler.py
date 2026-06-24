@@ -23,8 +23,8 @@ _presence: dict[str, dict] = {}
 # Per-room snake tick tasks
 _snake_tasks: dict[str, "asyncio.Task[None]"] = {}
 
-# Per-room pong tick tasks
-_pong_tasks: dict[str, "asyncio.Task[None]"] = {}
+# Per-room AI pong tasks (one-shot per trajectory, only when AI is in game)
+_pong_ai_tasks: dict[str, "asyncio.Task[None]"] = {}
 
 ROOM_TIMEOUT_SECONDS = 600  # 10 minutes
 
@@ -250,9 +250,9 @@ async def _close_room(room_id: str, reason: str = "Sala cerrada"):
     snake_task = _snake_tasks.pop(room_id, None)
     if snake_task:
         snake_task.cancel()
-    pong_task = _pong_tasks.pop(room_id, None)
-    if pong_task:
-        pong_task.cancel()
+    pong_ai_task = _pong_ai_tasks.pop(room_id, None)
+    if pong_ai_task:
+        pong_ai_task.cancel()
     await manager.broadcast(room_id, ServerEvent.ROOM_CLOSED, {"reason": reason})
     del _rooms[room_id]
     await broadcast_lobby_update()
@@ -295,7 +295,9 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.SET_TTT_PATTERN: _handle_set_ttt_pattern,
         ClientEvent.SET_MS_BOARD_SIZE: _handle_set_ms_board_size,
         ClientEvent.SNAKE_DIRECTION: _handle_snake_direction,
-        ClientEvent.PONG_PADDLE: _handle_pong_paddle,
+        ClientEvent.PONG_HIT: _handle_pong_hit,
+        ClientEvent.PONG_MISS: _handle_pong_miss,
+        ClientEvent.PONG_PADDLE_MOVE: _handle_pong_paddle_move,
         ClientEvent.PONG_SET_WIN_SCORE: _handle_pong_set_win_score,
     }
     handler = handlers.get(event)
@@ -712,9 +714,9 @@ async def _handle_abandon(ws: WebSocket, uid: str, data: dict):
     snake_task = _snake_tasks.pop(room_id, None)
     if snake_task:
         snake_task.cancel()
-    pong_task = _pong_tasks.pop(room_id, None)
-    if pong_task:
-        pong_task.cancel()
+    pong_ai_task = _pong_ai_tasks.pop(room_id, None)
+    if pong_ai_task:
+        pong_ai_task.cancel()
     await manager.broadcast(room_id, ServerEvent.GAME_ABANDONED, {
         "uid": uid,
         "display_name": player_info.get("display_name", "Jugador"),
@@ -1092,65 +1094,196 @@ async def _handle_pong_set_win_score(ws: WebSocket, uid: str, data: dict):
     await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
 
 
-async def _handle_pong_paddle(ws: WebSocket, uid: str, data: dict):
-    room_id = data.get("room_id")
-    action = data.get("action", "")    # "start" | "stop"
-    direction = data.get("direction")  # "up" | "down" | None
+async def _handle_pong_paddle_move(ws: WebSocket, uid: str, data: dict):
+    """Client pressed/released a key — relay direction to opponent for visual sync."""
+    room_id  = data.get("room_id")
+    direction = data.get("direction")   # "up" | "down" | None
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "playing" or room["game_id"] != "pong":
+        return
+    # Relay to everyone else in the room
+    await manager.broadcast(room_id, ServerEvent.PONG_PADDLE_MOVE,
+                            {"uid": uid, "direction": direction},
+                            exclude_uid=uid)
+
+
+async def _handle_pong_hit(ws: WebSocket, uid: str, data: dict):
+    """Client reports its paddle hit the ball — compute new trajectory and broadcast."""
+    from app.games.pong.game import calculate_hit, calculate_ball_arrival, get_serve_trajectory, WIN_SCORE
+    room_id        = data.get("room_id")
+    hit_pos        = float(data.get("hit_pos", 0.5))
+    paddle_dir     = data.get("paddle_dir")
+    ball_y         = float(data.get("ball_y", 250.0))
+    incoming_speed = float(data.get("speed", 300.0))
+
     room = _rooms.get(room_id)
     if not room or room["status"] != "playing" or room["game_id"] != "pong":
         return
     state = room.get("game_state")
+    if not state or uid not in state.get("players", []):
+        return
+
+    side = state["paddles"][uid]["side"]
+    traj = calculate_hit(hit_pos, paddle_dir, incoming_speed, side, ball_y)
+
+    state["ball"].update(traj)
+    room["last_activity"] = time.time()
+
+    payload = {**traj, "scores": state["scores"]}
+    await manager.broadcast(room_id, ServerEvent.PONG_TRAJECTORY, payload)
+
+    # If opponent is AI, schedule one-shot response
+    players = state["players"]
+    opponent_uid = next((p for p in players if p != uid), None)
+    if opponent_uid and _is_ai_uid(room, opponent_uid):
+        old = _pong_ai_tasks.pop(room_id, None)
+        if old:
+            old.cancel()
+        _pong_ai_tasks[room_id] = asyncio.create_task(
+            _ai_pong_task(room_id, traj, opponent_uid)
+        )
+
+
+async def _handle_pong_miss(ws: WebSocket, uid: str, data: dict):
+    """Client reports it missed the ball — opponent scores, send new serve."""
+    from app.games.pong.game import get_serve_trajectory, WIN_SCORE
+    room_id = data.get("room_id")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "playing" or room["game_id"] != "pong":
+        return
+    state = room.get("game_state")
+    if not state or uid not in state.get("players", []):
+        return
+
+    players = state["players"]
+    scorer_uid = next((p for p in players if p != uid), None)
+    if not scorer_uid:
+        return
+
+    scores    = state["scores"]
+    win_score = state.get("win_score", WIN_SCORE)
+    scores[scorer_uid] = scores.get(scorer_uid, 0) + 1
+
+    if scores[scorer_uid] >= win_score:
+        state["winner"] = scorer_uid
+        game = get_game("pong")
+        await _end_game(room_id, room, game, state)
+        return
+
+    # Serve toward the player who missed
+    traj = get_serve_trajectory(toward_uid=uid, players=players)
+    room["last_activity"] = time.time()
+
+    await manager.broadcast(room_id, ServerEvent.PONG_TRAJECTORY,
+                            {**traj, "scores": scores})
+
+    # Schedule AI response if AI is receiving the serve
+    ai_uid = next((p["uid"] for p in room.get("players", []) if p.get("is_ai")), None)
+    if ai_uid:
+        old = _pong_ai_tasks.pop(room_id, None)
+        if old:
+            old.cancel()
+        _pong_ai_tasks[room_id] = asyncio.create_task(
+            _ai_pong_task(room_id, traj, ai_uid)
+        )
+
+
+async def _ai_pong_task(room_id: str, traj: dict, ai_uid: str):
+    """
+    One-shot task per trajectory: sleeps until the ball reaches the AI paddle,
+    then decides hit or miss. No loop — fires exactly once per trajectory.
+    """
+    from app.games.pong.game import (calculate_ball_arrival, calculate_hit,
+                                     get_serve_trajectory, WIN_SCORE,
+                                     PADDLE_H, PADDLE_SPEED, BALL_SIZE, H)
+
+    room = _rooms.get(room_id)
+    if not room:
+        return
+    state = room.get("game_state")
     if not state:
         return
-    paddle = state.get("paddles", {}).get(uid)
-    if paddle is None:
+
+    ai_paddle = state.get("paddles", {}).get(ai_uid)
+    if not ai_paddle:
         return
-    if action == "start" and direction in ("up", "down"):
-        paddle["moving"] = direction
-    elif action == "stop":
-        paddle["moving"] = None
 
+    ai_side = ai_paddle["side"]
+    serve_delay = traj.get("serve_ms", 0) / 1000.0  # seconds
 
-async def _pong_tick_loop(room_id: str):
-    """Advances Pong physics at 30 fps until the game ends."""
-    from app.games.pong.game import PongGame
-    TICK_S = 1 / 30
-    while True:
-        await asyncio.sleep(TICK_S)
+    # Wait for serve countdown before checking arrival
+    if serve_delay > 0:
+        await asyncio.sleep(serve_delay)
         room = _rooms.get(room_id)
-        if not room or room["status"] != "playing" or room["game_id"] != "pong":
-            _pong_tasks.pop(room_id, None)
+        if not room or room["status"] != "playing":
+            return
+        state = room.get("game_state")
+        if not state:
             return
 
-        game: PongGame = get_game("pong")  # type: ignore[assignment]
-        state = room["game_state"]
+    t_arrival, ball_y = calculate_ball_arrival(traj, ai_side)
 
-        # AI paddle direction
-        for player in room.get("players", []):
-            if player.get("is_ai"):
-                ai_uid = player["uid"]
-                direction = game.get_ai_direction(state, ai_uid)
-                paddle = state.get("paddles", {}).get(ai_uid)
-                if paddle is not None:
-                    paddle["moving"] = direction
+    if t_arrival >= 999.0:
+        return  # Ball not heading toward AI
 
-        try:
-            new_state = game.tick(state)
-        except Exception:
-            _pong_tasks.pop(room_id, None)
-            return
+    await asyncio.sleep(max(0.0, t_arrival))
 
-        room["game_state"] = new_state
+    # Re-validate room still active
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "playing":
+        return
+    state = room.get("game_state")
+    if not state:
+        return
+
+    ai_paddle = state.get("paddles", {}).get(ai_uid)
+    if not ai_paddle:
+        return
+
+    # Simulate AI paddle movement toward predicted ball position
+    ai_py    = float(ai_paddle.get("y", H / 2 - PADDLE_H / 2))
+    target_y = ball_y - PADDLE_H / 2
+    max_move = PADDLE_SPEED * t_arrival
+    if target_y < ai_py:
+        ai_py = max(0.0, ai_py - max_move)
+    else:
+        ai_py = min(float(H - PADDLE_H), ai_py + max_move)
+    ai_paddle["y"] = ai_py
+
+    players  = state["players"]
+    scores   = state["scores"]
+    win_score = state.get("win_score", WIN_SCORE)
+
+    ball_center = ball_y + BALL_SIZE / 2
+    hits = ball_y + BALL_SIZE > ai_py and ball_y < ai_py + PADDLE_H
+
+    if hits:
+        hit_pos  = max(0.0, min(1.0, (ball_center - ai_py) / PADDLE_H))
+        new_traj = calculate_hit(hit_pos, None, traj["speed"], ai_side, ball_y)
+        state["ball"].update(new_traj)
         room["last_activity"] = time.time()
-
-        await manager.broadcast(room_id, ServerEvent.MOVE_MADE, {
-            "game_state": new_state,
-        })
-
-        if game.is_terminal(new_state):
-            _pong_tasks.pop(room_id, None)
-            await _end_game(room_id, room, game, new_state)
+        await manager.broadcast(room_id, ServerEvent.PONG_TRAJECTORY,
+                                {**new_traj, "scores": scores})
+        # Ball goes toward human now — no AI task needed until human hits back
+    else:
+        # AI missed — human scores
+        human_uid = next((p for p in players if p != ai_uid), None)
+        if not human_uid:
             return
+        scores[human_uid] = scores.get(human_uid, 0) + 1
+        if scores[human_uid] >= win_score:
+            state["winner"] = human_uid
+            game = get_game("pong")
+            await _end_game(room_id, room, game, state)
+            return
+        new_traj = get_serve_trajectory(toward_uid=ai_uid, players=players)
+        room["last_activity"] = time.time()
+        await manager.broadcast(room_id, ServerEvent.PONG_TRAJECTORY,
+                                {**new_traj, "scores": scores})
+        # New serve toward AI — schedule next AI task
+        _pong_ai_tasks[room_id] = asyncio.create_task(
+            _ai_pong_task(room_id, new_traj, ai_uid)
+        )
 
 
 async def _start_game(room_id: str):
@@ -1231,9 +1364,22 @@ async def _start_game(room_id: str):
         return
 
     if room["game_id"] == "pong":
-        _pong_tasks[room_id] = asyncio.create_task(_pong_tick_loop(room_id))
-        if any(p.get("is_ai") for p in room["players"]):
+        from app.games.pong.game import get_serve_trajectory
+        traj = get_serve_trajectory(players=player_uids)
+        await manager.broadcast(room_id, ServerEvent.PONG_TRAJECTORY,
+                                {**traj, "scores": state["scores"]})
+        # Schedule AI task if AI is in the game
+        ai_player = next((p for p in room["players"] if p.get("is_ai")), None)
+        if ai_player:
             asyncio.create_task(_ai_chat(room_id, random.choice(_AI_POOL_START), delay=1.5))
+            ai_uid  = ai_player["uid"]
+            ai_side = state["paddles"][ai_uid]["side"]
+            vx      = traj["vx"]
+            going_to_ai = (ai_side == "left" and vx < 0) or (ai_side == "right" and vx > 0)
+            if going_to_ai:
+                _pong_ai_tasks[room_id] = asyncio.create_task(
+                    _ai_pong_task(room_id, traj, ai_uid)
+                )
         return
 
     turn_uid = room["game_state"].get("current_turn")
@@ -1307,9 +1453,9 @@ async def _end_game(room_id: str, room: dict, game, state: dict):
     snake_task = _snake_tasks.pop(room_id, None)
     if snake_task:
         snake_task.cancel()
-    pong_task = _pong_tasks.pop(room_id, None)
-    if pong_task:
-        pong_task.cancel()
+    pong_ai_task = _pong_ai_tasks.pop(room_id, None)
+    if pong_ai_task:
+        pong_ai_task.cancel()
     room["status"] = "finished"
     room["last_activity"] = time.time()
     scores = game.get_scores(state)

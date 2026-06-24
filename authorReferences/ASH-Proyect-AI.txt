@@ -33,10 +33,12 @@ FUNCIONALIDADES IMPLEMENTADAS
    - Rutas protegidas por guard Angular
    - Token verificado en backend con Firebase Admin SDK
 
-2. JUEGOS BASE (3 juegos)
+2. JUEGOS BASE (5 juegos)
    - Conecta Cuatro  (multijugador + IA)
    - Tres en Raya    (multijugador + IA)
    - Buscaminas      (multijugador por turnos + IA)
+   - Pong            (multijugador en tiempo real, WebSocket tick-loop 30 fps)
+   - Snake           (multijugador en tiempo real, WebSocket tick-loop)
    - Sistema de puntos: se guardan por juego en Firestore
    - HUD con chat en tiempo real vía WS
 
@@ -79,6 +81,112 @@ FUNCIONALIDADES IMPLEMENTADAS
      (los UIDs de Firestore se resuelven a perfiles completos vía
      GET /api/users/friends)
    - Leaderboard global en sidebar de home
+
+8. PANEL DE ADMINISTRACIÓN
+   - Ruta protegida /admin
+   - Gestión de usuarios y estadísticas globales
+
+
+PONG — DETALLES DE IMPLEMENTACIÓN
+-----------------------------------
+
+Constantes del backend (backend/app/games/pong/game.py):
+  PADDLE_SPEED      = 8
+  INITIAL_SPEED     = 10.0
+  MAX_SPEED         = 20.0
+  SPEED_INCREMENT   = 0.5
+  WALL_SPEED_INCREMENT = 0.3   ← incremento de velocidad al chocar con pared
+  SERVE_TICKS       = 20
+  BALL_SIZE         = 20
+
+Física de paredes (choques arriba/abajo):
+  - Cada choque aumenta la velocidad en WALL_SPEED_INCREMENT (máx MAX_SPEED)
+  - La componente vy se aplana un 20% (vy_mag = abs(vy) * 0.80)
+  - vx se recalcula para mantener la nueva velocidad resultante
+  - Efecto: la bola va progresivamente más "recta" horizontalmente
+
+Configuración de win_score en lobby:
+  - El líder puede elegir 5, 10 o 15 puntos para ganar
+  - Evento WS: pong_set_win_score → valida y hace broadcast de room_state
+  - room["pong_win_score"] almacena la elección
+  - _start_game pasa win_score a get_initial_state()
+
+Diseño visual del canvas (pong.component.ts):
+  - Sin línea central
+  - Sin neon/glow en paletas (roundRect simple)
+  - Bola: círculo SVG-equivalente (ctx.arc + clip), radio = BALL_SIZE/2 = 10px
+  - Rainbow ball: radial gradient HSL cuando speed >= RAINBOW_THRESHOLD (13)
+  - Puntuaciones: grandes (200px Impact) en cada mitad del tablero
+    · Flash a alpha=0.82 durante 600ms al marcar un punto
+    · Fade hasta alpha=0.05 en 1600ms (apenas visibles)
+  - Sin texto "READY", sin "/15"
+
+SVG de assets (frontend/public/pong/):
+  - Ball.svg  (1 archivo — geometría de círculo, implementada como arc nativo)
+
+
+SNAKE — DETALLES DE IMPLEMENTACIÓN
+-------------------------------------
+
+Constantes del frontend (snake.component.ts):
+  CELL  = 64   ← tamaño de celda en píxeles (canvas interno: 64×24 = 1536px)
+  BOARD = 24   ← celdas por lado
+
+  Nota: CELL fue ajustado manualmente a 64 tras varios incrementos (20→28→32→64).
+  La visualización en pantalla se escala con CSS: min(672px, calc(100vw - 64px)).
+  El CELL actual puede ser excesivo; si los sprites se ven demasiado grandes
+  comparados con el tablero o generan problemas, considerar bajarlo a 32 o 40.
+
+Sprites SVG (frontend/public/serpiente/) — 9 archivos en total:
+  HEAD.svg           ← cabeza del jugador propio (cara mirando ARRIBA)
+  HEAD_2.svg         ← cabeza de rivales
+  BODY.svg           ← segmento recto vertical
+  BODY_UP_RIGHT.svg  ← esquina que conecta ARRIBA y DERECHA
+  BODY_DOWN_RIGHT.svg← esquina que conecta ABAJO y DERECHA
+  BODY_DOWN_LEFT.svg ← esquina que conecta ABAJO y IZQUIERDA
+  BODY_UP_LEFT.svg   ← esquina que conecta ARRIBA y IZQUIERDA
+  TAIL.svg           ← cola (punta ABAJO, conexión ARRIBA)
+  snakePoints.svg    ← icono decorativo (UI de puntuación)
+
+Orientaciones canónicas de los SVGs:
+  HEAD / HEAD_2  → cara mirando ARRIBA (rotar para otras direcciones)
+  TAIL           → punta ABAJO, conexión al cuerpo en la PARTE SUPERIOR
+  BODY           → segmento vertical (arriba ↔ abajo)
+  BODY_*         → esquinas sin rotación adicional (nombre indica las conexiones)
+
+Sistema de tintado por jugador:
+  - Todos los SVGs tienen fill="white"
+  - globalCompositeOperation = 'source-in' aplica el color del jugador
+  - Cada combinación (color, sprite, angleDeg) se cachea como bitmap CELL×CELL
+  - Coste por segmento por frame: 1 drawImage() (antes: ~6 ops canvas costosas)
+
+Optimización de rendimiento (solución al FPS drop con serpientes largas):
+  - Pre-renderizado del fondo estático (grid) una sola vez en bgCanvas
+  - Cache de sprites tintados: Map<"color:sprite:angle", HTMLCanvasElement>
+  - Invalidación: al cambiar colores → clear(); al recargar SVG → borrar claves
+  - Fondo: 1 drawImage() por frame en lugar de N² líneas de grid
+
+Estado actual / pendiente en Snake:
+  - Los sprites se ven correctamente tintados con los colores de cada jugador
+  - La rotación de HEAD y TAIL funciona según la dirección actual
+  - Las esquinas del body usan sprites específicos sin rotación adicional
+  - PROBLEMA CONOCIDO: el ajuste visual no queda del todo bien en algunos casos;
+    el valor de CELL (actualmente 64) fue modificado manualmente y puede que no
+    sea el óptimo. La relación entre el tamaño del canvas interno y el CSS de
+    visualización necesita revisión para que los sprites encajen correctamente
+    en las celdas del tablero.
+  - Pendiente: revisar y ajustar la escala/tamaño de los sprites SVG dentro
+    de cada celda para que haya un padding natural y no queden pegados al borde.
+
+
+DISEÑO VISUAL GLOBAL
+----------------------
+
+- Sin box-shadow en los contenedores de juego (.pong-canvas, .snake-canvas)
+- image-rendering: auto en canvas del Snake (antes: pixelated)
+- Paleta de colores oscura (#0d0f18 fondo del tablero Snake)
+- Fuente de marcadores: Impact, "Arial Black", Arial, sans-serif
+- Estilo de botones de lobby: mode-btn / mode-toggle (reutilizados de ms_board_size)
 
 
 BUGS ENCONTRADOS Y SOLUCIONADOS
@@ -132,6 +240,37 @@ BUGS ENCONTRADOS Y SOLUCIONADOS
    Solución:  WS gestionado solo en App component. GameRoom solo envía
               "leave_room" en ngOnDestroy, nunca desconecta.
 
+8. FPS drop en Snake al crecer la serpiente
+   Problema:  Por cada segmento por frame se ejecutaban ~6 operaciones
+              canvas costosas (SVG drawImage + composite source-in + fillRect).
+              Con serpientes de 30+ segmentos el juego iba lento.
+   Solución:  Cache de bitmaps pre-tintados (ver sección Snake arriba) +
+              pre-renderizado del fondo estático en canvas separado.
+
+9. Pong - bola chocando en paredes iba demasiado "diagonal"
+   Problema:  Tras cada rebote la trayectoria mantenía mucha componente
+              vertical, haciendo el juego aburrido y predecible.
+   Solución:  Cada choque con pared aplana vy un 20% y aumenta velocidad;
+              vx se recalcula para mantener la velocidad total, resultando
+              en una trayectoria más horizontal con el tiempo.
+
+
+ESTADO ACTUAL DEL PROYECTO (junio 2026)
+-----------------------------------------
+
+Juegos operativos:
+  [✓] Tres en Raya     — completo con IA
+  [✓] Conecta Cuatro   — completo con IA
+  [✓] Buscaminas       — completo con IA
+  [✓] Pong             — multijugador en tiempo real, mejoras visuales aplicadas
+  [~] Snake            — funcional pero sprites necesitan revisión visual
+                         (escala/tamaño CELL pendiente de ajuste fino)
+
+Próximas áreas de mejora identificadas:
+  - Snake: ajustar CELL y padding de sprites para mejor presentación visual
+  - Snake: revisar si CELL=64 es demasiado grande (canvas 1536px interno)
+  - Pong: posibles mejoras futuras en efectos de pelota o audio
+
 
 ENDPOINTS RELEVANTES (Backend)
 --------------------------------
@@ -152,7 +291,8 @@ EVENTOS WS RELEVANTES
 -----------------------
 Cliente → Servidor:
   register_presence, leave_room, make_move, send_chat,
-  request_rematch, spectate_room, send_invite, respond_invite
+  request_rematch, spectate_room, send_invite, respond_invite,
+  pong_set_win_score
 
 Servidor → Cliente:
   room_state, player_joined, player_left, game_started,
@@ -160,3 +300,31 @@ Servidor → Cliente:
   room_closed, rematch_vote, game_reset,
   invite_received, invite_response,
   spectator_joined, spectator_left
+
+
+INICIAR EL ENTORNO LOCAL
+--------------------------
+
+Windows (CMD/PowerShell):
+  deploy.bat   ← abre dos ventanas: backend y frontend
+
+Git Bash / Linux / Mac (deploy.sh):
+  bash deploy.sh   ← equivalente al .bat, para terminales POSIX
+
+El script:
+  1. Comprueba que .env existe
+  2. Crea backend/.venv si no existe e instala dependencias pip
+  3. Instala dependencias npm en frontend/
+  4. Lanza backend  → http://localhost:8000  (uvicorn --reload)
+  5. Lanza frontend → http://localhost:4200  (ng serve)
+  6. API Docs       → http://localhost:8000/docs
+
+
+DEPLOY EN RENDER
+-----------------
+- Frontend: Static Site, build command: cd frontend && npm install && npm run build
+  publish dir: frontend/dist/frontend/browser
+  _redirects: frontend/public/_redirects ("/* /index.html 200")
+- Backend:  Web Service, start: uvicorn main:app --host 0.0.0.0 --port $PORT
+  root dir: backend/
+- Variables de entorno en Render: DEEPSEEK_API_KEY, FIREBASE_* credentials

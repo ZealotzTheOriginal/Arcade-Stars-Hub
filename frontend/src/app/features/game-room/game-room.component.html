@@ -311,10 +311,17 @@
           }
           @case ('pong') {
             <app-pong
-              [gameState]="gameState()"
               [myUid]="isSpectator() ? '' : myUid"
               [playerColors]="playerColors()"
-              (paddleAction)="doPongPaddle($event)">
+              [pongTraj]="pongTraj()"
+              [scores]="pongScores()"
+              [players]="pongPlayers()"
+              [mySide]="mySide()"
+              [opponentDir]="pongOpDir()"
+              [isOpponentAI]="isOpponentAI()"
+              (pongHit)="doPongHit($event)"
+              (pongMiss)="doPongMiss()"
+              (paddleMove)="doPongPaddleMove($event)">
             </app-pong>
           }
         }

@@ -87,7 +87,13 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   previewPiece = signal<'X' | 'O'>('X');
 
   msBoardSize = signal<string>('normal');
-  pongWinScore = signal<number>(15);
+  pongWinScore   = signal<number>(15);
+  pongTraj       = signal<any>(null);
+  pongScores     = signal<Record<string, number>>({});
+  pongPlayers    = signal<string[]>([]);
+  mySide         = signal<string>('left');
+  pongOpDir      = signal<string | null>(null);
+  isOpponentAI   = computed(() => this.players().some((p: any) => p.is_ai));
   readonly MS_BOARD_SIZES = [
     { id: 'normal',       label: 'Normal',     detail: '9×9 · 10 minas' },
     { id: 'intermediate', label: 'Intermedio', detail: '16×16 · 40 minas' },
@@ -225,10 +231,26 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         this.spectators.update((ss) => ss.filter((s: any) => s.uid !== msg.data.uid));
         break;
 
+      case 'pong_trajectory':
+        this.pongTraj.set({ ...msg.data, ts: performance.now() });
+        if (msg.data.scores) this.pongScores.set(msg.data.scores);
+        break;
+
+      case 'pong_paddle_move':
+        if (msg.data.uid !== this.myUid) this.pongOpDir.set(msg.data.direction ?? null);
+        break;
+
       case 'game_started':
         this.players.set(msg.data.players ?? []);
         this.gameState.set(msg.data.game_state);
         this.challengeAnim.dismiss();
+        if (this.gameId === 'pong') {
+          const state = msg.data.game_state;
+          this.mySide.set(state?.paddles?.[this.myUid]?.side ?? 'left');
+          this.pongPlayers.set(state?.players ?? []);
+          this.pongScores.set(state?.scores ?? {});
+          this.pongOpDir.set(null);
+        }
         if (msg.data.reconnected) {
           this.showToast('Reconectado a la partida');
           this.disconnectedUids.set(new Set());
@@ -374,9 +396,19 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.ws.send('snake_direction', { room_id: this.roomId, direction });
   }
 
-  doPongPaddle(e: { action: string; direction: string | null }) {
+  doPongPaddleMove(direction: string | null) {
     if (this.isSpectator()) return;
-    this.ws.send('pong_paddle', { room_id: this.roomId, ...e });
+    this.ws.send('pong_paddle_move', { room_id: this.roomId, direction });
+  }
+
+  doPongHit(e: { hit_pos: number; paddle_dir: string | null; ball_y: number; speed: number }) {
+    if (this.isSpectator()) return;
+    this.ws.send('pong_hit', { room_id: this.roomId, ...e });
+  }
+
+  doPongMiss() {
+    if (this.isSpectator()) return;
+    this.ws.send('pong_miss', { room_id: this.roomId });
   }
 
   startGame() {
