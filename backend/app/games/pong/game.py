@@ -94,10 +94,13 @@ def calculate_hit(hit_pos: float, paddle_dir: str | None,
 
 # ── Ball-arrival prediction (for AI) ──────────────────────────────────────────
 
-def calculate_ball_arrival(traj: dict, side: str) -> tuple[float, float]:
+def calculate_ball_arrival(traj: dict, side: str) -> tuple[float, float, float]:
     """
-    Return (t_arrival_s, ball_y_at_arrival) for a trajectory heading toward `side`.
-    Returns (999.0, 0) if ball is not heading toward that side.
+    Return (t_arrival_s, ball_y_at_arrival, speed_at_arrival) for a trajectory
+    heading toward `side`. Returns (999.0, 0, 0) if not heading toward that side.
+
+    Simulates wall bounces step by step, tracking x and vx changes so the timing
+    matches the client's extrapolateBall physics exactly.
     """
     x, y   = float(traj["x"]), float(traj["y"])
     vx, vy = float(traj["vx"]), float(traj["vy"])
@@ -106,42 +109,43 @@ def calculate_ball_arrival(traj: dict, side: str) -> tuple[float, float]:
     if side == "left":
         target_x = float(PADDLE_MARGIN + PADDLE_W)
         if vx >= 0:
-            return (999.0, y)
+            return (999.0, y, speed)
     else:
         target_x = float(W - PADDLE_MARGIN - PADDLE_W - BALL_SIZE)
         if vx <= 0:
-            return (999.0, y)
+            return (999.0, y, speed)
 
-    t_total = (target_x - x) / vx   # positive: ball heading there
+    t_total = 0.0
 
-    # Simulate y through wall bounces over t_total seconds
-    cur_y     = y
-    cur_vy    = vy
-    cur_speed = speed
-    remaining = t_total
+    for _ in range(30):
+        t_to_target = (target_x - x) / vx
 
-    while remaining > 0.001:
-        if cur_vy < 0:
-            t_wall = -cur_y / cur_vy if cur_vy != 0 else 999.0
-        elif cur_vy > 0:
-            t_wall = (H - BALL_SIZE - cur_y) / cur_vy if cur_vy != 0 else 999.0
+        if vy < 0:
+            t_wall = -y / vy if vy != 0 else 999.0
+        elif vy > 0:
+            t_wall = (H - BALL_SIZE - y) / vy if vy != 0 else 999.0
         else:
             t_wall = 999.0
 
         t_wall = max(t_wall, 0.001)
 
-        if t_wall < remaining:
-            cur_y     += cur_vy * t_wall
-            cur_y      = max(0.0, min(float(H - BALL_SIZE), cur_y))
-            cur_speed  = min(cur_speed + WALL_SPEED_INCREMENT, MAX_SPEED)
-            vy_mag     = abs(cur_vy) * 0.80
-            cur_vy     = vy_mag if cur_vy < 0 else -vy_mag
-            remaining -= t_wall
-        else:
-            cur_y += cur_vy * remaining
-            remaining = 0
+        if t_to_target <= t_wall:
+            # Ball reaches target before next wall bounce
+            t_total += t_to_target
+            y += vy * t_to_target
+            break
 
-    return (float(t_total), float(cur_y))
+        # Wall bounce — update x and vx (same physics as client's extrapolateBall)
+        t_total += t_wall
+        x += vx * t_wall
+        y += vy * t_wall
+        y = max(0.0, min(float(H - BALL_SIZE), y))
+        speed = min(speed + WALL_SPEED_INCREMENT, MAX_SPEED)
+        vy_mag = abs(vy) * 0.80
+        vx = math.copysign(math.sqrt(max(speed ** 2 - vy_mag ** 2, 1.0)), vx)
+        vy = vy_mag if vy < 0 else -vy_mag
+
+    return (float(t_total), float(y), float(speed))
 
 
 # ── Game class ─────────────────────────────────────────────────────────────────

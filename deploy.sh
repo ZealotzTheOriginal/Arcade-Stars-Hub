@@ -32,10 +32,14 @@ pip install -r backend/requirements.txt --quiet || {
 
 # ── Frontend setup ─────────────────────────────────────
 echo "[3/4] Installing frontend dependencies..."
-(cd frontend && npm install --silent) || {
-  echo "[ERROR] Failed to install frontend dependencies. Is Node/npm installed?"
-  exit 1
-}
+if [ ! -d "frontend/node_modules" ]; then
+  (cd frontend && npm install --silent) || {
+    echo "[ERROR] Failed to install frontend dependencies. Is Node/npm installed?"
+    exit 1
+  }
+else
+  echo "  node_modules found, skipping install. Run 'npm install' manually if deps changed."
+fi
 
 # ── Launch both servers ────────────────────────────────
 echo "[4/4] Launching servers..."

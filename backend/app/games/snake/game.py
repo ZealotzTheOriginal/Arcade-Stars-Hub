@@ -54,7 +54,7 @@ class SnakeGame(BaseGame):
             snakes[uid] = {
                 "body": body,
                 "direction": d,
-                "pending_dir": None,
+                "pending_dirs": [],  # queue, max 3 — one dequeued per tick
                 "alive": True,
                 "score": 0,
             }
@@ -81,13 +81,15 @@ class SnakeGame(BaseGame):
         state = copy.deepcopy(state)
         snakes = state["snakes"]
 
-        # Apply pending directions (no 180° reversal)
+        # Dequeue one direction per tick (no 180° reversal)
         for snake in snakes.values():
             if not snake["alive"]:
                 continue
-            pd = snake.pop("pending_dir", None)
-            if pd and pd != OPP.get(snake["direction"]):
-                snake["direction"] = pd
+            pending = snake.get("pending_dirs", [])
+            if pending:
+                pd = pending.pop(0)
+                if pd != OPP.get(snake["direction"]):
+                    snake["direction"] = pd
 
         # Compute new head positions
         new_heads: dict[str, list[int]] = {}
@@ -169,16 +171,21 @@ class SnakeGame(BaseGame):
     # ── BaseGame interface ─────────────────────────────────────────
 
     def apply_move(self, state: dict, uid: str, move: Any) -> dict:
-        """Set a pending direction for uid (used when client sends snake_direction)."""
+        """Push direction onto pending queue for uid."""
         direction = str(move)
         if direction not in DIRS:
             raise ValueError(f"Invalid direction: {direction}")
         snake = state.get("snakes", {}).get(uid)
         if not snake or not snake.get("alive"):
             return state
-        if direction == OPP.get(snake.get("direction", "")):
+        pending = list(snake.get("pending_dirs", []))
+        if len(pending) >= 3:
             return state
-        return {**state, "snakes": {**state["snakes"], uid: {**snake, "pending_dir": direction}}}
+        effective = pending[-1] if pending else snake.get("direction", "right")
+        if direction == OPP.get(effective, ""):
+            return state
+        pending.append(direction)
+        return {**state, "snakes": {**state["snakes"], uid: {**snake, "pending_dirs": pending}}}
 
     def is_terminal(self, state: dict) -> bool:
         alive = [s for s in state.get("snakes", {}).values() if s.get("alive")]

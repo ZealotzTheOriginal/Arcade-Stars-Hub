@@ -318,10 +318,15 @@
               [players]="pongPlayers()"
               [mySide]="mySide()"
               [opponentDir]="pongOpDir()"
+              [opponentSyncY]="pongOpSyncY()"
               [isOpponentAI]="isOpponentAI()"
+              [gameOver]="roomStatus() === 'finished'"
+              [gameKey]="pongGameKey()"
               (pongHit)="doPongHit($event)"
               (pongMiss)="doPongMiss()"
-              (paddleMove)="doPongPaddleMove($event)">
+              (paddleMove)="doPongPaddleMove($event)"
+              (opponentHit)="doAiHit($event)"
+              (opponentMiss)="doAiMiss()">
             </app-pong>
           }
         }

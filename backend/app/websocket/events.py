@@ -35,6 +35,8 @@ class ClientEvent(str, Enum):
     PONG_MISS = "pong_miss"
     PONG_PADDLE_MOVE = "pong_paddle_move"
     PONG_SET_WIN_SCORE = "pong_set_win_score"
+    PONG_AI_HIT = "pong_ai_hit"
+    PONG_AI_MISS = "pong_ai_miss"
 
 
 # ── Outgoing event types (server → client) ──────────────

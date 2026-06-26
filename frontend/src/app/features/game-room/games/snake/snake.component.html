@@ -1,11 +1,19 @@
 <div class="snake-wrapper">
-  <canvas
-    #canvasEl
-    [width]="CANVAS_PX"
-    [height]="CANVAS_PX"
-    class="snake-canvas"
-    tabindex="0">
-  </canvas>
+  <div class="snake-canvas-wrap">
+    <canvas
+      #canvasEl
+      [width]="CANVAS_PX"
+      [height]="CANVAS_PX"
+      class="snake-canvas"
+      tabindex="0">
+    </canvas>
+
+    @if (isWaiting) {
+      <div class="snake-start-overlay">
+        <div class="snake-start-label">Presiona una tecla para empezar</div>
+      </div>
+    }
+  </div>
 
   <div class="snake-scores">
     @for (uid of (gameState?.players ?? []); track uid) {

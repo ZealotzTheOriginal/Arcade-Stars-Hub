@@ -36,12 +36,17 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
   @Input() players:     string[] = [];
   @Input() mySide:      string   = 'left';   // 'left' | 'right'
   @Input() opponentDir: string | null = null; // opponent key direction (human only)
+  @Input() opponentSyncY: number | null = null; // authoritative Y for drift correction
   @Input() isOpponentAI = false;             // true → animate opponent paddle via physics
+  @Input() gameOver  = false;               // true → freeze display (ball hides, paddles center)
+  @Input() gameKey   = 0;                   // increments on each new game → triggers full reset
 
   // ── Outputs ─────────────────────────────────────────────
   @Output() pongHit  = new EventEmitter<{ hit_pos: number; paddle_dir: string | null; ball_y: number; speed: number }>();
   @Output() pongMiss = new EventEmitter<void>();
-  @Output() paddleMove = new EventEmitter<string | null>(); // null = released
+  @Output() paddleMove = new EventEmitter<{ direction: string | null; y: number }>(); // includes absolute Y for sync
+  @Output() opponentHit  = new EventEmitter<{ hit_pos: number; ball_y: number; speed: number; side: string }>();
+  @Output() opponentMiss = new EventEmitter<void>();
 
   @ViewChild('canvasEl') canvasRef!: ElementRef<HTMLCanvasElement>;
   readonly W = W;
@@ -54,13 +59,15 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
   private myPaddleY = H / 2 - PADDLE_H / 2;
   private opPaddleY = H / 2 - PADDLE_H / 2;
 
-  private currentDir: string | null = null; // my key held
-  private opArrivalY: number | null = null; // AI: predicted paddle intercept Y
+  private currentDir: string | null = null;    // my key held
+  private opArrivalY: number | null = null;    // AI: predicted paddle intercept Y
+  private opPaddleTargetY: number | null = null; // authoritative Y for drift correction lerp
 
   // Trajectory tracking
   private currentTraj: any = null;
   private trajId = 0;         // incremented on each new traj, detects changes
-  private hitSent  = false;   // guard: one hit/miss per trajectory
+  private hitSent   = false;  // guard: one hit/miss per trajectory
+  private aiHitSent = false;  // guard: one AI hit/miss per trajectory
   private lastFrameMs = 0;
 
   // Score flash
@@ -82,14 +89,48 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    // New trajectory from server
-    if (changes['pongTraj'] && this.pongTraj) {
+    // New game (rematch or first start) — full reset
+    if (changes['gameKey'] && !changes['gameKey'].firstChange) {
+      this.myPaddleY       = H / 2 - PADDLE_H / 2;
+      this.opPaddleY       = H / 2 - PADDLE_H / 2;
+      this.currentTraj     = null;
+      this.currentDir      = null;
+      this.hitSent         = false;
+      this.aiHitSent       = false;
+      this.opArrivalY      = null;
+      this.opPaddleTargetY = null;
+      this.prevScores      = {};
+      this.flashTimes      = {};
+    }
+
+    // Opponent absolute Y received — update drift correction target
+    if (changes['opponentSyncY'] && this.opponentSyncY != null) {
+      this.opPaddleTargetY = this.opponentSyncY;
+    }
+
+    // Game over — hide ball, center paddles
+    if (changes['gameOver'] && this.gameOver) {
+      this.myPaddleY  = H / 2 - PADDLE_H / 2;
+      this.opPaddleY  = H / 2 - PADDLE_H / 2;
+      this.currentTraj = null;
+      this.opArrivalY  = null;
+    }
+
+    // New trajectory from server (ignored when game is over)
+    if (changes['pongTraj'] && this.pongTraj && !this.gameOver) {
       this.currentTraj = this.pongTraj;
       this.trajId++;
-      this.hitSent = false;
+      this.hitSent   = false;
+      this.aiHitSent = false;
 
-      if (this.isOpponentAI && !this.pongTraj.serving) {
-        const opSide = this.mySide === 'left' ? 'right' : 'left';
+      // Snap opponent paddle to server-confirmed position (AI games)
+      if (this.pongTraj.opponent_snap_y !== undefined) {
+        this.opPaddleY = this.pongTraj.opponent_snap_y;
+      }
+
+      // Set AI animation target (works for serves and hits alike)
+      if (this.isOpponentAI) {
+        const opSide  = this.mySide === 'left' ? 'right' : 'left';
         const ballToOp = opSide === 'left' ? this.pongTraj.vx < 0 : this.pongTraj.vx > 0;
         this.opArrivalY = ballToOp ? this.predictOpponentArrival() : null;
       }
@@ -114,7 +155,7 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
 
   @HostListener('window:keydown', ['$event'])
   onKeyDown(e: KeyboardEvent) {
-    if (!this.myUid) return;
+    if (!this.myUid || this.gameOver) return;
     const t = e.target as HTMLElement;
     if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
     let dir: string | null = null;
@@ -124,50 +165,56 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
     if (e.key.startsWith('Arrow')) e.preventDefault();
     if (dir !== this.currentDir) {
       this.currentDir = dir;
-      this.zone.run(() => this.paddleMove.emit(dir));
+      const y = this.myPaddleY;
+      this.zone.run(() => this.paddleMove.emit({ direction: dir, y }));
     }
   }
 
   @HostListener('window:keyup', ['$event'])
   onKeyUp(e: KeyboardEvent) {
-    if (!this.myUid) return;
+    if (!this.myUid || this.gameOver) return;
     if (['ArrowUp','ArrowDown','w','W','s','S'].includes(e.key) && this.currentDir) {
       this.currentDir = null;
-      this.zone.run(() => this.paddleMove.emit(null));
+      const y = this.myPaddleY;
+      this.zone.run(() => this.paddleMove.emit({ direction: null, y }));
     }
   }
 
   // Called by game-room to get current paddle Y for position sync
   getMyPaddleY(): number { return this.myPaddleY; }
 
-  // Predict where the ball will reach the opponent's paddle face (for AI animation)
+  // Predict where the ball will reach the opponent's paddle face (for AI animation).
+  // Simulates wall bounces step by step — tracks vx changes like extrapolateBall does.
   private predictOpponentArrival(): number {
     const traj = this.currentTraj;
     if (!traj) return this.opPaddleY;
-    const opSide = this.mySide === 'left' ? 'right' : 'left';
+    const opSide  = this.mySide === 'left' ? 'right' : 'left';
     const targetX = opSide === 'left'
       ? PADDLE_MARGIN + PADDLE_W
       : W - PADDLE_MARGIN - PADDLE_W - BALL_SIZE;
 
-    const t = (targetX - traj.x) / traj.vx;
-    if (t <= 0) return this.opPaddleY;
+    if (opSide === 'left'  && traj.vx >= 0) return this.opPaddleY;
+    if (opSide === 'right' && traj.vx <= 0) return this.opPaddleY;
 
-    let y = traj.y, vy = traj.vy, speed = traj.speed, remaining = t;
-    while (remaining > 0.0001) {
+    let x = traj.x, y = traj.y, vx = traj.vx, vy = traj.vy, speed = traj.speed;
+
+    for (let i = 0; i < 30; i++) {
+      const t_to_target = (targetX - x) / vx;
       const t_top  = vy < 0 ? -y / vy                : Infinity;
       const t_bot  = vy > 0 ? (H - BALL_SIZE - y) / vy : Infinity;
       const t_wall = Math.min(t_top, t_bot);
-      if (t_wall > 0 && t_wall < remaining) {
-        y += vy * t_wall;
-        y = vy < 0 ? 0 : H - BALL_SIZE;
-        speed = Math.min(speed + WALL_SPEED_INC, MAX_SPEED);
-        const mag = Math.abs(vy) * 0.80;
-        vy = vy < 0 ? mag : -mag;
-        remaining -= t_wall;
-      } else {
-        y += vy * remaining;
-        remaining = 0;
+
+      if (t_to_target <= t_wall || t_wall <= 0.0001) {
+        y += vy * t_to_target;
+        break;
       }
+      x += vx * t_wall;
+      y += vy * t_wall;
+      y = vy < 0 ? 0 : H - BALL_SIZE;
+      speed = Math.min(speed + WALL_SPEED_INC, MAX_SPEED);
+      const mag = Math.abs(vy) * 0.80;
+      vx = Math.sign(vx) * Math.sqrt(Math.max(speed ** 2 - mag ** 2, 1));
+      vy = vy < 0 ? mag : -mag;
     }
     return Math.max(0, Math.min(H - PADDLE_H, y - PADDLE_H / 2));
   }
@@ -187,6 +234,7 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
   // ── Paddle simulation ─────────────────────────────────────
 
   private movePaddles(dt: number) {
+    if (this.gameOver) return;
     // My paddle
     if (this.currentDir === 'up') {
       this.myPaddleY = Math.max(0, this.myPaddleY - PADDLE_SPEED * dt);
@@ -205,6 +253,18 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
       this.opPaddleY = Math.abs(diff) <= step
         ? this.opArrivalY
         : this.opPaddleY + Math.sign(diff) * step;
+    }
+
+    // Drift correction: when opponent is stopped, lerp to authoritative Y
+    if (!this.isOpponentAI && this.opponentDir === null && this.opPaddleTargetY !== null) {
+      const diff = this.opPaddleTargetY - this.opPaddleY;
+      if (Math.abs(diff) < 0.5) {
+        this.opPaddleY = this.opPaddleTargetY;
+        this.opPaddleTargetY = null;
+      } else {
+        this.opPaddleY = Math.max(0, Math.min(H - PADDLE_H,
+          this.opPaddleY + diff * Math.min(1, 12 * dt)));
+      }
     }
   }
 
@@ -248,6 +308,10 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
       }
     }
 
+    // Clamp at paddle faces — prevents visual pass-through while awaiting server response
+    if (vx < 0) x = Math.max(x, PADDLE_MARGIN + PADDLE_W);
+    if (vx > 0) x = Math.min(x, W - PADDLE_MARGIN - PADDLE_W - BALL_SIZE);
+
     return { x, y, vx, vy, speed, serving: false };
   }
 
@@ -284,6 +348,40 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
     }
   }
 
+  // ── AI hit / miss detection (client controls AI paddle) ──
+
+  private checkAIHitMiss(ball: { x: number; y: number; vx: number; vy: number; speed: number; serving: boolean }) {
+    if (ball.serving || this.aiHitSent || !this.isOpponentAI || !this.currentTraj) return;
+
+    const opSide = this.mySide === 'left' ? 'right' : 'left';
+    const approachingOp = opSide === 'left' ? ball.vx < 0 : ball.vx > 0;
+    if (!approachingOp) return;
+
+    const paddleFaceX = opSide === 'left'
+      ? PADDLE_MARGIN + PADDLE_W
+      : W - PADDLE_MARGIN - PADDLE_W;
+
+    const reached = opSide === 'left'
+      ? ball.x <= paddleFaceX
+      : ball.x + BALL_SIZE >= paddleFaceX;
+
+    if (!reached) return;
+
+    this.aiHitSent = true;
+
+    if (ball.y + BALL_SIZE > this.opPaddleY && ball.y < this.opPaddleY + PADDLE_H) {
+      const hitPos = (ball.y + BALL_SIZE / 2 - this.opPaddleY) / PADDLE_H;
+      this.zone.run(() => this.opponentHit.emit({
+        hit_pos: Math.max(0, Math.min(1, hitPos)),
+        ball_y:  ball.y,
+        speed:   ball.speed,
+        side:    opSide,
+      }));
+    } else {
+      this.zone.run(() => this.opponentMiss.emit());
+    }
+  }
+
   // ── Draw ──────────────────────────────────────────────────
 
   private draw(now: number) {
@@ -292,6 +390,7 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
     const ball = this.extrapolateBall(now);
 
     this.checkHitMiss(ball);
+    this.checkAIHitMiss(ball);
 
     const p0   = this.players[0] ?? '';
     const p1   = this.players[1] ?? '';

@@ -93,6 +93,8 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   pongPlayers    = signal<string[]>([]);
   mySide         = signal<string>('left');
   pongOpDir      = signal<string | null>(null);
+  pongOpSyncY    = signal<number | null>(null);
+  pongGameKey    = signal<number>(0);
   isOpponentAI   = computed(() => this.players().some((p: any) => p.is_ai));
   readonly MS_BOARD_SIZES = [
     { id: 'normal',       label: 'Normal',     detail: '9×9 · 10 minas' },
@@ -237,7 +239,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         break;
 
       case 'pong_paddle_move':
-        if (msg.data.uid !== this.myUid) this.pongOpDir.set(msg.data.direction ?? null);
+        if (msg.data.uid !== this.myUid) {
+          this.pongOpDir.set(msg.data.direction ?? null);
+          if (msg.data.y != null) this.pongOpSyncY.set(msg.data.y);
+        }
         break;
 
       case 'game_started':
@@ -250,6 +255,8 @@ export class GameRoomComponent implements OnInit, OnDestroy {
           this.pongPlayers.set(state?.players ?? []);
           this.pongScores.set(state?.scores ?? {});
           this.pongOpDir.set(null);
+          this.pongOpSyncY.set(null);
+          this.pongGameKey.update(n => n + 1);
         }
         if (msg.data.reconnected) {
           this.showToast('Reconectado a la partida');
@@ -396,9 +403,9 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.ws.send('snake_direction', { room_id: this.roomId, direction });
   }
 
-  doPongPaddleMove(direction: string | null) {
+  doPongPaddleMove(e: { direction: string | null; y: number }) {
     if (this.isSpectator()) return;
-    this.ws.send('pong_paddle_move', { room_id: this.roomId, direction });
+    this.ws.send('pong_paddle_move', { room_id: this.roomId, direction: e.direction, y: e.y });
   }
 
   doPongHit(e: { hit_pos: number; paddle_dir: string | null; ball_y: number; speed: number }) {
@@ -409,6 +416,14 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   doPongMiss() {
     if (this.isSpectator()) return;
     this.ws.send('pong_miss', { room_id: this.roomId });
+  }
+
+  doAiHit(e: { hit_pos: number; ball_y: number; speed: number; side: string }) {
+    this.ws.send('pong_ai_hit', { room_id: this.roomId, ...e });
+  }
+
+  doAiMiss() {
+    this.ws.send('pong_ai_miss', { room_id: this.roomId });
   }
 
   startGame() {
