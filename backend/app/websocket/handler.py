@@ -1074,7 +1074,7 @@ async def _snake_tick_loop(room_id: str):
         room["last_activity"] = time.time()
 
         await manager.broadcast(room_id, ServerEvent.MOVE_MADE, {
-            "game_state": new_state,
+            "game_state": _public_state(new_state),
         })
 
         if game.is_terminal(new_state):
@@ -1419,8 +1419,9 @@ def _safe_room(room: dict) -> dict:
 
 
 def _public_state(state: dict) -> dict:
-    """Strip mine positions from Minesweeper state sent to clients."""
+    """Strip server-only fields from game state sent to clients."""
     if "board" in state and state.get("board") is not None:
+        # Minesweeper: hide unrevealed mine positions
         board = state["board"]
         revealed = state.get("revealed", [])
         public_board = [
@@ -1428,4 +1429,11 @@ def _public_state(state: dict) -> dict:
             for r, row in enumerate(board)
         ] if revealed else board
         return {**state, "board": public_board}
+    if "snakes" in state:
+        # Snake: strip pending_dirs (server-only input queue — cheat vector if exposed)
+        public_snakes = {
+            uid: {k: v for k, v in snake.items() if k != "pending_dirs"}
+            for uid, snake in state["snakes"].items()
+        }
+        return {**state, "snakes": public_snakes}
     return state

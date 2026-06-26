@@ -306,6 +306,7 @@
               [gameState]="gameState()"
               [myUid]="isSpectator() ? '' : myUid"
               [playerColors]="playerColors()"
+              [gameOver]="roomStatus() === 'finished'"
               (directionChanged)="changeSnakeDir($event)">
             </app-snake>
           }

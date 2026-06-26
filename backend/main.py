@@ -132,18 +132,34 @@ async def health():
 
 @app.get("/debug/firebase")
 async def debug_firebase():
-    import os
+    import os, json as _json
     has_json = bool(os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON"))
     has_file = False
+    project_id_from_json = None
     try:
         from pathlib import Path
         has_file = Path(settings.firebase_service_account_path).exists()
     except Exception:
         pass
     try:
+        raw = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON", "")
+        if raw:
+            project_id_from_json = _json.loads(raw).get("project_id")
+    except Exception:
+        pass
+    try:
+        import firebase_admin
         from app.core.firebase_client import get_firebase_app
         get_firebase_app()
-        return {"firebase": "ok", "source": "json_env" if has_json else "file", "has_json_env": has_json, "has_file": has_file}
+        sdk_project = firebase_admin.get_app().project_id
+        return {
+            "firebase": "ok",
+            "source": "json_env" if has_json else "file",
+            "has_json_env": has_json,
+            "has_file": has_file,
+            "project_id_in_json": project_id_from_json,
+            "sdk_project_id": sdk_project,
+        }
     except Exception as e:
         return {"firebase": "error", "detail": str(e), "has_json_env": has_json, "has_file": has_file}
 
@@ -154,7 +170,8 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     try:
         user = await verify_token(token)
         uid = user["uid"]
-    except Exception:
+    except Exception as e:
+        logger.warning("WS token verification failed: %s", e)
         await ws.close(code=4001)
         return
 

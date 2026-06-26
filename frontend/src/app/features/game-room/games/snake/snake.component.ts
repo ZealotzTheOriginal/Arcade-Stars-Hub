@@ -24,6 +24,7 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
   @Input() gameState: any = null;
   @Input() myUid: string = '';
   @Input() playerColors: Partial<Record<string, string>> = {};
+  @Input() gameOver = false;
   @Output() directionChanged = new EventEmitter<string>();
 
   @ViewChild('canvasEl') canvasRef!: ElementRef<HTMLCanvasElement>;
@@ -101,6 +102,9 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
         : (serverDir ?? this.effectiveDir);
     }
 
+    // Game over: drain pending queue so effectiveDir stays clean
+    if (this.gameOver) this.pendingDirs = [];
+
     this.tickTs    = performance.now();
     this.lastState = this.gameState;
   }
@@ -111,7 +115,8 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
 
   @HostListener('window:keydown', ['$event'])
   onKey(e: KeyboardEvent) {
-    if (!this.myUid) return;
+    if (!this.myUid || this.gameOver) return;
+    if (!this.lastState?.snakes?.[this.myUid]?.alive) return;
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
     const map: Record<string, string> = {
@@ -145,10 +150,9 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
     const ctx = this.ctx;
     const S   = CELL;
 
-    // t is NOT clamped at 1 — values > 1 trigger extrapolation into next tick
-    const t = (this.tickTs && state.tick > 0)
-      ? (now - this.tickTs) / TICK_MS
-      : 0;
+    // t > 1 triggers extrapolation; clamp to 1 when game over so snakes freeze at final tick
+    const rawT = (this.tickTs && state.tick > 0) ? (now - this.tickTs) / TICK_MS : 0;
+    const t = this.gameOver ? Math.min(rawT, 1) : rawT;
 
     ctx.drawImage(this.bgCanvas, 0, 0);
 
@@ -184,6 +188,63 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
       const { headX, headY, eyeDir } = this.computeHead(body, dir, t, isMe, snake.alive);
       this.drawSnake(ctx, body, headX, headY, eyeDir, color, alpha, t, prev);
     }
+
+    if (this.gameOver) this.drawGameOver(ctx, state, now);
+  }
+
+  private drawGameOver(ctx: CanvasRenderingContext2D, state: any, now: number) {
+    const PX = BOARD * CELL;
+    const winner: string | null = state.winner ?? null;
+
+    // Dark vignette
+    ctx.save();
+    ctx.fillStyle = 'rgba(5, 5, 8, 0.55)';
+    ctx.fillRect(0, 0, PX, PX);
+
+    const cx = PX / 2;
+    const cy = PX / 2;
+
+    if (winner) {
+      const color = (this.playerColors[winner] ?? '#ffffff') as string;
+      const isMe  = winner === this.myUid;
+      const label = isMe ? '¡Ganaste!' : '¡Perdiste!';
+
+      // Pulsing glow ring
+      const pulse = 0.85 + 0.15 * Math.sin(now / 280);
+      ctx.shadowBlur  = 48 * pulse;
+      ctx.shadowColor = color;
+      ctx.strokeStyle = color;
+      ctx.lineWidth   = 3 * pulse;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 90 * pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Main label
+      ctx.font      = 'bold 52px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = color;
+      ctx.shadowBlur  = 20;
+      ctx.shadowColor = color;
+      ctx.fillText(label, cx, cy - 14);
+      ctx.shadowBlur = 0;
+
+      // Score sub-label
+      const score = state.snakes?.[winner]?.score ?? 0;
+      ctx.font      = '22px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.fillText(`${score} pt${score !== 1 ? 's' : ''}`, cx, cy + 34);
+    } else {
+      // Draw (all died on same tick)
+      ctx.font      = 'bold 52px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText('Empate', cx, cy);
+    }
+
+    ctx.restore();
   }
 
   private computeHead(
