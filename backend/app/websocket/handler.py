@@ -13,6 +13,7 @@ from app.games.registry import get_game, get_definition
 from app.services.deepseek import get_ai_move, AI_UID
 from app.services.scoring import award_points, mark_win
 from app.services.room_names import pick_room_name
+from app.services.user_service import get_user_settings
 
 # In-memory room store: room_id -> GameRoom dict
 _rooms: dict[str, dict] = {}
@@ -198,15 +199,25 @@ def get_online_users() -> list[dict]:
             "room_id": info.get("room_id"),
         }
         for uid, info in _presence.items()
+        if not info.get("hidden")
     ]
 
 
-def register_presence(uid: str, display_name: str, avatar: str):
-    _presence[uid] = {"display_name": display_name, "avatar": avatar, "room_id": None}
+def register_presence(uid: str, display_name: str, avatar: str, hidden: bool = False):
+    _presence[uid] = {"display_name": display_name, "avatar": avatar, "room_id": None, "hidden": hidden}
 
 
 def unregister_presence(uid: str):
     _presence.pop(uid, None)
+
+
+def set_presence_hidden(uid: str, hidden: bool) -> bool:
+    """Flip invisible-mode for an already-connected user. Returns False if
+    they're not currently connected (nothing to update / broadcast)."""
+    if uid not in _presence:
+        return False
+    _presence[uid]["hidden"] = hidden
+    return True
 
 
 async def broadcast_lobby_update():
@@ -690,7 +701,8 @@ async def _handle_global_chat(ws: WebSocket, uid: str, data: dict):
 async def _handle_register_presence(ws: WebSocket, uid: str, data: dict):
     display_name = data.get("display_name", "")
     avatar = data.get("avatar", "⭐")
-    register_presence(uid, display_name, avatar)
+    settings = await get_user_settings(uid)
+    register_presence(uid, display_name, avatar, hidden=settings.hide_online_status)
     manager.register_direct(uid, ws)
     await broadcast_lobby_update()
 

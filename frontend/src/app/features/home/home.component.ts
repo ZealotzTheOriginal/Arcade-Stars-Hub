@@ -3,19 +3,21 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { TranslateService, TranslatePipe } from '@ngx-translate/core';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { WsService } from '../../core/services/ws.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { FriendsService } from '../../core/services/friends.service';
 import { UserProfileService } from '../../core/services/user-profile.service';
+import { LobbyService } from '../../core/services/lobby.service';
 import { ToastService } from '../../core/services/toast.service';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, EmptyStateComponent],
+  imports: [CommonModule, FormsModule, RouterLink, EmptyStateComponent, TranslatePipe],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
 })
@@ -27,7 +29,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   readonly notifService = inject(NotificationService);
   private friendsSvc = inject(FriendsService);
   private profileSvc = inject(UserProfileService);
+  private lobbySvc = inject(LobbyService);
   private toast = inject(ToastService);
+  private translate = inject(TranslateService);
 
   games = signal<GameDefinition[]>([]);
   leaderboard = signal<LeaderboardEntry[]>([]);
@@ -40,8 +44,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   joiningRoom = signal(false);
   joinError = signal('');
 
-  activeRooms = signal<any[]>([]);
-  onlineUsers = signal<any[]>([]);
+  readonly activeRooms = this.lobbySvc.activeRooms;
+  readonly onlineUsers = this.lobbySvc.onlineUsers;
   loadingRooms = signal(true);
   invitingUser = signal<string | null>(null);
   spectTooltipRoom = signal<string | null>(null);
@@ -52,7 +56,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   @ViewChild('chatMessages') private chatMessagesEl?: ElementRef;
 
-  private pollInterval?: ReturnType<typeof setInterval>;
   private reconnectPollInterval?: ReturnType<typeof setInterval>;
   private wsSub?: Subscription;
 
@@ -78,23 +81,17 @@ export class HomeComponent implements OnInit, OnDestroy {
       })
       .catch(() => {});
 
-    this.profileSvc.load()
-      .then((p) => {
-        this.ws.send('register_presence', { display_name: p.display_name, avatar: p.avatar });
-        // Auth token is now cached and presence is registered; refresh online list promptly.
-        // Small delay gives the WS message time to be processed on the backend.
-        setTimeout(() => {
-          this.api.getOnlineUsers()
-            .then((users) => this.onlineUsers.set(users))
-            .catch(() => {});
-          this._checkReconnectable();
-        }, 350);
-      })
-      .catch(() => {});
+    // Profile/presence registration is owned globally by the root App
+    // component (fires once on login); this is just a safety-net refresh in
+    // case Home mounts before that finishes (e.g. direct navigation on reload).
+    this.profileSvc.load().catch(() => {});
 
-    this._fetchLive();
-    // Polling is a fallback for missed WS events; primary updates come via lobby_update
-    this.pollInterval = setInterval(() => this._fetchLive(), 15_000);
+    this.lobbySvc.loadActiveRooms()
+      .then(() => {
+        this.loadingRooms.set(false);
+        this._checkReconnectable();
+      })
+      .catch(() => this.loadingRooms.set(false));
 
     this.wsSub = this.ws.messages$.subscribe((msg) => {
       if (msg.event === 'global_chat_message') {
@@ -105,8 +102,9 @@ export class HomeComponent implements OnInit, OnDestroy {
         }, 0);
       }
       if (msg.event === 'lobby_update') {
-        this.activeRooms.set(msg.data.rooms ?? []);
-        this.onlineUsers.set(msg.data.online_users ?? []);
+        // LobbyService itself is already updated by the root App component's
+        // subscription (it subscribes first, being always-mounted); this just
+        // reacts to the same event for Home-local UI state.
         this.loadingRooms.set(false);
         this._checkReconnectable();
       }
@@ -133,24 +131,23 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.profile()?.uid === uid;
   }
 
-  ngOnDestroy() {
-    clearInterval(this.pollInterval);
-    clearInterval(this.reconnectPollInterval);
-    this.wsSub?.unsubscribe();
+  /** The active room a given online user is currently connected to, if any. */
+  roomFor(uid: string): any | undefined {
+    return this.lobbySvc.roomFor(uid);
   }
 
-  private _fetchLive() {
-    this.api.listActiveRooms()
-      .then((rooms) => {
-        this.activeRooms.set(rooms);
-        this.loadingRooms.set(false);
-        this._checkReconnectable();
-      })
-      .catch(() => this.loadingRooms.set(false));
+  /** Same eligibility rules as the public "Salas activas" list: joinable if
+   *  you're already a player there, or it's still waiting with an open slot;
+   *  otherwise it's spectate-only. */
+  canJoinRoom(room: any): boolean {
+    const uid = this.profile()?.uid;
+    const alreadyIn = !!uid && (room.players ?? []).some((p: any) => p.uid === uid);
+    return alreadyIn || (room.status === 'waiting' && !this.isRoomFull(room));
+  }
 
-    this.api.getOnlineUsers()
-      .then((users) => this.onlineUsers.set(users))
-      .catch(() => {});
+  ngOnDestroy() {
+    clearInterval(this.reconnectPollInterval);
+    this.wsSub?.unsubscribe();
   }
 
   private _checkReconnectable() {
@@ -166,11 +163,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     // is deleted — without waiting for the normal 15s interval.
     if (room && !this.reconnectPollInterval) {
       this.reconnectPollInterval = setInterval(() => {
-        this.api.listActiveRooms()
-          .then((rooms) => {
-            this.activeRooms.set(rooms);
-            this._checkReconnectable();
-          })
+        this.lobbySvc.loadActiveRooms()
+          .then(() => this._checkReconnectable())
           .catch(() => {});
       }, 3_000);
     } else if (!room && this.reconnectPollInterval) {
@@ -198,7 +192,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         await this.api.activateAdmin(code);
         this.router.navigate(['/profile']);
       } catch {
-        this.joinError.set('No se pudo activar el modo administrador.');
+        this.joinError.set(this.translate.instant('HOME.ADMIN_ACTIVATE_FAILED'));
       }
       return;
     }
@@ -215,7 +209,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       if (isFull) params['spectate'] = '1';
       this.router.navigate(['/room', code], { queryParams: params });
     } catch (e: any) {
-      this.joinError.set(e?.status === 404 ? 'Sala no encontrada.' : 'Error al unirse a la sala.');
+      this.joinError.set(this.translate.instant(e?.status === 404 ? 'HOME.ROOM_NOT_FOUND' : 'HOME.JOIN_ROOM_FAILED'));
     } finally {
       this.joiningRoom.set(false);
     }
@@ -256,14 +250,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   async addFriend(uid: string) {
     try {
       await this.friendsSvc.add(uid);
-      this.toast.success('Solicitud de amistad enviada');
+      this.toast.success(this.translate.instant('TOASTS.FRIEND_REQUEST_SENT'));
     } catch { /* toast shown by the error interceptor */ }
   }
 
   async removeFriend(uid: string) {
     try {
       await this.friendsSvc.remove(uid);
-      this.toast.success('Amigo eliminado');
+      this.toast.success(this.translate.instant('TOASTS.FRIEND_REMOVED'));
     } catch { /* toast shown by the error interceptor */ }
   }
 
@@ -329,14 +323,27 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   gameLabel(id: string): string {
-    const map: Record<string, string> = {
-      connect_four: 'Conecta 4',
-      minesweeper: 'Buscaminas',
-      tic_tac_toe: 'Tres en Raya',
-      snake:       'Serpiente',
-      pong:        'Pong',
+    const key: Record<string, string> = {
+      connect_four: 'GAMES.CONNECT_FOUR.NAME',
+      minesweeper: 'GAMES.MINESWEEPER.NAME',
+      tic_tac_toe: 'GAMES.TIC_TAC_TOE.NAME',
+      snake:       'GAMES.SNAKE.NAME',
+      pong:        'GAMES.PONG.NAME',
     };
-    return map[id] ?? id;
+    return key[id] ? this.translate.instant(key[id]) : id;
+  }
+
+  categoryLabel(category: string): string {
+    const key: Record<string, string> = {
+      Estrategia: 'HOME.CATEGORY_STRATEGY',
+      Puzzle: 'HOME.CATEGORY_PUZZLE',
+      Arcade: 'HOME.CATEGORY_ARCADE',
+    };
+    return key[category] ? this.translate.instant(key[category]) : category;
+  }
+
+  playersWord(count: number): string {
+    return this.translate.instant(count === 1 ? 'HOME.PLAYER_SINGULAR' : 'HOME.PLAYER_PLURAL');
   }
 
   sendGlobalChat() {
@@ -360,9 +367,12 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   notifLabel(type: string, game_id?: string): string {
-    if (type === 'missed_invite') return `Te invitó a jugar${game_id ? ' · ' + game_id.replace('_', ' ') : ''}`;
-    if (type === 'friend_request_rejected') return 'Rechazó tu solicitud de amistad';
-    if (type === 'friend_removed') return 'Te eliminó de amigos';
+    if (type === 'missed_invite') {
+      const suffix = game_id ? ' · ' + this.gameLabel(game_id) : '';
+      return this.translate.instant('TOASTS.MISSED_INVITE') + suffix;
+    }
+    if (type === 'friend_request_rejected') return this.translate.instant('TOASTS.FRIEND_REQUEST_REJECTED_LONG');
+    if (type === 'friend_removed') return this.translate.instant('TOASTS.FRIEND_REMOVED_BY_OTHER');
     return '';
   }
 
@@ -373,7 +383,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   roomStatusLabel(status: string): string {
-    return status === 'waiting' ? 'Esperando' : status === 'playing' ? 'En juego' : 'Terminada';
+    const key = status === 'waiting' ? 'HOME.STATUS_WAITING' : status === 'playing' ? 'HOME.STATUS_PLAYING' : 'HOME.STATUS_FINISHED';
+    return this.translate.instant(key);
   }
 
   isFirstGlobalMsg(index: number): boolean {

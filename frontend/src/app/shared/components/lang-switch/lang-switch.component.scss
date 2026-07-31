@@ -1,0 +1,29 @@
+.lang-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+
+  button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.1rem 0.3rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+
+    &.active {
+      color: var(--rainbow-teal);
+    }
+
+    &:hover:not(.active) {
+      color: var(--text-primary);
+    }
+  }
+
+  .sep {
+    opacity: 0.4;
+  }
+}

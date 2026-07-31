@@ -3,12 +3,15 @@ import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { TranslateService, TranslatePipe } from '@ngx-translate/core';
 import { AuthService } from './core/services/auth.service';
 import { WsService } from './core/services/ws.service';
 import { ChallengeAnimService } from './core/services/challenge-anim.service';
 import { NotificationService } from './core/services/notification.service';
 import { FriendsService } from './core/services/friends.service';
 import { UserProfileService } from './core/services/user-profile.service';
+import { LobbyService } from './core/services/lobby.service';
+import { LanguageService } from './core/services/language.service';
 import { ToastService } from './core/services/toast.service';
 import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
 import { ToastContainerComponent } from './shared/components/toast/toast-container.component';
@@ -16,7 +19,7 @@ import { ToastContainerComponent } from './shared/components/toast/toast-contain
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, CommonModule, ToastContainerComponent],
+  imports: [RouterOutlet, CommonModule, ToastContainerComponent, TranslatePipe],
   template: `
     <router-outlet />
 
@@ -28,15 +31,15 @@ import { ToastContainerComponent } from './shared/components/toast/toast-contain
           <span class="invite-avatar">{{ activeInvite()!.from_avatar }}</span>
           <div class="invite-body">
             <p class="invite-text">
-              <strong>{{ activeInvite()!.from_name }}</strong> te invita a jugar
+              <strong>{{ activeInvite()!.from_name }}</strong> {{ 'APP.INVITES_YOU' | translate }}
             </p>
             <div class="invite-bar">
               <div class="invite-bar-fill" [style.width.%]="timerPercent()"></div>
             </div>
           </div>
           <div class="invite-btns">
-            <button class="btn btn--primary btn-sm" (click)="acceptInvite()">Aceptar</button>
-            <button class="btn btn--ghost btn-sm" (click)="rejectInvite()">Rechazar</button>
+            <button class="btn btn--primary btn-sm" (click)="acceptInvite()">{{ 'PROFILE.ACCEPT' | translate }}</button>
+            <button class="btn btn--ghost btn-sm" (click)="rejectInvite()">{{ 'HOME.REJECT' | translate }}</button>
           </div>
         </div>
       </div>
@@ -45,7 +48,7 @@ import { ToastContainerComponent } from './shared/components/toast/toast-contain
     @if (rejectedBy()) {
       <div class="rejected-toast">
         <i class="fa-solid fa-circle-xmark rejected-icon"></i>
-        <span><strong>{{ rejectedBy() }}</strong> ha rechazado tu invitación</span>
+        <span><strong>{{ rejectedBy() }}</strong> {{ 'APP.REJECTED_YOUR_INVITE' | translate }}</span>
       </div>
     }
 
@@ -60,14 +63,14 @@ import { ToastContainerComponent } from './shared/components/toast/toast-contain
       <div class="friend-request-toast">
         <span class="fr-avatar">{{ friendRequest()!.avatar }}</span>
         <div class="fr-body">
-          <p class="fr-text"><strong>{{ friendRequest()!.name }}</strong> te ha enviado una solicitud de amistad</p>
+          <p class="fr-text"><strong>{{ friendRequest()!.name }}</strong> {{ 'PROFILE.SENT_FRIEND_REQUEST' | translate }}</p>
           <div class="fr-bar">
             <div class="fr-bar-fill" [style.width.%]="frTimerPercent()"></div>
           </div>
         </div>
         <div class="fr-btns">
-          <button class="btn btn--primary btn-sm" (click)="acceptFriendRequestToast()">Aceptar</button>
-          <button class="fr-close" (click)="dismissFriendRequestToast()" title="Aceptar luego desde Notificaciones">
+          <button class="btn btn--primary btn-sm" (click)="acceptFriendRequestToast()">{{ 'PROFILE.ACCEPT' | translate }}</button>
+          <button class="fr-close" (click)="dismissFriendRequestToast()" [title]="'APP.ACCEPT_LATER_HINT' | translate">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
@@ -80,7 +83,7 @@ import { ToastContainerComponent } from './shared/components/toast/toast-contain
         <div class="reto-flash"></div>
         <div class="reto-bar-top"></div>
         <div class="reto-bar-bottom"></div>
-        <div class="reto-text">RETO ACEPTADO</div>
+        <div class="reto-text">{{ 'APP.CHALLENGE_ACCEPTED' | translate }}</div>
       </div>
     }
   `,
@@ -292,7 +295,10 @@ export class App implements OnInit, OnDestroy {
   private notifService = inject(NotificationService);
   private friendsSvc = inject(FriendsService);
   private profileSvc = inject(UserProfileService);
+  private lobbySvc = inject(LobbyService);
+  private langSvc = inject(LanguageService);
   private toast = inject(ToastService);
+  private translate = inject(TranslateService);
 
   activeInvite = signal<InviteData | null>(null);
   timerPercent = signal(100);
@@ -306,6 +312,7 @@ export class App implements OnInit, OnDestroy {
   private frTimer?: ReturnType<typeof setTimeout>;
   private frProgressTimer?: ReturnType<typeof setInterval>;
   private inviteErrorTimer?: ReturnType<typeof setTimeout>;
+  private lobbyPollInterval?: ReturnType<typeof setInterval>;
   private subs: Subscription[] = [];
   private readonly INVITE_SECONDS = 15;
   private readonly FR_SECONDS = 8;
@@ -321,13 +328,25 @@ export class App implements OnInit, OnDestroy {
           // Firebase Auth user object's own `displayName` is frozen at signup
           // and would silently reintroduce a stale name here otherwise.
           const profile = await this.profileSvc.load().catch(() => null);
+          this.langSvc.syncFromProfile(profile?.settings?.language);
           this.ws.send('register_presence', {
             display_name: profile?.display_name || 'Player',
             avatar: profile?.avatar || '⭐',
           });
+          // Small delay gives the WS message time to be processed server-side
+          // before we fetch, so we see ourselves in the online list right away.
+          setTimeout(() => {
+            this.lobbySvc.loadOnlineUsers().catch(() => {});
+            this.lobbySvc.loadActiveRooms().catch(() => {});
+          }, 350);
+          this.lobbyPollInterval = setInterval(() => {
+            this.lobbySvc.loadOnlineUsers().catch(() => {});
+            this.lobbySvc.loadActiveRooms().catch(() => {});
+          }, 15_000);
         }).catch(() => {});
       } else {
         this.profileSvc.clear();
+        clearInterval(this.lobbyPollInterval);
         this.ws.disconnect();
       }
     });
@@ -336,24 +355,35 @@ export class App implements OnInit, OnDestroy {
   ngOnInit() {
     this.subs.push(
       this.ws.messages$.subscribe((msg) => {
+        if (msg.event === 'lobby_update') {
+          this.lobbySvc.setActiveRooms(msg.data.rooms ?? []);
+          this.lobbySvc.setOnlineUsers(msg.data.online_users ?? []);
+        }
         if (msg.event === 'invite_received') {
-          this._showInvite(msg.data as InviteData);
+          if (this.profileSvc.profile()?.settings?.notify_game_invites !== false) {
+            this._showInvite(msg.data as InviteData);
+          }
         }
         if (msg.event === 'invite_response' && msg.data?.accepted === false) {
           clearTimeout(this.rejectedTimer);
-          this.rejectedBy.set(msg.data.from_name ?? 'El usuario');
+          this.rejectedBy.set(msg.data.from_name ?? this.translate.instant('APP.THE_USER'));
           this.rejectedTimer = setTimeout(() => this.rejectedBy.set(null), 4000);
         }
         if (msg.event === 'friend_request') {
-          this._showFriendRequest(msg.data.from_uid, msg.data.from_name, msg.data.from_avatar);
-          this.notifService.addFriendRequest();
           this.friendsSvc.load().catch(() => {});
+          if (this.profileSvc.profile()?.settings?.notify_friend_requests !== false) {
+            this._showFriendRequest(msg.data.from_uid, msg.data.from_name, msg.data.from_avatar);
+            this.notifService.addFriendRequest();
+          }
         }
         if (msg.event === 'friend_request_accepted') {
           // The other side just accepted (or completed mutuality by adding us
-          // back) — refresh so our semi-friend heart flips to solid right away.
+          // back) — always refresh so our semi-friend heart flips to solid
+          // right away; only the celebratory toast is gated by the setting.
           this.friendsSvc.load().catch(() => {});
-          this.toast.success(`${msg.data.from_name} aceptó tu solicitud de amistad`);
+          if (this.profileSvc.profile()?.settings?.notify_friend_requests !== false) {
+            this.toast.success(this.translate.instant('APP.ACCEPTED_YOUR_REQUEST', { name: msg.data.from_name }));
+          }
         }
         if (msg.event === 'friend_request_rejected') {
           this.notifService.addFriendRequestRejected(msg.data.from_name, msg.data.from_avatar);
@@ -365,7 +395,7 @@ export class App implements OnInit, OnDestroy {
         }
         if (msg.event === 'invite_failed') {
           clearTimeout(this.inviteErrorTimer);
-          this.inviteError.set(msg.data?.message ?? 'La sala ya no está disponible.');
+          this.inviteError.set(msg.data?.message ?? this.translate.instant('APP.ROOM_NO_LONGER_AVAILABLE'));
           this.inviteErrorTimer = setTimeout(() => this.inviteError.set(null), 5000);
         }
         if (msg.event === 'invite_accepted') {
@@ -405,6 +435,7 @@ export class App implements OnInit, OnDestroy {
     clearTimeout(this.frTimer);
     clearInterval(this.frProgressTimer);
     clearTimeout(this.inviteErrorTimer);
+    clearInterval(this.lobbyPollInterval);
   }
 
   private _showFriendRequest(uid: string, name: string, avatar: string) {
@@ -430,7 +461,7 @@ export class App implements OnInit, OnDestroy {
     try {
       await this.friendsSvc.accept(fr.uid);
       this.notifService.decrementUnread();
-      this.toast.success(`Ahora eres amigo de ${fr.name}`);
+      this.toast.success(this.translate.instant('APP.NOW_FRIENDS_WITH', { name: fr.name }));
     } catch { /* toast shown by the error interceptor */ }
   }
 

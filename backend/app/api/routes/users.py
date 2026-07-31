@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_user
-from app.models.user import UserUpdate
+from app.models.user import UserUpdate, UserSettingsUpdate
 from app.services.user_service import (
     get_or_create_user, update_user,
     add_friend, remove_friend, get_friend_profiles,
     accept_friend_request, reject_friend_request, get_user_info,
     is_admin_user, get_all_users, set_admin, reset_user_points, add_user_points,
     reset_all_users_points, set_user_avatar, set_user_badges,
+    get_user_settings, update_user_settings,
 )
-from app.websocket.handler import get_online_users
+from app.websocket.handler import get_online_users, set_presence_hidden, broadcast_lobby_update
 from app.websocket.manager import manager
 from app.websocket.events import ServerEvent
 
@@ -38,6 +39,17 @@ async def update_me(body: UserUpdate, user: dict = Depends(get_current_user)):
     return await update_user(user["uid"], body)
 
 
+@router.patch("/me/settings")
+async def update_my_settings(body: UserSettingsUpdate, user: dict = Depends(get_current_user)):
+    updated = await update_user_settings(user["uid"], body)
+    if body.hide_online_status is not None:
+        # Take effect immediately for an already-open connection instead of
+        # waiting for the next reconnect to re-register presence.
+        if set_presence_hidden(user["uid"], updated.hide_online_status):
+            await broadcast_lobby_update()
+    return updated
+
+
 @router.get("/friends")
 async def list_friends(user: dict = Depends(get_current_user)):
     return await get_friend_profiles(user["uid"])
@@ -47,6 +59,9 @@ async def list_friends(user: dict = Depends(get_current_user)):
 async def add_friend_route(friend_uid: str, user: dict = Depends(get_current_user)):
     if friend_uid == user["uid"]:
         raise HTTPException(status_code=400, detail="No puedes agregarte a ti mismo como amigo.")
+    target_settings = await get_user_settings(friend_uid)
+    if target_settings.block_friend_requests:
+        raise HTTPException(status_code=403, detail="Este usuario no acepta solicitudes de amistad.")
     sender_info = await add_friend(user["uid"], friend_uid)
     if sender_info.get("mutual"):
         # friend_uid had already added us first — this call completes the

@@ -481,6 +481,14 @@
     color: var(--rainbow-teal);
     flex-shrink: 0;
   }
+  .ou-in-game {
+    font-size: 0.65rem;
+    color: var(--rainbow-yellow);
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 199, 0, 0.4);
+    border-radius: 4px;
+    padding: 0 0.3rem;
+  }
   .ou-actions { display: flex; gap: 0.125rem; opacity: 0; transition: opacity 0.15s; }
   &:hover .ou-actions { opacity: 1; }
 
@@ -529,6 +537,16 @@
   height: 13px;
   object-fit: contain;
   display: block;
+}
+
+// .action-icon is also reused on <i> (Font Awesome) icons — e.g. the
+// join/spectate buttons — which ignore width/height/object-fit and instead
+// need an explicit color, or they fall back to black on this dark theme.
+i.action-icon {
+  width: auto;
+  height: auto;
+  color: var(--text-primary);
+  font-size: 12px;
 }
 
 .icon-heart {

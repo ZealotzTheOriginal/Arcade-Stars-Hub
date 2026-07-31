@@ -1,10 +1,10 @@
 <div class="profile-layout">
   <header class="profile-header card">
     <div class="header-nav">
-      <a class="btn btn--ghost btn--sm" routerLink="/home"><i class="fa-solid fa-arrow-left"></i> Inicio</a>
-      <button class="profile-logout-btn" (click)="logout()" title="Cerrar sesión">
-        <img src="/StarCross.svg" class="profile-logout-icon" alt="Salir" />
-        <span>Salir</span>
+      <a class="btn btn--ghost btn--sm" routerLink="/home"><i class="fa-solid fa-arrow-left"></i> {{ 'PROFILE.HOME' | translate }}</a>
+      <button class="profile-logout-btn" (click)="logout()" [title]="'HOME.LOGOUT' | translate">
+        <img src="/StarCross.svg" class="profile-logout-icon" alt="" />
+        <span>{{ 'HOME.LOGOUT_LABEL' | translate }}</span>
       </button>
     </div>
     @if (profile(); as p) {
@@ -14,16 +14,16 @@
           <h1>{{ p.display_name }}</h1>
           <p class="user-email">{{ p.email }}</p>
           <div class="user-badges">
-            <span class="badge">Nivel {{ p.level }}</span>
+            <span class="badge">{{ 'HOME.LEVEL' | translate }} {{ p.level }}</span>
             <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ p.total_points }} pts</span>
             @if (p.is_admin) {
-              <span class="badge badge--admin"><i class="fa-solid fa-shield-halved"></i> Admin</span>
+              <span class="badge badge--admin"><i class="fa-solid fa-shield-halved"></i> {{ 'PROFILE.ADMIN' | translate }}</span>
             }
             @for (b of (p.badges ?? []); track b) {
-              @if (b === 'beta') { <span class="badge badge--beta"><i class="fa-solid fa-flask"></i> Beta</span> }
-              @if (b === 'payaso') { <span class="badge badge--payaso"><i class="fa-solid fa-face-grin-squint-tears"></i> Payaso</span> }
-              @if (b === 'eminencia') { <span class="badge badge--eminencia"><i class="fa-solid fa-crown"></i> Eminencia</span> }
-              @if (b === 'hardcore') { <span class="badge badge--hardcore"><i class="fa-solid fa-skull"></i> Hardcore</span> }
+              @if (b === 'beta') { <span class="badge badge--beta"><i class="fa-solid fa-flask"></i> {{ 'PROFILE.BADGE_BETA' | translate }}</span> }
+              @if (b === 'payaso') { <span class="badge badge--payaso"><i class="fa-solid fa-face-grin-squint-tears"></i> {{ 'PROFILE.BADGE_CLOWN' | translate }}</span> }
+              @if (b === 'eminencia') { <span class="badge badge--eminencia"><i class="fa-solid fa-crown"></i> {{ 'PROFILE.BADGE_EMINENCE' | translate }}</span> }
+              @if (b === 'hardcore') { <span class="badge badge--hardcore"><i class="fa-solid fa-skull"></i> {{ 'PROFILE.BADGE_HARDCORE' | translate }}</span> }
             }
           </div>
         </div>
@@ -34,19 +34,20 @@
   <div class="profile-body">
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab" [class.active]="activeTab() === 'stats'" (click)="setTab('stats')"><i class="fa-solid fa-chart-bar"></i> Estadísticas</button>
-      <button class="tab" [class.active]="activeTab() === 'games'" (click)="setTab('games')"><i class="fa-solid fa-gamepad"></i> Juegos</button>
-      <button class="tab" [class.active]="activeTab() === 'friends'" (click)="setTab('friends')"><i class="fa-solid fa-users"></i> Amigos</button>
-      <button class="tab" [class.active]="activeTab() === 'ranking'" (click)="setTab('ranking')"><i class="fa-solid fa-trophy"></i> Ranking</button>
+      <button class="tab" [class.active]="activeTab() === 'stats'" (click)="setTab('stats')"><i class="fa-solid fa-chart-bar"></i> {{ 'PROFILE.TAB_STATS' | translate }}</button>
+      <button class="tab" [class.active]="activeTab() === 'games'" (click)="setTab('games')"><i class="fa-solid fa-gamepad"></i> {{ 'HOME.NAV_GAMES' | translate }}</button>
+      <button class="tab" [class.active]="activeTab() === 'friends'" (click)="setTab('friends')"><i class="fa-solid fa-users"></i> {{ 'PROFILE.TAB_FRIENDS' | translate }}</button>
+      <button class="tab" [class.active]="activeTab() === 'ranking'" (click)="setTab('ranking')"><i class="fa-solid fa-trophy"></i> {{ 'HOME.RANKING' | translate }}</button>
       <button class="tab tab--notifs" [class.active]="activeTab() === 'notifs'" (click)="setTab('notifs')">
-        <i class="fa-solid fa-bell"></i> Notificaciones
+        <i class="fa-solid fa-bell"></i> {{ 'HOME.NOTIFICATIONS' | translate }}
         @if (pendingRequests().length + notifService.items().length > 0) {
           <span class="tab-badge">{{ pendingRequests().length + notifService.items().length }}</span>
         }
       </button>
+      <button class="tab" [class.active]="activeTab() === 'settings'" (click)="setTab('settings')"><i class="fa-solid fa-gear"></i> {{ 'PROFILE.TAB_SETTINGS' | translate }}</button>
       @if (profile()?.is_admin) {
         <button class="tab tab--admin" [class.active]="activeTab() === 'admin'" (click)="setTab('admin')">
-          <i class="fa-solid fa-shield-halved"></i> Admin
+          <i class="fa-solid fa-shield-halved"></i> {{ 'PROFILE.ADMIN' | translate }}
         </button>
       }
     </div>
@@ -57,15 +58,15 @@
       <!-- Stats -->
       @if (activeTab() === 'stats') {
         <section class="stats-section">
-          <h2>Editar Perfil</h2>
+          <h2>{{ 'PROFILE.EDIT_PROFILE' | translate }}</h2>
           <div class="edit-name">
-            <input class="input" [(ngModel)]="editName" placeholder="Nombre de usuario" />
+            <input class="input" [(ngModel)]="editName" [placeholder]="'PROFILE.USERNAME_PLACEHOLDER' | translate" />
             <button class="btn btn--ghost" (click)="saveName()" [disabled]="saving()">
-              {{ saving() ? 'Guardando...' : 'Guardar' }}
+              {{ (saving() ? 'PROFILE.SAVING' : 'PROFILE.SAVE') | translate }}
             </button>
           </div>
 
-          <h3>Selecciona tu avatar</h3>
+          <h3>{{ 'PROFILE.CHOOSE_AVATAR' | translate }}</h3>
           <div class="avatar-grid">
             @for (av of avatars; track av) {
               <button
@@ -82,19 +83,19 @@
       <!-- Games -->
       @if (activeTab() === 'games') {
         <section class="games-section">
-          <h2>Mis Juegos</h2>
+          <h2>{{ 'PROFILE.MY_GAMES' | translate }}</h2>
           @if (gameStatsList().length === 0) {
-            <p class="empty">Aún no has jugado ninguna partida.</p>
+            <p class="empty">{{ 'PROFILE.NO_GAMES_PLAYED' | translate }}</p>
           } @else {
             <div class="game-stats-grid">
               @for (g of gameStatsList(); track g.id) {
                 <div class="game-stat-card">
                   <h3>{{ g.name }}</h3>
-                  <div class="stat-row"><span>Partidas</span><strong>{{ g.played }}</strong></div>
-                  <div class="stat-row"><span>Victorias</span><strong class="green">{{ g.won }}</strong></div>
-                  <div class="stat-row"><span>Puntos</span><strong class="gold">{{ g.points }}</strong></div>
+                  <div class="stat-row"><span>{{ 'PROFILE.MATCHES' | translate }}</span><strong>{{ g.played }}</strong></div>
+                  <div class="stat-row"><span>{{ 'PROFILE.WINS' | translate }}</span><strong class="green">{{ g.won }}</strong></div>
+                  <div class="stat-row"><span>{{ 'PROFILE.POINTS' | translate }}</span><strong class="gold">{{ g.points }}</strong></div>
                   <div class="stat-row">
-                    <span>Winrate</span>
+                    <span>{{ 'PROFILE.WINRATE' | translate }}</span>
                     <strong>{{ g.played > 0 ? ((g.won / g.played) * 100).toFixed(0) : 0 }}%</strong>
                   </div>
                 </div>
@@ -110,7 +111,7 @@
 
           <!-- Pending requests -->
           @if (pendingRequests().length > 0) {
-            <h2><i class="fa-solid fa-user-clock"></i> Solicitudes pendientes</h2>
+            <h2><i class="fa-solid fa-user-clock"></i> {{ 'PROFILE.PENDING_REQUESTS' | translate }}</h2>
             <div class="friends-list pending-list">
               @for (f of pendingRequests(); track f.uid) {
                 <div class="friend-card friend-card--pending">
@@ -118,16 +119,16 @@
                   <div class="friend-info">
                     <p class="friend-name">{{ f.display_name }}</p>
                     <div class="friend-badges">
-                      <span class="badge">Nivel {{ f.level }}</span>
+                      <span class="badge">{{ 'HOME.LEVEL' | translate }} {{ f.level }}</span>
                       <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ f.total_points }} pts</span>
                     </div>
                   </div>
                   <div class="friend-request-actions">
                     <button class="btn btn--primary btn--sm" (click)="acceptFriendRequest(f.uid)">
-                      <i class="fa-solid fa-check"></i> Aceptar
+                      <i class="fa-solid fa-check"></i> {{ 'PROFILE.ACCEPT' | translate }}
                     </button>
                     <button class="btn btn--ghost btn--sm" (click)="rejectFriendRequest(f.uid)">
-                      Rechazar
+                      {{ 'HOME.REJECT' | translate }}
                     </button>
                   </div>
                 </div>
@@ -137,42 +138,54 @@
             <app-empty-state
               [compact]="true"
               icon="📭"
-              title="Sin solicitudes pendientes">
+              [title]="'PROFILE.NO_PENDING_REQUESTS' | translate">
             </app-empty-state>
           }
 
           <!-- Accepted friends -->
           <h2>
-            <i class="fa-solid fa-users"></i> Amigos
+            <i class="fa-solid fa-users"></i> {{ 'PROFILE.TAB_FRIENDS' | translate }}
             @if (acceptedFriends().length > 0) { <span class="friends-count">{{ acceptedFriends().length }}</span> }
           </h2>
           @if (loadingFriends()) {
-            <p class="empty">Cargando amigos...</p>
+            <p class="empty">{{ 'PROFILE.LOADING_FRIENDS' | translate }}</p>
           } @else if (acceptedFriends().length === 0 && pendingRequests().length === 0) {
             <app-empty-state
               icon="🧑‍🤝‍🧑"
-              title="Aún no tienes amigos añadidos"
-              subtitle="Usa el botón + junto a los jugadores en línea desde la pantalla de inicio."
-              actionLabel="Ir al inicio"
+              [title]="'PROFILE.NO_FRIENDS_TITLE' | translate"
+              [subtitle]="'PROFILE.NO_FRIENDS_SUBTITLE' | translate"
+              [actionLabel]="'PROFILE.GO_HOME' | translate"
               (action)="goHome()">
             </app-empty-state>
           } @else if (acceptedFriends().length === 0) {
-            <p class="empty">Tus solicitudes aceptadas aparecerán aquí.</p>
+            <p class="empty">{{ 'PROFILE.ACCEPTED_WILL_APPEAR' | translate }}</p>
           } @else {
             <div class="friends-list">
               @for (f of acceptedFriends(); track f.uid) {
                 <div class="friend-card">
                   <div class="friend-menu-wrap">
-                    <button class="friend-menu-btn" (click)="toggleFriendMenu(f.uid)" title="Opciones">
+                    <button class="friend-menu-btn" (click)="toggleFriendMenu(f.uid)" [title]="'PROFILE.OPTIONS' | translate">
                       <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
                     @if (openMenuUid() === f.uid) {
                       <div class="friend-menu-dropdown">
-                        <button class="friend-menu-item" (click)="startFriendInvite(f.uid)">
-                          <i class="fa-solid fa-envelope"></i> Invitar
-                        </button>
+                        @if (roomFor(f.uid); as room) {
+                          @if (canJoinRoom(room)) {
+                            <button class="friend-menu-item" (click)="joinFriendRoom(room)">
+                              <i class="fa-solid fa-right-to-bracket"></i> {{ 'HOME.JOIN' | translate }}
+                            </button>
+                          } @else {
+                            <button class="friend-menu-item" (click)="spectateFriendRoom(room)">
+                              <i class="fa-solid fa-eye"></i> {{ 'HOME.SPECTATE' | translate }}
+                            </button>
+                          }
+                        } @else {
+                          <button class="friend-menu-item" (click)="startFriendInvite(f.uid)">
+                            <i class="fa-solid fa-envelope"></i> {{ 'HOME.INVITE_TO_GAME' | translate }}
+                          </button>
+                        }
                         <button class="friend-menu-item friend-menu-item--danger" (click)="removeFriend(f.uid)">
-                          Eliminar
+                          {{ 'PROFILE.REMOVE' | translate }}
                         </button>
                       </div>
                     }
@@ -182,16 +195,21 @@
                     <p class="friend-name">{{ f.display_name }}</p>
                     <div class="friend-badges">
                       @if (f.status === 'semi_friend') {
-                        <span class="badge" title="Le enviaste una solicitud y aún no la ha aceptado">
-                          <i class="fa-regular fa-heart"></i> Semi-amigo
+                        <span class="badge" [title]="'PROFILE.SEMI_FRIEND_HINT' | translate">
+                          <i class="fa-regular fa-heart"></i> {{ 'PROFILE.SEMI_FRIEND' | translate }}
                         </span>
                       }
-                      <span class="badge">Nivel {{ f.level }}</span>
+                      @if (roomFor(f.uid)) {
+                        <span class="badge badge--gold">
+                          <i class="fa-solid fa-gamepad"></i> {{ 'HOME.IN_GAME_TAG' | translate }}
+                        </span>
+                      }
+                      <span class="badge">{{ 'HOME.LEVEL' | translate }} {{ f.level }}</span>
                       <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ f.total_points }} pts</span>
                     </div>
                     @if (f.best_game) {
                       <p class="friend-best">
-                        <i class="fa-solid fa-trophy"></i> Mejor juego: <strong>{{ f.best_game }}</strong>
+                        <i class="fa-solid fa-trophy"></i> {{ 'PROFILE.BEST_GAME' | translate }}: <strong>{{ f.best_game }}</strong>
                         <span class="friend-best-pts">({{ f.best_game_points }} pts)</span>
                       </p>
                     }
@@ -206,14 +224,14 @@
       <!-- Notifications -->
       @if (activeTab() === 'notifs') {
         <section class="notifs-section">
-          <h2><i class="fa-solid fa-bell"></i> Notificaciones</h2>
+          <h2><i class="fa-solid fa-bell"></i> {{ 'HOME.NOTIFICATIONS' | translate }}</h2>
           @if (loadingFriends()) {
-            <p class="empty">Cargando notificaciones...</p>
+            <p class="empty">{{ 'PROFILE.LOADING_NOTIFS' | translate }}</p>
           } @else if (pendingRequests().length === 0 && notifService.items().length === 0) {
             <div class="notifs-empty">
               <i class="fa-regular fa-bell notifs-empty-icon"></i>
-              <p>Sin notificaciones pendientes</p>
-              <span class="empty-hint">Aquí aparecerán las solicitudes de amistad y las invitaciones no aceptadas</span>
+              <p>{{ 'PROFILE.NO_PENDING_NOTIFS' | translate }}</p>
+              <span class="empty-hint">{{ 'PROFILE.NOTIFS_HINT' | translate }}</span>
             </div>
           } @else {
             <div class="notif-list">
@@ -226,17 +244,17 @@
                     <span class="notif-type-dot notif-type-dot--friend"><i class="fa-solid fa-user-plus"></i></span>
                   </div>
                   <div class="notif-body">
-                    <p class="notif-title"><strong>{{ f.display_name }}</strong> te ha enviado una solicitud de amistad</p>
+                    <p class="notif-title"><strong>{{ f.display_name }}</strong> {{ 'PROFILE.SENT_FRIEND_REQUEST' | translate }}</p>
                     <div class="notif-meta">
-                      <span class="badge">Nivel {{ f.level }}</span>
+                      <span class="badge">{{ 'HOME.LEVEL' | translate }} {{ f.level }}</span>
                       <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ f.total_points }} pts</span>
                     </div>
                     <div class="notif-actions">
                       <button class="btn btn--primary btn--sm" (click)="acceptFriendRequest(f.uid)">
-                        <i class="fa-solid fa-check"></i> Aceptar
+                        <i class="fa-solid fa-check"></i> {{ 'PROFILE.ACCEPT' | translate }}
                       </button>
                       <button class="btn btn--ghost btn--sm" (click)="rejectFriendRequest(f.uid)">
-                        Rechazar
+                        {{ 'HOME.REJECT' | translate }}
                       </button>
                     </div>
                   </div>
@@ -253,12 +271,12 @@
                     </div>
                     <div class="notif-body">
                       <p class="notif-title">
-                        <strong>{{ n.from_name }}</strong> te invitó a jugar
-                        <strong>{{ gameNames[n.game_id!] ?? n.game_id }}</strong>
+                        <strong>{{ n.from_name }}</strong> {{ 'TOASTS.MISSED_INVITE' | translate }}
+                        <strong>{{ n.game_id ? gameLabel(n.game_id) : '' }}</strong>
                       </p>
-                      <p class="notif-subtitle notif-subtitle--invite">No aceptaste a tiempo</p>
+                      <p class="notif-subtitle notif-subtitle--invite">{{ 'PROFILE.MISSED_INVITE_SUBTITLE' | translate }}</p>
                     </div>
-                    <button class="notif-dismiss" (click)="notifService.dismiss(n.id)" title="Descartar">
+                    <button class="notif-dismiss" (click)="notifService.dismiss(n.id)" [title]="'HOME.DISMISS' | translate">
                       <i class="fa-solid fa-xmark"></i>
                     </button>
                   </div>
@@ -271,11 +289,11 @@
                     </div>
                     <div class="notif-body">
                       <p class="notif-title">
-                        <strong>{{ n.from_name }}</strong> rechazó tu solicitud de amistad
+                        <strong>{{ n.from_name }}</strong> {{ 'TOASTS.FRIEND_REQUEST_REJECTED_LONG' | translate }}
                       </p>
-                      <p class="notif-subtitle notif-subtitle--rejected">Tu solicitud no fue aceptada</p>
+                      <p class="notif-subtitle notif-subtitle--rejected">{{ 'PROFILE.REJECTED_SUBTITLE' | translate }}</p>
                     </div>
-                    <button class="notif-dismiss" (click)="notifService.dismiss(n.id)" title="Descartar">
+                    <button class="notif-dismiss" (click)="notifService.dismiss(n.id)" [title]="'HOME.DISMISS' | translate">
                       <i class="fa-solid fa-xmark"></i>
                     </button>
                   </div>
@@ -288,11 +306,11 @@
                     </div>
                     <div class="notif-body">
                       <p class="notif-title">
-                        <strong>{{ n.from_name }}</strong> te ha eliminado de sus amigos
+                        <strong>{{ n.from_name }}</strong> {{ 'TOASTS.FRIEND_REMOVED_BY_OTHER' | translate }}
                       </p>
-                      <p class="notif-subtitle notif-subtitle--removed">Ya no sois amigos</p>
+                      <p class="notif-subtitle notif-subtitle--removed">{{ 'PROFILE.REMOVED_SUBTITLE' | translate }}</p>
                     </div>
-                    <button class="notif-dismiss" (click)="notifService.dismiss(n.id)" title="Descartar">
+                    <button class="notif-dismiss" (click)="notifService.dismiss(n.id)" [title]="'HOME.DISMISS' | translate">
                       <i class="fa-solid fa-xmark"></i>
                     </button>
                   </div>
@@ -307,7 +325,7 @@
       <!-- Ranking -->
       @if (activeTab() === 'ranking') {
         <section class="ranking-section">
-          <h2><i class="fa-solid fa-trophy"></i> Ranking Global</h2>
+          <h2><i class="fa-solid fa-trophy"></i> {{ 'HOME.RANKING' | translate }}</h2>
           <div class="lb-list">
             @for (entry of leaderboard(); track entry.uid; let i = $index) {
               <div class="lb-row"
@@ -326,57 +344,91 @@
         </section>
       }
 
+      <!-- Settings -->
+      @if (activeTab() === 'settings' && profile(); as p) {
+        <section class="settings-section">
+          <h2><i class="fa-solid fa-gear"></i> {{ 'PROFILE.TAB_SETTINGS' | translate }}</h2>
+
+          <h3>{{ 'PROFILE.LANGUAGE' | translate }}</h3>
+          <p class="settings-hint">{{ 'PROFILE.LANGUAGE_HINT' | translate }}</p>
+          <select class="input settings-select" [ngModel]="p.settings.language" (ngModelChange)="updateSetting('language', $event)">
+            <option value="es">Español</option>
+            <option value="en">English</option>
+          </select>
+
+          <h3>{{ 'HOME.NOTIFICATIONS' | translate }}</h3>
+          <label class="settings-toggle">
+            <input type="checkbox" [ngModel]="p.settings.notify_friend_requests" (ngModelChange)="updateSetting('notify_friend_requests', $event)" />
+            <span>{{ 'PROFILE.NOTIFY_FRIEND_REQUESTS' | translate }}</span>
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" [ngModel]="p.settings.notify_game_invites" (ngModelChange)="updateSetting('notify_game_invites', $event)" />
+            <span>{{ 'PROFILE.NOTIFY_GAME_INVITES' | translate }}</span>
+          </label>
+
+          <h3>{{ 'PROFILE.PRIVACY' | translate }}</h3>
+          <label class="settings-toggle">
+            <input type="checkbox" [ngModel]="p.settings.hide_online_status" (ngModelChange)="updateSetting('hide_online_status', $event)" />
+            <span>{{ 'PROFILE.HIDE_ONLINE' | translate }}</span>
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" [ngModel]="p.settings.block_friend_requests" (ngModelChange)="updateSetting('block_friend_requests', $event)" />
+            <span>{{ 'PROFILE.BLOCK_REQUESTS' | translate }}</span>
+          </label>
+        </section>
+      }
+
       <!-- Admin panel -->
       @if (activeTab() === 'admin') {
         <section class="admin-section">
-          <h2><i class="fa-solid fa-shield-halved"></i> Panel de Administración</h2>
+          <h2><i class="fa-solid fa-shield-halved"></i> {{ 'PROFILE.ADMIN_PANEL' | translate }}</h2>
 
           <div class="admin-danger-bar">
             @if (!resetAllConfirm()) {
               <button class="btn btn--danger btn--sm" (click)="resetAllConfirm.set(true)">
-                <i class="fa-solid fa-rotate-left"></i> Resetear todos los puntos
+                <i class="fa-solid fa-rotate-left"></i> {{ 'PROFILE.RESET_ALL_POINTS' | translate }}
               </button>
             } @else {
-              <span class="admin-danger-label">¿Confirmar reset global?</span>
+              <span class="admin-danger-label">{{ 'PROFILE.CONFIRM_RESET_ALL' | translate }}</span>
               <button class="btn btn--danger btn--sm" (click)="adminResetAllPoints()">
-                <i class="fa-solid fa-check"></i> Sí, resetear todo
+                <i class="fa-solid fa-check"></i> {{ 'PROFILE.YES_RESET_ALL' | translate }}
               </button>
-              <button class="btn btn--ghost btn--sm" (click)="resetAllConfirm.set(false)">Cancelar</button>
+              <button class="btn btn--ghost btn--sm" (click)="resetAllConfirm.set(false)">{{ 'PROFILE.CANCEL' | translate }}</button>
             }
           </div>
 
           @if (adminLoading()) {
-            <p class="empty">Cargando usuarios...</p>
+            <p class="empty">{{ 'PROFILE.LOADING_USERS' | translate }}</p>
           } @else {
             <div class="admin-user-list">
               @for (u of adminUsers(); track u.uid) {
                 <div class="admin-user-row" [class.admin-user-row--admin]="u.is_admin">
                   <div class="admin-user-menu-wrap">
-                    <button class="friend-menu-btn" (click)="toggleAdminMenu(u.uid)" title="Acciones">
+                    <button class="friend-menu-btn" (click)="toggleAdminMenu(u.uid)" [title]="'PROFILE.ACTIONS' | translate">
                       <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
                     @if (openAdminMenuUid() === u.uid) {
                       <div class="friend-menu-dropdown admin-dropdown">
                         @if (u.is_admin) {
                           <button class="friend-menu-item" (click)="adminSetAdmin(u.uid, false)">
-                            <i class="fa-solid fa-shield-halved"></i> Quitar admin
+                            <i class="fa-solid fa-shield-halved"></i> {{ 'PROFILE.REMOVE_ADMIN' | translate }}
                           </button>
                         } @else {
                           <button class="friend-menu-item" (click)="adminSetAdmin(u.uid, true)">
-                            <i class="fa-solid fa-shield-halved"></i> Hacer admin
+                            <i class="fa-solid fa-shield-halved"></i> {{ 'PROFILE.MAKE_ADMIN' | translate }}
                           </button>
                         }
                         <button class="friend-menu-item" (click)="openAddPoints(u.uid)">
-                          <i class="fa-solid fa-plus"></i> Añadir puntos
+                          <i class="fa-solid fa-plus"></i> {{ 'PROFILE.ADD_POINTS' | translate }}
                         </button>
                         <button class="friend-menu-item friend-menu-item--danger" (click)="adminResetPoints(u.uid)">
-                          <i class="fa-solid fa-rotate-left"></i> Resetear puntos
+                          <i class="fa-solid fa-rotate-left"></i> {{ 'PROFILE.RESET_POINTS' | translate }}
                         </button>
                         <button class="friend-menu-item" (click)="openAvatarPicker(u.uid)">
-                          <i class="fa-solid fa-face-smile"></i> Cambiar avatar
+                          <i class="fa-solid fa-face-smile"></i> {{ 'PROFILE.CHANGE_AVATAR' | translate }}
                         </button>
                         <button class="friend-menu-item" (click)="openBadgeManager(u.uid)">
-                          <i class="fa-solid fa-tags"></i> Insignias
+                          <i class="fa-solid fa-tags"></i> {{ 'PROFILE.BADGES' | translate }}
                         </button>
                       </div>
                     }
@@ -386,13 +438,13 @@
                     <span class="admin-user-name">{{ u.display_name }}</span>
                     <div class="admin-user-badges">
                       @if (u.is_admin) {
-                        <span class="badge badge--admin badge--xs"><i class="fa-solid fa-shield-halved"></i> Admin</span>
+                        <span class="badge badge--admin badge--xs"><i class="fa-solid fa-shield-halved"></i> {{ 'PROFILE.ADMIN' | translate }}</span>
                       }
                       @for (b of (u.badges ?? []); track b) {
-                        @if (b === 'beta') { <span class="badge badge--beta badge--xs"><i class="fa-solid fa-flask"></i> Beta</span> }
-                        @if (b === 'payaso') { <span class="badge badge--payaso badge--xs"><i class="fa-solid fa-face-grin-squint-tears"></i> Payaso</span> }
-                        @if (b === 'eminencia') { <span class="badge badge--eminencia badge--xs"><i class="fa-solid fa-crown"></i> Eminencia</span> }
-                        @if (b === 'hardcore') { <span class="badge badge--hardcore badge--xs"><i class="fa-solid fa-skull"></i> Hardcore</span> }
+                        @if (b === 'beta') { <span class="badge badge--beta badge--xs"><i class="fa-solid fa-flask"></i> {{ 'PROFILE.BADGE_BETA' | translate }}</span> }
+                        @if (b === 'payaso') { <span class="badge badge--payaso badge--xs"><i class="fa-solid fa-face-grin-squint-tears"></i> {{ 'PROFILE.BADGE_CLOWN' | translate }}</span> }
+                        @if (b === 'eminencia') { <span class="badge badge--eminencia badge--xs"><i class="fa-solid fa-crown"></i> {{ 'PROFILE.BADGE_EMINENCE' | translate }}</span> }
+                        @if (b === 'hardcore') { <span class="badge badge--hardcore badge--xs"><i class="fa-solid fa-skull"></i> {{ 'PROFILE.BADGE_HARDCORE' | translate }}</span> }
                       }
                     </div>
                   </div>
@@ -412,11 +464,11 @@
 @if (addPointsTarget()) {
   <div class="overlay" (click)="addPointsTarget.set(null)">
     <div class="add-points-modal card" (click)="$event.stopPropagation()">
-      <h3><i class="fa-solid fa-plus"></i> Añadir puntos</h3>
-      <input class="input" type="number" min="1" [(ngModel)]="addPointsAmount" placeholder="Cantidad de puntos" />
+      <h3><i class="fa-solid fa-plus"></i> {{ 'PROFILE.ADD_POINTS' | translate }}</h3>
+      <input class="input" type="number" min="1" [(ngModel)]="addPointsAmount" [placeholder]="'PROFILE.POINTS_AMOUNT' | translate" />
       <div class="add-points-actions">
-        <button class="btn btn--primary" (click)="confirmAddPoints()">Confirmar</button>
-        <button class="btn btn--ghost" (click)="addPointsTarget.set(null)">Cancelar</button>
+        <button class="btn btn--primary" (click)="confirmAddPoints()">{{ 'PROFILE.CONFIRM' | translate }}</button>
+        <button class="btn btn--ghost" (click)="addPointsTarget.set(null)">{{ 'PROFILE.CANCEL' | translate }}</button>
       </div>
     </div>
   </div>
@@ -425,14 +477,14 @@
 @if (avatarPickerUid()) {
   <div class="overlay" (click)="avatarPickerUid.set(null)">
     <div class="add-points-modal card" (click)="$event.stopPropagation()">
-      <h3><i class="fa-solid fa-face-smile"></i> Cambiar avatar</h3>
+      <h3><i class="fa-solid fa-face-smile"></i> {{ 'PROFILE.CHANGE_AVATAR' | translate }}</h3>
       <div class="avatar-grid">
         @for (av of avatars; track av) {
           <button class="avatar-btn" (click)="adminConfirmAvatar(av)">{{ av }}</button>
         }
       </div>
       <div class="add-points-actions">
-        <button class="btn btn--ghost" (click)="avatarPickerUid.set(null)">Cancelar</button>
+        <button class="btn btn--ghost" (click)="avatarPickerUid.set(null)">{{ 'PROFILE.CANCEL' | translate }}</button>
       </div>
     </div>
   </div>
@@ -441,7 +493,7 @@
 @if (badgesTargetUid()) {
   <div class="overlay" (click)="badgesTargetUid.set(null)">
     <div class="add-points-modal card" (click)="$event.stopPropagation()">
-      <h3><i class="fa-solid fa-tags"></i> Gestionar insignias</h3>
+      <h3><i class="fa-solid fa-tags"></i> {{ 'PROFILE.MANAGE_BADGES' | translate }}</h3>
       <div class="badge-picker">
         @for (def of badgeDefs; track def.id) {
           <button
@@ -450,13 +502,13 @@
             [style.--badge-color]="def.color"
             (click)="toggleBadgeEdit(def.id)">
             <i [class]="'fa-solid ' + def.icon"></i>
-            {{ def.label }}
+            {{ badgeLabel(def.id) }}
           </button>
         }
       </div>
       <div class="add-points-actions">
-        <button class="btn btn--primary" (click)="adminSaveBadges()"><i class="fa-solid fa-check"></i> Guardar</button>
-        <button class="btn btn--ghost" (click)="badgesTargetUid.set(null)">Cancelar</button>
+        <button class="btn btn--primary" (click)="adminSaveBadges()"><i class="fa-solid fa-check"></i> {{ 'PROFILE.SAVE' | translate }}</button>
+        <button class="btn btn--ghost" (click)="badgesTargetUid.set(null)">{{ 'PROFILE.CANCEL' | translate }}</button>
       </div>
     </div>
   </div>
@@ -466,7 +518,7 @@
   <div class="overlay" (click)="cancelFriendInvite()">
     <div class="invite-picker card rainbow-border" (click)="$event.stopPropagation()">
       <div class="invite-picker-header">
-        <h3><i class="fa-solid fa-gamepad"></i> Elige el juego</h3>
+        <h3><i class="fa-solid fa-gamepad"></i> {{ 'HOME.INVITE_PICKER_TITLE' | translate }}</h3>
         <button class="invite-close-btn" (click)="cancelFriendInvite()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="invite-games">
@@ -474,7 +526,7 @@
           <button class="invite-game-btn" (click)="inviteFriendToGame(game)"
             [style.--ig-color]="gameColor(game.id)">
             <div class="ig-icon"><i [class]="gameIcon(game.id)"></i></div>
-            <span class="ig-name">{{ game.name }}</span>
+            <span class="ig-name">{{ gameLabel(game.id) }}</span>
           </button>
         }
       </div>

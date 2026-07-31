@@ -1,19 +1,21 @@
 <div class="auth-layout">
   <div class="auth-card card rainbow-border">
+    <app-lang-switch class="auth-lang-switch" />
+
     <div class="auth-logo">
       <span class="logo-icon"><i class="fa-solid fa-star"></i></span>
       <h1>Arcade Stars Hub</h1>
     </div>
 
-    <h2>Iniciar Sesión</h2>
+    <h2>{{ 'AUTH.LOGIN.TITLE' | translate }}</h2>
 
     <form (ngSubmit)="onSubmit()" #f="ngForm">
       <div class="field">
-        <label>Email</label>
+        <label>{{ 'AUTH.LOGIN.EMAIL' | translate }}</label>
         <input class="input" type="email" [(ngModel)]="email" name="email" placeholder="tu@email.com" required />
       </div>
       <div class="field">
-        <label>Contraseña</label>
+        <label>{{ 'AUTH.LOGIN.PASSWORD' | translate }}</label>
         <input class="input" type="password" [(ngModel)]="password" name="password" placeholder="••••••••" required />
       </div>
 
@@ -22,14 +24,14 @@
       }
 
       <button class="btn btn--primary full-width" type="submit" [disabled]="loading()">
-        {{ loading() ? 'Entrando...' : 'Entrar' }}
+        {{ (loading() ? 'AUTH.LOGIN.SUBMITTING' : 'AUTH.LOGIN.SUBMIT') | translate }}
       </button>
     </form>
 
     <div class="auth-links">
-      <a routerLink="/recover">¿Olvidaste tu contraseña?</a>
+      <a routerLink="/recover">{{ 'AUTH.LOGIN.FORGOT' | translate }}</a>
       <span>·</span>
-      <a routerLink="/register">Crear cuenta</a>
+      <a routerLink="/register">{{ 'AUTH.LOGIN.CREATE_ACCOUNT' | translate }}</a>
     </div>
   </div>
 </div>

@@ -3,17 +3,20 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { TranslateService, TranslatePipe } from '@ngx-translate/core';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { WsService } from '../../core/services/ws.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { FriendsService } from '../../core/services/friends.service';
 import { UserProfileService } from '../../core/services/user-profile.service';
+import { LobbyService } from '../../core/services/lobby.service';
 import { ToastService } from '../../core/services/toast.service';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
+import { UserSettingsUpdate } from '../../core/models/user.model';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
-type Tab = 'stats' | 'games' | 'friends' | 'ranking' | 'notifs' | 'admin';
+type Tab = 'stats' | 'games' | 'friends' | 'ranking' | 'notifs' | 'settings' | 'admin';
 
 const AVATARS = [
   '🐉', '🦎', '🐀', '🦅', '🐺', '🦁', '🦂', '🦈',
@@ -33,7 +36,7 @@ const BADGE_DEFS = [
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, EmptyStateComponent],
+  imports: [CommonModule, FormsModule, RouterLink, EmptyStateComponent, TranslatePipe],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.scss'],
 })
@@ -46,7 +49,9 @@ export class ProfileComponent implements OnInit, OnDestroy {
   readonly notifService = inject(NotificationService);
   private friendsSvc = inject(FriendsService);
   private profileSvc = inject(UserProfileService);
+  private lobbySvc = inject(LobbyService);
   private toast = inject(ToastService);
+  private translate = inject(TranslateService);
   private wsSub?: Subscription;
 
   readonly profile = this.profileSvc.profile;
@@ -73,12 +78,6 @@ export class ProfileComponent implements OnInit, OnDestroy {
   readonly avatars = AVATARS;
   readonly badgeDefs = BADGE_DEFS;
 
-  readonly gameNames: Partial<Record<string, string>> = {
-    connect_four: 'Conecta Cuatro',
-    tic_tac_toe: 'Tres en Raya',
-    minesweeper: 'Buscaminas',
-  };
-
   async ngOnInit() {
     const [profile, lb, gamesData] = await Promise.all([
       this.profileSvc.load(),
@@ -95,6 +94,11 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
     // Always load friends on init so notifications tab and pending count work immediately
     this._loadFriends();
+
+    // Safety-net refresh: the root App component already keeps this live via
+    // lobby_update, but Profile might mount before that first fetch lands.
+    this.lobbySvc.loadOnlineUsers().catch(() => {});
+    this.lobbySvc.loadActiveRooms().catch(() => {});
 
     // Listen for live events while profile is open
     this.wsSub = this.ws.messages$.subscribe((msg) => {
@@ -194,7 +198,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
     try {
       await this.api.updateMe({ avatar } as any);
       this.profileSvc.update({ avatar });
-      this.toast.success('Avatar actualizado');
+      this.toast.success(this.translate.instant('TOASTS.AVATAR_UPDATED'));
     } catch { /* toast shown by the error interceptor */ }
   }
 
@@ -206,7 +210,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
       this.profileSvc.set(updated);
       // Keep Firebase Auth's displayName from drifting from Firestore's again.
       this.auth.updateDisplayName(this.editName).catch(() => {});
-      this.toast.success('Nombre actualizado');
+      this.toast.success(this.translate.instant('TOASTS.NAME_UPDATED'));
     } catch {
       /* toast shown by the error interceptor */
     } finally {
@@ -218,26 +222,34 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.openMenuUid.set(null);
     try {
       await this.friendsSvc.remove(uid);
-      this.toast.success('Amigo eliminado');
+      this.toast.success(this.translate.instant('TOASTS.FRIEND_REMOVED'));
     } catch { /* toast shown by the error interceptor */ }
   }
 
   async acceptFriendRequest(uid: string) {
     try {
       await this.friendsSvc.accept(uid);
-      this.toast.success('Solicitud aceptada');
+      this.toast.success(this.translate.instant('TOASTS.REQUEST_ACCEPTED'));
     } catch { /* toast shown by the error interceptor */ }
   }
 
   async rejectFriendRequest(uid: string) {
     try {
       await this.friendsSvc.reject(uid);
-      this.toast.success('Solicitud rechazada');
+      this.toast.success(this.translate.instant('TOASTS.REQUEST_REJECTED'));
     } catch { /* toast shown by the error interceptor */ }
   }
 
   goHome() {
     this.router.navigate(['/home']);
+  }
+
+  async updateSetting<K extends keyof UserSettingsUpdate>(key: K, value: UserSettingsUpdate[K]) {
+    try {
+      const updated = await this.api.updateMySettings({ [key]: value } as UserSettingsUpdate);
+      this.profileSvc.update({ settings: updated });
+      this.toast.success(this.translate.instant('TOASTS.SETTINGS_SAVED'));
+    } catch { /* toast shown by the error interceptor */ }
   }
 
   toggleFriendMenu(uid: string) {
@@ -278,15 +290,59 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.ws.send('send_invite', { to_uid: uid, game_id: game.id });
   }
 
+  /** The active room a friend is currently connected to, if any. */
+  roomFor(uid: string): any | undefined {
+    return this.lobbySvc.roomFor(uid);
+  }
+
+  /** Same eligibility rules as the public "Salas activas" list on Home. */
+  canJoinRoom(room: any): boolean {
+    const uid = this.profile()?.uid;
+    const alreadyIn = !!uid && (room.players ?? []).some((p: any) => p.uid === uid);
+    const isFull = (room.players ?? []).length >= (room.max_players ?? 2);
+    return alreadyIn || (room.status === 'waiting' && !isFull);
+  }
+
+  joinFriendRoom(room: any) {
+    this.openMenuUid.set(null);
+    this.router.navigate(['/room', room.room_id], { queryParams: { game: room.game_id } });
+  }
+
+  spectateFriendRoom(room: any) {
+    this.openMenuUid.set(null);
+    this.router.navigate(['/room', room.room_id], { queryParams: { game: room.game_id, spectate: '1' } });
+  }
+
   gameStatsList(): Array<{ id: string; name: string; played: number; won: number; points: number }> {
     const stats = this.profile()?.game_stats ?? {};
     return Object.entries(stats).map(([id, s]) => ({
       id,
-      name: this.gameNames[id] ?? id,
+      name: this.gameLabel(id),
       played: s.played,
       won: s.won,
       points: s.points,
     }));
+  }
+
+  gameLabel(id: string): string {
+    const key: Record<string, string> = {
+      connect_four: 'GAMES.CONNECT_FOUR.NAME',
+      minesweeper: 'GAMES.MINESWEEPER.NAME',
+      tic_tac_toe: 'GAMES.TIC_TAC_TOE.NAME',
+      snake:       'GAMES.SNAKE.NAME',
+      pong:        'GAMES.PONG.NAME',
+    };
+    return key[id] ? this.translate.instant(key[id]) : id;
+  }
+
+  badgeLabel(id: string): string {
+    const key: Record<string, string> = {
+      beta: 'PROFILE.BADGE_BETA',
+      payaso: 'PROFILE.BADGE_CLOWN',
+      eminencia: 'PROFILE.BADGE_EMINENCE',
+      hardcore: 'PROFILE.BADGE_HARDCORE',
+    };
+    return key[id] ? this.translate.instant(key[id]) : id;
   }
 
   openAvatarPicker(uid: string) {

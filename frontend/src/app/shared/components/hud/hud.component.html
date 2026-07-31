@@ -18,7 +18,7 @@
           <span class="turn-indicator"><i class="fa-solid fa-play"></i></span>
         }
         @if (player.is_ai) {
-          <span class="ai-badge">IA</span>
+          <span class="ai-badge">{{ 'HOME.AI_TAG' | translate }}</span>
         }
       </div>
     }
@@ -28,23 +28,23 @@
   <div class="hud-stats">
     @if (roomCode) {
       <div class="stat">
-        <span class="stat-label">Código</span>
-        <span class="hud-code-chip" (click)="copyCode()" title="Copiar código">{{ roomCode }} <i class="fa-solid fa-copy"></i></span>
+        <span class="stat-label">{{ 'HUD.CODE' | translate }}</span>
+        <span class="hud-code-chip" (click)="copyCode()" [title]="'HOME.COPY_CODE' | translate">{{ roomCode }} <i class="fa-solid fa-copy"></i></span>
       </div>
       <div class="stat-divider"></div>
     }
     <div class="stat">
-      <span class="stat-label">Tiempo</span>
+      <span class="stat-label">{{ 'HUD.TIME' | translate }}</span>
       <span class="stat-value">{{ formattedTime }}</span>
     </div>
     <div class="stat">
-      <span class="stat-label">Nivel</span>
+      <span class="stat-label">{{ 'HOME.LEVEL' | translate }}</span>
       <span class="stat-value">{{ level }}</span>
     </div>
     <div class="stat">
-      <span class="stat-label">Estado</span>
+      <span class="stat-label">{{ 'HUD.STATUS' | translate }}</span>
       <span class="stat-value status-badge" [class]="'status-' + status">
-        {{ status === 'waiting' ? 'Esperando' : status === 'playing' ? 'En juego' : 'Terminado' }}
+        {{ (status === 'waiting' ? 'HOME.STATUS_WAITING' : status === 'playing' ? 'HOME.STATUS_PLAYING' : 'HUD.STATUS_FINISHED') | translate }}
       </span>
     </div>
   </div>

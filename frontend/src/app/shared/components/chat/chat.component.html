@@ -2,7 +2,7 @@
   <button class="chat-header" [class.chat-header--closed]="!open()" (click)="toggle()">
     @if (open()) {
       <i class="fa-solid fa-comments"></i>
-      <span class="chat-title-text">Chat</span>
+      <span class="chat-title-text">{{ 'HOME.MOBILE_CHAT' | translate }}</span>
       @if (unread() > 0) {
         <span class="unread-dot" [class.unread-dot--count]="unread() > 1">
           @if (unread() > 1) { {{ unread() }} }
@@ -24,7 +24,7 @@
   @if (renderContent()) {
     <div class="msg-list" #msgList>
       @if (messages.length === 0) {
-        <p class="empty">Sin mensajes aún</p>
+        <p class="empty">{{ 'CHAT.NO_MESSAGES' | translate }}</p>
       }
       @for (msg of messages; track $index; let i = $index) {
         <div
@@ -45,7 +45,7 @@
         class="input"
         [(ngModel)]="text"
         (keydown)="onKey($event)"
-        placeholder="Escribe un mensaje..."
+        [placeholder]="'HOME.CHAT_PLACEHOLDER' | translate"
         maxlength="300" />
       <button class="btn btn--ghost send-btn" (click)="send()"><i class="fa-solid fa-paper-plane"></i></button>
     </div>

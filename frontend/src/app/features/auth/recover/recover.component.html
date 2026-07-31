@@ -1,20 +1,22 @@
 <div class="auth-layout">
   <div class="auth-card card rainbow-border">
+    <app-lang-switch class="auth-lang-switch" />
+
     <div class="auth-logo">
       <span class="logo-icon"><i class="fa-solid fa-star"></i></span>
       <h1>Arcade Stars Hub</h1>
     </div>
-    <h2>Recuperar Contraseña</h2>
+    <h2>{{ 'AUTH.RECOVER.TITLE' | translate }}</h2>
 
     @if (success()) {
       <div class="success-box">
-        <p><i class="fa-solid fa-circle-check"></i> Correo enviado. Revisa tu bandeja de entrada.</p>
-        <a routerLink="/login">Volver al inicio</a>
+        <p><i class="fa-solid fa-circle-check"></i> {{ 'AUTH.RECOVER.SUCCESS' | translate }}</p>
+        <a routerLink="/login">{{ 'AUTH.RECOVER.BACK_TO_LOGIN' | translate }}</a>
       </div>
     } @else {
       <form (ngSubmit)="onSubmit()">
         <div class="field">
-          <label>Email</label>
+          <label>{{ 'AUTH.LOGIN.EMAIL' | translate }}</label>
           <input class="input" type="email" [(ngModel)]="email" name="email" placeholder="tu@email.com" required />
         </div>
 
@@ -23,12 +25,12 @@
         }
 
         <button class="btn btn--primary full-width" type="submit" [disabled]="loading()">
-          {{ loading() ? 'Enviando...' : 'Enviar correo' }}
+          {{ (loading() ? 'AUTH.RECOVER.SUBMITTING' : 'AUTH.RECOVER.SUBMIT') | translate }}
         </button>
       </form>
 
       <div class="auth-links">
-        <a routerLink="/login"><i class="fa-solid fa-arrow-left"></i> Volver al inicio</a>
+        <a routerLink="/login"><i class="fa-solid fa-arrow-left"></i> {{ 'AUTH.RECOVER.BACK_TO_LOGIN' | translate }}</a>
       </div>
     }
   </div>

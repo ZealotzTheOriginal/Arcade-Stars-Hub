@@ -1,8 +1,9 @@
 import {
   Component, Input, Output, EventEmitter,
   OnChanges, AfterViewInit, OnDestroy,
-  ViewChild, ElementRef, HostListener, NgZone,
+  ViewChild, ElementRef, HostListener, NgZone, inject,
 } from '@angular/core';
+import { TranslateService, TranslatePipe } from '@ngx-translate/core';
 
 const CELL    = 64;
 const BOARD   = 24;
@@ -17,10 +18,12 @@ const DIR_OFFSET: Record<string, [number, number]> = {
 @Component({
   selector: 'app-snake',
   standalone: true,
+  imports: [TranslatePipe],
   templateUrl: './snake.component.html',
   styleUrls: ['./snake.component.scss'],
 })
 export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
+  private translate = inject(TranslateService);
   @Input() gameState: any = null;
   @Input() myUid: string = '';
   @Input() playerColors: Partial<Record<string, string>> = {};
@@ -207,7 +210,7 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
     if (winner) {
       const color = (this.playerColors[winner] ?? '#ffffff') as string;
       const isMe  = winner === this.myUid;
-      const label = isMe ? '¡Ganaste!' : '¡Perdiste!';
+      const label = this.translate.instant(isMe ? 'GAMES.COMMON.YOU_WON' : 'GAMES.SNAKE.YOU_LOST');
 
       // Pulsing glow ring
       const pulse = 0.85 + 0.15 * Math.sin(now / 280);
@@ -241,7 +244,7 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.fillText('Empate', cx, cy);
+      ctx.fillText(this.translate.instant('GAMES.SNAKE.DRAW'), cx, cy);
     }
 
     ctx.restore();

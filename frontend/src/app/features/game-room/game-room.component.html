@@ -11,13 +11,13 @@
       <div class="reconnecting-box">
         @if (ws.fatalError()) {
           <i class="fa-solid fa-wifi" style="color: var(--rainbow-red)"></i>
-          <span>Sin conexión</span>
+          <span>{{ 'GAME_ROOM.NO_CONNECTION' | translate }}</span>
           <button class="btn btn--primary btn--xs" (click)="ws.manualReconnect()">
-            <i class="fa-solid fa-rotate"></i> Reintentar
+            <i class="fa-solid fa-rotate"></i> {{ 'GAME_ROOM.RETRY' | translate }}
           </button>
         } @else {
           <span class="reconnecting-spinner"></span>
-          <span>Reconectando...</span>
+          <span>{{ 'GAME_ROOM.RECONNECTING' | translate }}</span>
         }
       </div>
     </div>
@@ -25,19 +25,19 @@
 
   <!-- Header -->
   <header class="room-header">
-    <a routerLink="/home" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Salir</a>
+    <a routerLink="/home" class="back-btn"><i class="fa-solid fa-arrow-left"></i> {{ 'GAME_ROOM.LEAVE' | translate }}</a>
     <div class="room-id">
       <strong class="room-name-label">{{ roomName() || roomId }}</strong>
     </div>
     @if (isSpectator()) {
-      <div class="spectator-badge"><i class="fa-solid fa-eye"></i> Espectando</div>
+      <div class="spectator-badge"><i class="fa-solid fa-eye"></i> {{ 'GAME_ROOM.SPECTATING' | translate }}</div>
     }
     <div class="header-right">
       @if (roomStatus() === 'playing' && !isSpectator()) {
-        <button class="abandon-btn" (click)="abandonGame()"><i class="fa-solid fa-flag"></i> Abandonar</button>
+        <button class="abandon-btn" (click)="abandonGame()"><i class="fa-solid fa-flag"></i> {{ 'HOME.ABANDON' | translate }}</button>
       }
       @if (aiThinking()) {
-        <div class="ai-badge"><i class="fa-solid fa-robot"></i> IA pensando...</div>
+        <div class="ai-badge"><i class="fa-solid fa-robot"></i> {{ 'GAME_ROOM.AI_THINKING' | translate }}</div>
       }
       @if (spectators().length > 0) {
         <div class="spectators-count"><i class="fa-solid fa-eye"></i> {{ spectators().length }}</div>
@@ -74,13 +74,13 @@
           @if (isLeader() && !isSpectator()) {
             <div class="lobby-actions">
               @if (canAddAI()) {
-                <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> Añadir IA</button>
+                <button class="btn btn--ghost" (click)="addAI()"><i class="fa-solid fa-robot"></i> {{ 'GAME_ROOM.ADD_AI' | translate }}</button>
               }
               @if (friends().length > 0 && players().length < maxPlayers()) {
-                <button class="btn btn--ghost" (click)="showFriendsModal.set(true)"><i class="fa-solid fa-user-group"></i> Invitar amigo</button>
+                <button class="btn btn--ghost" (click)="showFriendsModal.set(true)"><i class="fa-solid fa-user-group"></i> {{ 'GAME_ROOM.INVITE_FRIEND' | translate }}</button>
               }
               @if (players().length < maxPlayers()) {
-                <button class="btn btn--ghost" (click)="shareRoomInGlobalChat()"><i class="fa-solid fa-share-nodes"></i> Compartir en chat</button>
+                <button class="btn btn--ghost" (click)="shareRoomInGlobalChat()"><i class="fa-solid fa-share-nodes"></i> {{ 'GAME_ROOM.SHARE_IN_CHAT' | translate }}</button>
               }
             </div>
           }
@@ -99,10 +99,10 @@
                   <div class="slot-name">{{ slot.display_name }}</div>
                   <div class="slot-tags">
                     @if (slot.uid === leaderUid()) {
-                      <span class="tag tag--leader"><i class="fa-solid fa-crown"></i> Líder</span>
+                      <span class="tag tag--leader"><i class="fa-solid fa-crown"></i> {{ 'GAME_ROOM.LEADER' | translate }}</span>
                     }
-                    @if (slot.is_ai) { <span class="tag tag--ai">IA</span> }
-                    @if (!slot.is_ai && slot.uid !== leaderUid()) { <span class="tag tag--guest"><i class="fa-solid fa-user"></i> Invitado</span> }
+                    @if (slot.is_ai) { <span class="tag tag--ai">{{ 'HOME.AI_TAG' | translate }}</span> }
+                    @if (!slot.is_ai && slot.uid !== leaderUid()) { <span class="tag tag--guest"><i class="fa-solid fa-user"></i> {{ 'GAME_ROOM.GUEST' | translate }}</span> }
                     @if (disconnectedUids().has(slot.uid)) { <span class="tag tag--dc">DC</span> }
                   </div>
                   @if (gameMode() === 'teams') {
@@ -113,18 +113,18 @@
                       </div>
                     } @else if (playerTeam(slot.uid)) {
                       <span class="team-label" [class.team-label--a]="playerTeam(slot.uid) === 'a'" [class.team-label--b]="playerTeam(slot.uid) === 'b'">
-                        Equipo {{ playerTeam(slot.uid)!.toUpperCase() }}
+                        {{ 'GAME_ROOM.TEAM' | translate }} {{ playerTeam(slot.uid)!.toUpperCase() }}
                       </span>
                     }
                   }
                   @if (isLeader() && !isSpectator() && slot.uid !== myUid) {
                     <div class="slot-actions">
                       @if (!slot.is_ai) {
-                        <button class="slot-action-btn slot-action-btn--crown" (click)="transferLeader(slot.uid)" title="Ceder liderazgo">
+                        <button class="slot-action-btn slot-action-btn--crown" (click)="transferLeader(slot.uid)" [title]="'GAME_ROOM.TRANSFER_LEADER' | translate">
                           <i class="fa-solid fa-crown"></i>
                         </button>
                       }
-                      <button class="slot-action-btn slot-action-btn--kick" (click)="kickPlayer(slot.uid)" title="Expulsar">
+                      <button class="slot-action-btn slot-action-btn--kick" (click)="kickPlayer(slot.uid)" [title]="'GAME_ROOM.KICK' | translate">
                         <i class="fa-solid fa-xmark"></i>
                       </button>
                     </div>
@@ -133,7 +133,7 @@
               } @else {
                 <div class="player-slot player-slot--empty">
                   <i class="fa-solid fa-user-plus slot-empty-icon"></i>
-                  <span class="slot-empty-text">Vacío</span>
+                  <span class="slot-empty-text">{{ 'GAME_ROOM.EMPTY_SLOT' | translate }}</span>
                 </div>
               }
             }
@@ -142,7 +142,7 @@
           <!-- TTT pattern picker -->
           @if (!isSpectator() && gameId === 'tic_tac_toe') {
             <div class="color-picker-section">
-              <p class="color-picker-label">Tu diseño de ficha</p>
+              <p class="color-picker-label">{{ 'GAME_ROOM.YOUR_PIECE_DESIGN' | translate }}</p>
               <div class="pattern-swatches">
                 @for (p of TTT_PATTERNS; track p) {
                   <button class="pattern-swatch" [class.selected]="myTttPattern() === p" (click)="setTttPattern(p)">
@@ -160,7 +160,7 @@
           <!-- Color picker (not used in minesweeper) -->
           @if (!isSpectator() && gameId !== 'minesweeper') {
             <div class="color-picker-section">
-              <p class="color-picker-label">Tu color de ficha</p>
+              <p class="color-picker-label">{{ 'GAME_ROOM.YOUR_PIECE_COLOR' | translate }}</p>
               <div class="color-swatches">
                 @for (hex of CHIP_COLORS; track hex) {
                   <button
@@ -182,7 +182,7 @@
 
               @if (gameId === 'connect_four' || gameId === 'minesweeper') {
                 <div class="mode-section">
-                  <p class="leader-section-label"><i class="fa-solid fa-user-group"></i> Jugadores en sala</p>
+                  <p class="leader-section-label"><i class="fa-solid fa-user-group"></i> {{ 'GAME_ROOM.PLAYERS_IN_ROOM' | translate }}</p>
                   <div class="mode-toggle">
                     @for (n of [2, 3, 4]; track n) {
                       <button class="mode-btn"
@@ -198,12 +198,12 @@
 
               @if (gameId === 'minesweeper') {
                 <div class="mode-section">
-                  <p class="leader-section-label"><i class="fa-solid fa-bomb"></i> Tamaño del tablero</p>
+                  <p class="leader-section-label"><i class="fa-solid fa-bomb"></i> {{ 'GAME_ROOM.BOARD_SIZE' | translate }}</p>
                   <div class="mode-toggle mode-toggle--col">
                     @for (s of MS_BOARD_SIZES; track s.id) {
                       <button class="mode-btn mode-btn--board" [class.active]="msBoardSize() === s.id" (click)="setMsBoardSize(s.id)">
-                        <span>{{ s.label }}</span>
-                        <small>{{ s.detail }}</small>
+                        <span>{{ s.labelKey | translate }}</span>
+                        <small>{{ s.detailKey | translate }}</small>
                       </button>
                     }
                   </div>
@@ -212,13 +212,13 @@
 
               @if (maxPlayers() === 4 && gameId !== 'minesweeper') {
                 <div class="mode-section">
-                  <p class="leader-section-label"><i class="fa-solid fa-sliders"></i> Modo de juego</p>
+                  <p class="leader-section-label"><i class="fa-solid fa-sliders"></i> {{ 'GAME_ROOM.GAME_MODE' | translate }}</p>
                   <div class="mode-toggle">
                     <button class="mode-btn" [class.active]="gameMode() === 'ffa'" (click)="setGameMode('ffa')">
-                      <i class="fa-solid fa-users"></i> Todos vs Todos
+                      <i class="fa-solid fa-users"></i> {{ 'GAME_ROOM.FREE_FOR_ALL' | translate }}
                     </button>
                     <button class="mode-btn" [class.active]="gameMode() === 'teams'" (click)="setGameMode('teams')">
-                      <i class="fa-solid fa-shield-halved"></i> Equipos 2v2
+                      <i class="fa-solid fa-shield-halved"></i> {{ 'GAME_ROOM.TEAMS_2V2' | translate }}
                     </button>
                   </div>
                 </div>
@@ -226,7 +226,7 @@
 
               @if (gameId === 'pong') {
                 <div class="mode-section">
-                  <p class="leader-section-label"><i class="fa-solid fa-trophy"></i> Puntos para ganar</p>
+                  <p class="leader-section-label"><i class="fa-solid fa-trophy"></i> {{ 'GAME_ROOM.POINTS_TO_WIN' | translate }}</p>
                   <div class="mode-toggle">
                     @for (n of [5, 10, 15]; track n) {
                       <button class="mode-btn" [class.active]="pongWinScore() === n" (click)="setPongWinScore(n)">{{ n }}</button>
@@ -243,26 +243,26 @@
             @if (isLeader()) {
               @if (canStart()) {
                 <button class="btn-start-game" (click)="startGame()">
-                  <i class="fa-solid fa-play"></i> Iniciar partida
+                  <i class="fa-solid fa-play"></i> {{ 'GAME_ROOM.START_GAME' | translate }}
                 </button>
               } @else {
                 <p class="waiting-players-hint">
                   <i class="fa-solid fa-hourglass-half"></i>
-                  Esperando jugadores... ({{ players().length }}/{{ maxPlayers() }})
+                  {{ 'GAME_ROOM.WAITING_PLAYERS' | translate }} ({{ players().length }}/{{ maxPlayers() }})
                 </p>
               }
             } @else {
               <p class="waiting-players-hint">
                 <i class="fa-solid fa-hourglass-half"></i>
-                Esperando que el líder inicie la partida...
+                {{ 'GAME_ROOM.WAITING_LEADER' | translate }}
               </p>
             }
           } @else {
             <div class="spectator-join">
-              <p class="hint">Estás como espectador</p>
+              <p class="hint">{{ 'GAME_ROOM.YOU_ARE_SPECTATING' | translate }}</p>
               @if (players().length < maxPlayers()) {
                 <button class="btn btn--primary" (click)="joinAsPlayer()">
-                  <i class="fa-solid fa-right-to-bracket"></i> Unirse a la partida
+                  <i class="fa-solid fa-right-to-bracket"></i> {{ 'GAME_ROOM.JOIN_GAME' | translate }}
                 </button>
               }
             </div>
@@ -337,17 +337,17 @@
       @if (isMyTurn()) {
         <div class="your-turn-pill">
           <span class="your-turn-dot"></span>
-          ¡Tu turno!
+          {{ 'GAME_ROOM.YOUR_TURN' | translate }}
         </div>
       }
 
       <!-- Abandoned bar -->
       @if (abandonedData()) {
         <div class="game-over-banner">
-          <span class="result result--loss"><i class="fa-solid fa-flag"></i> Abandonada</span>
-          <span class="banner-detail">{{ abandonedData()!.display_name }} se fue · cierra en {{ abandonCountdown() }}s</span>
+          <span class="result result--loss"><i class="fa-solid fa-flag"></i> {{ 'GAME_ROOM.ABANDONED' | translate }}</span>
+          <span class="banner-detail">{{ abandonedData()!.display_name }} {{ 'GAME_ROOM.LEFT_CLOSES_IN' | translate }} {{ abandonCountdown() }}s</span>
           <span class="banner-spacer"></span>
-          <a class="btn btn--ghost btn--xs" routerLink="/home"><i class="fa-solid fa-house"></i> Salir</a>
+          <a class="btn btn--ghost btn--xs" routerLink="/home"><i class="fa-solid fa-house"></i> {{ 'GAME_ROOM.LEAVE' | translate }}</a>
         </div>
       }
 
@@ -355,18 +355,18 @@
       @if (gameOverData()) {
         <div class="game-over-banner">
           @if (isWinner()) {
-            <span class="result result--win"><i class="fa-solid fa-trophy"></i> ¡Victoria!</span>
+            <span class="result result--win"><i class="fa-solid fa-trophy"></i> {{ 'GAME_ROOM.VICTORY' | translate }}</span>
           } @else if (!gameOverData().winner) {
-            <span class="result result--draw"><i class="fa-solid fa-handshake"></i> Empate</span>
+            <span class="result result--draw"><i class="fa-solid fa-handshake"></i> {{ 'GAME_ROOM.DRAW' | translate }}</span>
           } @else {
-            <span class="result result--loss"><i class="fa-solid fa-skull"></i> Derrota</span>
+            <span class="result result--loss"><i class="fa-solid fa-skull"></i> {{ 'GAME_ROOM.DEFEAT' | translate }}</span>
           }
           <span class="banner-spacer"></span>
           <div class="banner-actions">
             @if (!isSpectator()) {
               @if (!hasVotedRematch()) {
                 <button class="btn btn--primary btn--xs" (click)="requestRematch()">
-                  <i class="fa-solid fa-rotate"></i> Revancha
+                  <i class="fa-solid fa-rotate"></i> {{ 'GAME_ROOM.REMATCH' | translate }}
                 </button>
               } @else {
                 <span class="banner-waiting">
@@ -375,7 +375,7 @@
                 </span>
               }
             }
-            <a class="btn btn--ghost btn--xs" routerLink="/home"><i class="fa-solid fa-house"></i> Salir</a>
+            <a class="btn btn--ghost btn--xs" routerLink="/home"><i class="fa-solid fa-house"></i> {{ 'GAME_ROOM.LEAVE' | translate }}</a>
           </div>
         </div>
       }
@@ -387,7 +387,7 @@
         [messages]="chatMessages()"
         [roomId]="roomId"
         [myUid]="myUid"
-        [displayName]="(isSpectator() ? '[ Espectador ] ' : '') + (myProfile?.display_name ?? 'Player')"
+        [displayName]="(isSpectator() ? '[ ' + ('GAME_ROOM.SPECTATOR_TAG' | translate) + ' ] ' : '') + (myProfile?.display_name ?? 'Player')"
         (openChange)="chatOpen.set($event)">
       </app-chat>
     </div>
@@ -404,11 +404,11 @@
       <div class="coin-spin-wrap">
         <div class="coin-rainbow-ring">
           <div class="coin-glass">
-            <img src="/rooms/Coin.svg" class="coin-svg" alt="moneda" />
+            <img src="/rooms/Coin.svg" class="coin-svg" alt="" />
           </div>
         </div>
       </div>
-      <p class="coin-label">PRIMER TURNO</p>
+      <p class="coin-label">{{ 'GAME_ROOM.FIRST_TURN' | translate }}</p>
       <div class="coin-player">
         <span class="coin-avatar" [style.color]="coinFlipData()!.color">{{ coinFlipData()!.avatar }}</span>
         <span class="coin-name" [style.color]="coinFlipData()!.color">{{ coinFlipData()!.name }}</span>
@@ -425,11 +425,11 @@
         <i class="fa-solid fa-right-left" style="font-size:1rem; color: var(--text-muted)"></i>
         <span class="swap-color-dot" [style.background]="colorSwapRequest()!.target_color"></span>
       </span>
-      <h3>Cambio de color</h3>
-      <p><strong>{{ colorSwapRequest()!.requester_name }}</strong> quiere intercambiar su color por el tuyo.</p>
+      <h3>{{ 'GAME_ROOM.COLOR_SWAP' | translate }}</h3>
+      <p><strong>{{ colorSwapRequest()!.requester_name }}</strong> {{ 'GAME_ROOM.WANTS_COLOR_SWAP' | translate }}</p>
       <div class="abandon-dialog-actions">
-        <button class="btn btn--ghost" (click)="respondColorSwap(false)">Rechazar</button>
-        <button class="btn btn--primary" (click)="respondColorSwap(true)">Aceptar</button>
+        <button class="btn btn--ghost" (click)="respondColorSwap(false)">{{ 'HOME.REJECT' | translate }}</button>
+        <button class="btn btn--primary" (click)="respondColorSwap(true)">{{ 'PROFILE.ACCEPT' | translate }}</button>
       </div>
     </div>
   </div>
@@ -438,23 +438,23 @@
 @if (showFriendsModal()) {
   <div class="abandon-overlay" (click)="showFriendsModal.set(false)">
     <div class="friends-modal card" (click)="$event.stopPropagation()">
-      <h3><i class="fa-solid fa-user-group"></i> Invitar amigo</h3>
+      <h3><i class="fa-solid fa-user-group"></i> {{ 'GAME_ROOM.INVITE_FRIEND' | translate }}</h3>
       <div class="friend-invite-list">
         @for (f of friends(); track f.uid) {
           <div class="friend-invite-row" [class.fi-offline]="!isFriendOnline(f.uid)">
             <span class="fi-avatar">{{ f.avatar }}</span>
             <span class="fi-name">{{ f.display_name }}</span>
             @if (isInRoom(f.uid)) {
-              <span class="fi-status">En sala</span>
+              <span class="fi-status">{{ 'GAME_ROOM.IN_ROOM' | translate }}</span>
             } @else if (isFriendOnline(f.uid)) {
-              <button class="btn btn--primary btn--xs" (click)="inviteFriend(f.uid)">Invitar</button>
+              <button class="btn btn--primary btn--xs" (click)="inviteFriend(f.uid)">{{ 'HOME.INVITE_TO_GAME' | translate }}</button>
             } @else {
-              <span class="fi-status">Sin conexión</span>
+              <span class="fi-status">{{ 'GAME_ROOM.OFFLINE' | translate }}</span>
             }
           </div>
         }
       </div>
-      <button class="btn btn--ghost" (click)="showFriendsModal.set(false)">Cerrar</button>
+      <button class="btn btn--ghost" (click)="showFriendsModal.set(false)">{{ 'PROFILE.CANCEL' | translate }}</button>
     </div>
   </div>
 }
@@ -463,11 +463,11 @@
   <div class="abandon-overlay" (click)="cancelAbandon()">
     <div class="abandon-dialog card rainbow-border" (click)="$event.stopPropagation()">
       <span class="abandon-dialog-icon"><i class="fa-solid fa-flag"></i></span>
-      <h3>Abandonar partida</h3>
-      <p>Ningún jugador recibirá puntos por esta partida si la abandonas.</p>
+      <h3>{{ 'GAME_ROOM.ABANDON_GAME' | translate }}</h3>
+      <p>{{ 'GAME_ROOM.ABANDON_WARNING' | translate }}</p>
       <div class="abandon-dialog-actions">
-        <button class="btn btn--ghost" (click)="cancelAbandon()">Cancelar</button>
-        <button class="btn btn--danger" (click)="confirmAbandon()">Abandonar</button>
+        <button class="btn btn--ghost" (click)="cancelAbandon()">{{ 'PROFILE.CANCEL' | translate }}</button>
+        <button class="btn btn--danger" (click)="confirmAbandon()">{{ 'HOME.ABANDON' | translate }}</button>
       </div>
     </div>
   </div>

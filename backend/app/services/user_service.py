@@ -1,6 +1,6 @@
 import random
 from app.core.firebase_client import get_db
-from app.models.user import UserProfile, UserUpdate, GameStats
+from app.models.user import UserProfile, UserUpdate, GameStats, UserSettings, UserSettingsUpdate
 
 
 async def get_or_create_user(uid: str, email: str, display_name: str) -> UserProfile:
@@ -23,6 +23,7 @@ async def get_or_create_user(uid: str, email: str, display_name: str) -> UserPro
             ttt_pattern=data.get("ttt_pattern", None),
             is_admin=data.get("is_admin", False),
             badges=data.get("badges", []),
+            settings=UserSettings(**data.get("settings", {})),
         )
 
     if not display_name:
@@ -41,6 +42,23 @@ async def update_user(uid: str, update: UserUpdate) -> UserProfile:
     snap = ref.get()
     data = snap.to_dict()
     return UserProfile(uid=uid, **{k: v for k, v in data.items() if k != "uid"})
+
+
+async def get_user_settings(uid: str) -> UserSettings:
+    db = get_db()
+    snap = db.collection("users").document(uid).get()
+    d = snap.to_dict() if snap.exists else {}
+    return UserSettings(**d.get("settings", {}))
+
+
+async def update_user_settings(uid: str, update: UserSettingsUpdate) -> UserSettings:
+    db = get_db()
+    ref = db.collection("users").document(uid)
+    current = await get_user_settings(uid)
+    patch = {k: v for k, v in update.model_dump().items() if v is not None}
+    updated = current.model_copy(update=patch)
+    ref.update({"settings": updated.model_dump()})
+    return updated
 
 
 async def get_leaderboard(game_id: str | None = None, limit: int = 20) -> list[dict]:

@@ -2,18 +2,21 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { TranslateService, TranslatePipe } from '@ngx-translate/core';
 import { AuthService } from '../../../core/services/auth.service';
+import { LangSwitchComponent } from '../../../shared/components/lang-switch/lang-switch.component';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, TranslatePipe, LangSwitchComponent],
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss'],
 })
 export class LoginComponent {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private translate = inject(TranslateService);
 
   email = '';
   password = '';
@@ -35,10 +38,10 @@ export class LoginComponent {
 
   private _friendlyError(code: string): string {
     const map: Record<string, string> = {
-      'auth/invalid-credential': 'Email o contraseña incorrectos.',
-      'auth/user-not-found': 'No existe una cuenta con ese email.',
-      'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde.',
+      'auth/invalid-credential': 'AUTH.ERRORS.INVALID_CREDENTIAL',
+      'auth/user-not-found': 'AUTH.ERRORS.USER_NOT_FOUND',
+      'auth/too-many-requests': 'AUTH.ERRORS.TOO_MANY_REQUESTS',
     };
-    return map[code] ?? 'Error al iniciar sesión.';
+    return this.translate.instant(map[code] ?? 'AUTH.ERRORS.LOGIN_FAILED');
   }
 }

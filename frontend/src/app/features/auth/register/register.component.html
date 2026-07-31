@@ -1,23 +1,25 @@
 <div class="auth-layout">
   <div class="auth-card card rainbow-border">
+    <app-lang-switch class="auth-lang-switch" />
+
     <div class="auth-logo">
       <span class="logo-icon"><i class="fa-solid fa-star"></i></span>
       <h1>Arcade Stars Hub</h1>
     </div>
-    <h2>Crear Cuenta</h2>
+    <h2>{{ 'AUTH.REGISTER.TITLE' | translate }}</h2>
 
     <form (ngSubmit)="onSubmit()">
       <div class="field">
-        <label>Nombre de usuario</label>
-        <input class="input" [(ngModel)]="displayName" name="name" placeholder="Tu nombre" required />
+        <label>{{ 'AUTH.REGISTER.USERNAME' | translate }}</label>
+        <input class="input" [(ngModel)]="displayName" name="name" [placeholder]="'AUTH.REGISTER.USERNAME_PLACEHOLDER' | translate" required />
       </div>
       <div class="field">
-        <label>Email</label>
+        <label>{{ 'AUTH.LOGIN.EMAIL' | translate }}</label>
         <input class="input" type="email" [(ngModel)]="email" name="email" placeholder="tu@email.com" required />
       </div>
       <div class="field">
-        <label>Contraseña</label>
-        <input class="input" type="password" [(ngModel)]="password" name="password" placeholder="Mínimo 6 caracteres" required />
+        <label>{{ 'AUTH.LOGIN.PASSWORD' | translate }}</label>
+        <input class="input" type="password" [(ngModel)]="password" name="password" [placeholder]="'AUTH.REGISTER.PASSWORD_PLACEHOLDER' | translate" required />
       </div>
 
       @if (error()) {
@@ -25,13 +27,13 @@
       }
 
       <button class="btn btn--primary full-width" type="submit" [disabled]="loading()">
-        {{ loading() ? 'Registrando...' : 'Registrarse' }}
+        {{ (loading() ? 'AUTH.REGISTER.SUBMITTING' : 'AUTH.REGISTER.SUBMIT') | translate }}
       </button>
     </form>
 
     <div class="auth-links">
-      <span>¿Ya tienes cuenta?</span>
-      <a routerLink="/login">Iniciar Sesión</a>
+      <span>{{ 'AUTH.REGISTER.HAS_ACCOUNT' | translate }}</span>
+      <a routerLink="/login">{{ 'AUTH.LOGIN.TITLE' | translate }}</a>
     </div>
   </div>
 </div>

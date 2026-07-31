@@ -1,6 +1,6 @@
 <div class="ms-wrapper">
   @if (!gameState) {
-    <p class="waiting">Esperando que el juego comience...</p>
+    <p class="waiting">{{ 'GAMES.COMMON.WAITING_TO_START' | translate }}</p>
   } @else {
 
     <!-- Scoreboard -->
@@ -22,11 +22,11 @@
     <!-- Turn info -->
     <p class="turn-info">
       @if (gameState.game_over) {
-        Juego terminado
+        {{ 'GAMES.MINESWEEPER.GAME_OVER' | translate }}
       } @else if (isMyTurn) {
-        ¡Tu turno! Haz clic para revelar · Clic derecho para marcar
+        {{ 'GAMES.MINESWEEPER.YOUR_TURN_HINT' | translate }}
       } @else {
-        Turno de {{ currentTurnPlayer?.display_name ?? 'otro jugador' }}...
+        {{ 'GAMES.MINESWEEPER.TURN_OF' | translate }} {{ currentTurnPlayer?.display_name ?? ('GAMES.MINESWEEPER.ANOTHER_PLAYER' | translate) }}...
       }
     </p>
 
@@ -46,9 +46,9 @@
     @if (gameState.game_over) {
       <div class="result-banner">
         @if (gameState.winner === myUid) {
-          <span><i class="fa-solid fa-trophy"></i> ¡Ganaste!</span>
+          <span><i class="fa-solid fa-trophy"></i> {{ 'GAMES.COMMON.YOU_WON' | translate }}</span>
         } @else {
-          <span><i class="fa-solid fa-bomb"></i> Mejor suerte la próxima</span>
+          <span><i class="fa-solid fa-bomb"></i> {{ 'GAMES.MINESWEEPER.BETTER_LUCK' | translate }}</span>
         }
       </div>
     }

@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
 import { GameDefinition, LeaderboardEntry } from '../models/game.model';
-import { UserProfile, UserUpdate } from '../models/user.model';
+import { UserProfile, UserUpdate, UserSettings, UserSettingsUpdate } from '../models/user.model';
 import { SKIP_ERROR_TOAST } from '../interceptors/error.interceptor';
 
 @Injectable({ providedIn: 'root' })
@@ -29,6 +29,14 @@ export class ApiService {
   async updateMe(update: Partial<UserProfile>): Promise<UserProfile> {
     return firstValueFrom(
       this.http.patch<UserProfile>(`${environment.apiUrl}/users/me`, update, {
+        headers: await this.headers(),
+      })
+    );
+  }
+
+  async updateMySettings(update: UserSettingsUpdate): Promise<UserSettings> {
+    return firstValueFrom(
+      this.http.patch<UserSettings>(`${environment.apiUrl}/users/me/settings`, update, {
         headers: await this.headers(),
       })
     );

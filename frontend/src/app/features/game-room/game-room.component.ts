@@ -4,6 +4,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription, interval } from 'rxjs';
+import { TranslateService, TranslatePipe } from '@ngx-translate/core';
 
 import { WsService } from '../../core/services/ws.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -26,7 +27,7 @@ import { PongComponent } from './games/pong/pong.component';
   selector: 'app-game-room',
   standalone: true,
   imports: [
-    CommonModule, RouterLink,
+    CommonModule, RouterLink, TranslatePipe,
     HudComponent, ChatComponent,
     ConnectFourComponent, TicTacToeComponent, MinesweeperComponent,
     SnakeComponent, PongComponent,
@@ -43,6 +44,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   private friendsSvc = inject(FriendsService);
   private profileSvc = inject(UserProfileService);
   private challengeAnim = inject(ChallengeAnimService);
+  private translate = inject(TranslateService);
 
   roomId = '';
   gameId = '';
@@ -103,9 +105,9 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   pongGameKey    = signal<number>(0);
   isOpponentAI   = computed(() => this.players().some((p: any) => p.is_ai));
   readonly MS_BOARD_SIZES = [
-    { id: 'normal',       label: 'Normal',     detail: '9×9 · 10 minas' },
-    { id: 'intermediate', label: 'Intermedio', detail: '16×16 · 40 minas' },
-    { id: 'expert',       label: 'Experto',    detail: '30×16 · 99 minas' },
+    { id: 'normal',       labelKey: 'GAMES.MINESWEEPER.SIZE_NORMAL',       detailKey: 'GAMES.MINESWEEPER.SIZE_NORMAL_DETAIL' },
+    { id: 'intermediate', labelKey: 'GAMES.MINESWEEPER.SIZE_INTERMEDIATE', detailKey: 'GAMES.MINESWEEPER.SIZE_INTERMEDIATE_DETAIL' },
+    { id: 'expert',       labelKey: 'GAMES.MINESWEEPER.SIZE_EXPERT',       detailKey: 'GAMES.MINESWEEPER.SIZE_EXPERT_DETAIL' },
   ];
   isMyTurn = computed(() =>
     this.roomStatus() === 'playing' &&
@@ -264,7 +266,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
           this.pongGameKey.update(n => n + 1);
         }
         if (msg.data.reconnected) {
-          this.showToast('Reconectado a la partida');
+          this.showToast(this.translate.instant('GAME_ROOM.RECONNECTED'));
           this.disconnectedUids.set(new Set());
         } else {
           this.startTimer();
@@ -329,7 +331,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
       case 'player_disconnected':
         this.disconnectedUids.update((s) => new Set([...s, msg.data.uid]));
-        this.showToast(`${msg.data.display_name} se desconectó`);
+        this.showToast(`${msg.data.display_name} ${this.translate.instant('GAME_ROOM.DISCONNECTED')}`);
         break;
 
       case 'player_reconnected':
@@ -338,7 +340,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
           ns.delete(msg.data.uid);
           return ns;
         });
-        this.showToast(`${msg.data.display_name} se reconectó`);
+        this.showToast(`${msg.data.display_name} ${this.translate.instant('GAME_ROOM.PLAYER_RECONNECTED')}`);
         break;
 
       case 'game_abandoned': {
@@ -356,7 +358,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         break;
 
       case 'color_swap_declined':
-        this.showToast(`${msg.data.target_name} rechazó el cambio de color`);
+        this.showToast(`${msg.data.target_name} ${this.translate.instant('GAME_ROOM.COLOR_SWAP_DECLINED')}`);
         break;
 
       case 'room_closed':
@@ -446,7 +448,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
       return;
     }
     this.ws.send('request_color_swap', { room_id: this.roomId, target_uid: blocker.uid });
-    this.showToast('Solicitud de cambio de color enviada...');
+    this.showToast(this.translate.instant('GAME_ROOM.COLOR_SWAP_SENT'));
   }
 
   respondColorSwap(accept: boolean) {
@@ -463,7 +465,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   setMaxPlayers(n: number) {
     const humanCount = this.humanPlayers().length;
     if (humanCount > n) {
-      this.showToast(`Hay ${humanCount} jugadores humanos en la sala. Expulsa a uno para reducir el límite.`);
+      this.showToast(this.translate.instant('GAME_ROOM.TOO_MANY_HUMANS', { count: humanCount }));
       this.maxPlayersShake.set(n);
       setTimeout(() => this.maxPlayersShake.set(null), 500);
       return;
@@ -548,10 +550,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   shareRoomInGlobalChat() {
     this.ws.send('global_chat', {
-      text: 'está compartiendo el código de su sala',
+      text: this.translate.instant('GAME_ROOM.SHARING_ROOM_CODE'),
       room_id: this.roomId,
     });
-    this.showToast('Código compartido en el chat global');
+    this.showToast(this.translate.instant('GAME_ROOM.CODE_SHARED'));
   }
 
   requestRematch() {

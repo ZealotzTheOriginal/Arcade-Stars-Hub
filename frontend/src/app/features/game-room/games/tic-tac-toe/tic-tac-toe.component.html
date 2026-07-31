@@ -1,6 +1,6 @@
 <div class="ttt-wrapper">
   @if (!gameState) {
-    <p class="waiting">Esperando que el juego comience...</p>
+    <p class="waiting">{{ 'GAMES.COMMON.WAITING_TO_START' | translate }}</p>
   } @else {
     <div class="board">
       @for (row of size; track row) {
@@ -19,11 +19,11 @@
     @if (isTerminal()) {
       <div class="result-banner">
         @if (gameState.draw) {
-          <span><i class="fa-solid fa-handshake"></i> ¡Empate!</span>
+          <span><i class="fa-solid fa-handshake"></i> {{ 'GAMES.COMMON.DRAW_BANG' | translate }}</span>
         } @else if (gameState.winner === myUid) {
-          <span><i class="fa-solid fa-trophy"></i> ¡Ganaste!</span>
+          <span><i class="fa-solid fa-trophy"></i> {{ 'GAMES.COMMON.YOU_WON' | translate }}</span>
         } @else {
-          <span><i class="fa-solid fa-skull"></i> Perdiste</span>
+          <span><i class="fa-solid fa-skull"></i> {{ 'GAMES.COMMON.YOU_LOST' | translate }}</span>
         }
       </div>
     }

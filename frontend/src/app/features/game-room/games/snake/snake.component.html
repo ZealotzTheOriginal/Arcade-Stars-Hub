@@ -10,7 +10,7 @@
 
     @if (isWaiting) {
       <div class="snake-start-overlay">
-        <div class="snake-start-label">Presiona una tecla para empezar</div>
+        <div class="snake-start-label">{{ 'GAMES.SNAKE.PRESS_KEY_TO_START' | translate }}</div>
       </div>
     }
   </div>
@@ -30,6 +30,6 @@
   </div>
 
   <div class="snake-controls-hint">
-    <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span>
+    <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> {{ 'GAMES.COMMON.OR' | translate }} <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span>
   </div>
 </div>

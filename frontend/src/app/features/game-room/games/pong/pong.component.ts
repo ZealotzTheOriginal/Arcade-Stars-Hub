@@ -3,6 +3,7 @@ import {
   OnChanges, SimpleChanges, AfterViewInit, OnDestroy,
   ViewChild, ElementRef, HostListener, NgZone,
 } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
 
 // ── Canvas constants (must match backend px/s model) ──────────────────────────
 const W = 800, H = 500;
@@ -24,6 +25,7 @@ const FLASH_HOLD = 600, FLASH_FADE = 1600;
 @Component({
   selector: 'app-pong',
   standalone: true,
+  imports: [TranslatePipe],
   templateUrl: './pong.component.html',
   styleUrls: ['./pong.component.scss'],
 })

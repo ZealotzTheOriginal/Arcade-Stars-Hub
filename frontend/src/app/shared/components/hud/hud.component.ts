@@ -1,12 +1,13 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { TranslatePipe } from '@ngx-translate/core';
 import { PlayerInfo } from '../../../core/models/game.model';
 import { AiSlotsComponent } from '../ai-slots/ai-slots.component';
 
 @Component({
   selector: 'app-hud',
   standalone: true,
-  imports: [CommonModule, AiSlotsComponent],
+  imports: [CommonModule, AiSlotsComponent, TranslatePipe],
   templateUrl: './hud.component.html',
   styleUrls: ['./hud.component.scss'],
 })
