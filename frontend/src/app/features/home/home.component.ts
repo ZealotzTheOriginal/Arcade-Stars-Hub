@@ -7,12 +7,14 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { WsService } from '../../core/services/ws.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { ToastService } from '../../core/services/toast.service';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
 import { UserProfile } from '../../core/models/user.model';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, EmptyStateComponent],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
 })
@@ -22,6 +24,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   private ws = inject(WsService);
   private router = inject(Router);
   readonly notifService = inject(NotificationService);
+  private toast = inject(ToastService);
 
   games = signal<GameDefinition[]>([]);
   leaderboard = signal<LeaderboardEntry[]>([]);
@@ -52,7 +55,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   async ngOnInit() {
     try {
-      const games = await this.api.listGames();
+      const games = await this.api.listGames({ silent: true });
       this.games.set(games);
     } catch (e: any) {
       const status = e?.status ?? 'sin respuesta';
@@ -241,7 +244,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     try {
       await this.api.addFriend(uid);
       this.profile.update(p => p ? { ...p, friends: [...(p.friends ?? []), uid] } : p);
-    } catch { /* ignore */ }
+      this.toast.success('Solicitud de amistad enviada');
+    } catch { /* toast shown by the error interceptor */ }
   }
 
   startInvite(uid: string) {

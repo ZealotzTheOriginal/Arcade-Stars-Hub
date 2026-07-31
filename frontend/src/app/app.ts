@@ -8,13 +8,16 @@ import { WsService } from './core/services/ws.service';
 import { ChallengeAnimService } from './core/services/challenge-anim.service';
 import { NotificationService } from './core/services/notification.service';
 import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
+import { ToastContainerComponent } from './shared/components/toast/toast-container.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, CommonModule],
+  imports: [RouterOutlet, CommonModule, ToastContainerComponent],
   template: `
     <router-outlet />
+
+    <app-toast-container />
 
     @if (activeInvite()) {
       <div class="invite-toast">

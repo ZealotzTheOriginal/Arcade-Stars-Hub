@@ -1,14 +1,16 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink, ActivatedRoute } from '@angular/router';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { WsService } from '../../core/services/ws.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { ToastService } from '../../core/services/toast.service';
 import { UserProfile } from '../../core/models/user.model';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 type Tab = 'stats' | 'games' | 'friends' | 'ranking' | 'notifs' | 'admin';
 
@@ -30,7 +32,7 @@ const BADGE_DEFS = [
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, EmptyStateComponent],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.scss'],
 })
@@ -39,7 +41,9 @@ export class ProfileComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private ws = inject(WsService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   readonly notifService = inject(NotificationService);
+  private toast = inject(ToastService);
   private wsSub?: Subscription;
 
   profile = signal<UserProfile | null>(null);
@@ -189,8 +193,11 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
 
   async selectAvatar(avatar: string) {
-    await this.api.updateMe({ avatar } as any);
-    this.profile.update((p) => p ? { ...p, avatar } : p);
+    try {
+      await this.api.updateMe({ avatar } as any);
+      this.profile.update((p) => p ? { ...p, avatar } : p);
+      this.toast.success('Avatar actualizado');
+    } catch { /* toast shown by the error interceptor */ }
   }
 
   async saveName() {
@@ -199,6 +206,9 @@ export class ProfileComponent implements OnInit, OnDestroy {
     try {
       const updated = await this.api.updateMe({ display_name: this.editName } as any);
       this.profile.set(updated);
+      this.toast.success('Nombre actualizado');
+    } catch {
+      /* toast shown by the error interceptor */
     } finally {
       this.saving.set(false);
     }
@@ -209,21 +219,28 @@ export class ProfileComponent implements OnInit, OnDestroy {
     try {
       await this.api.removeFriend(uid);
       this.friends.update(list => list.filter(f => f.uid !== uid));
-    } catch { /* ignore */ }
+      this.toast.success('Amigo eliminado');
+    } catch { /* toast shown by the error interceptor */ }
   }
 
   async acceptFriendRequest(uid: string) {
     try {
       await this.api.acceptFriendRequest(uid);
       this.friends.update(list => list.map(f => f.uid === uid ? { ...f, is_pending_request: false } : f));
-    } catch { /* ignore */ }
+      this.toast.success('Solicitud aceptada');
+    } catch { /* toast shown by the error interceptor */ }
   }
 
   async rejectFriendRequest(uid: string) {
     try {
       await this.api.rejectFriendRequest(uid);
       this.friends.update(list => list.filter(f => f.uid !== uid));
-    } catch { /* ignore */ }
+      this.toast.success('Solicitud rechazada');
+    } catch { /* toast shown by the error interceptor */ }
+  }
+
+  goHome() {
+    this.router.navigate(['/home']);
   }
 
   toggleFriendMenu(uid: string) {

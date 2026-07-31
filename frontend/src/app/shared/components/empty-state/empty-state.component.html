@@ -1,0 +1,17 @@
+@if (compact) {
+  <div class="empty-state empty-state--compact">
+    <span class="empty-state-icon">{{ icon }}</span>
+    <span class="empty-state-title">{{ title }}</span>
+  </div>
+} @else {
+  <div class="empty-state">
+    <span class="empty-state-icon">{{ icon }}</span>
+    <p class="empty-state-title">{{ title }}</p>
+    @if (subtitle) {
+      <p class="empty-state-subtitle">{{ subtitle }}</p>
+    }
+    @if (actionLabel) {
+      <button class="btn btn--primary btn--sm" (click)="action.emit()">{{ actionLabel }}</button>
+    }
+  </div>
+}

@@ -1,0 +1,83 @@
+/* Bottom-right (not top-right): app.ts already owns the top-right corner for
+   social notifications (invites, friend requests) — stacking both there would
+   overlap. This is the generic feedback channel for API success/error. */
+.toast-stack {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.6rem;
+  max-width: 380px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #13131f;
+  border-radius: 14px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  animation: toast-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: auto;
+
+  &--success {
+    border-color: rgba(69, 246, 215, 0.6);
+  }
+  &--error {
+    border-color: rgba(255, 0, 0, 0.55);
+  }
+  &--info {
+    border-color: rgba(70, 67, 255, 0.55);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateY(20%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+.toast--success .toast-icon {
+  color: var(--rainbow-teal, #45f6d7);
+}
+.toast--error .toast-icon {
+  color: var(--rainbow-red, #ff0000);
+}
+.toast--info .toast-icon {
+  color: var(--rainbow-blue, #4643ff);
+}
+
+.toast-message {
+  flex: 1;
+  min-width: 0;
+  color: #e0e0e0;
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  padding: 0.2rem;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.toast-close:hover {
+  color: rgba(255, 255, 255, 0.7);
+}

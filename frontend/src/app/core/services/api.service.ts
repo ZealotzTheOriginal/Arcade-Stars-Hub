@@ -1,10 +1,11 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
 import { GameDefinition, LeaderboardEntry } from '../models/game.model';
 import { UserProfile, UserUpdate } from '../models/user.model';
+import { SKIP_ERROR_TOAST } from '../interceptors/error.interceptor';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -74,8 +75,11 @@ export class ApiService {
   }
 
   // ── Games ──────────────────────────────────────────────
-  async listGames(): Promise<GameDefinition[]> {
-    return firstValueFrom(this.http.get<GameDefinition[]>(`${environment.apiUrl}/games/`));
+  /** Pass { silent: true } when the caller already renders its own error state
+   *  (e.g. home's game list), so the interceptor doesn't also pop a toast. */
+  async listGames(opts?: { silent?: boolean }): Promise<GameDefinition[]> {
+    const context = opts?.silent ? new HttpContext().set(SKIP_ERROR_TOAST, true) : undefined;
+    return firstValueFrom(this.http.get<GameDefinition[]>(`${environment.apiUrl}/games/`, { context }));
   }
 
   async createRoom(gameId: string, displayName: string, avatar: string): Promise<{ room_id: string }> {

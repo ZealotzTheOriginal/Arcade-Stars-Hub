@@ -133,6 +133,12 @@
                 </div>
               }
             </div>
+          } @else if (acceptedFriends().length > 0) {
+            <app-empty-state
+              [compact]="true"
+              icon="📭"
+              title="Sin solicitudes pendientes">
+            </app-empty-state>
           }
 
           <!-- Accepted friends -->
@@ -143,10 +149,13 @@
           @if (loadingFriends()) {
             <p class="empty">Cargando amigos...</p>
           } @else if (acceptedFriends().length === 0 && pendingRequests().length === 0) {
-            <p class="empty">
-              Aún no tienes amigos añadidos.<br>
-              <span class="empty-hint">Usa el botón <i class="fa-solid fa-plus"></i> junto a los jugadores en línea desde la pantalla de inicio.</span>
-            </p>
+            <app-empty-state
+              icon="🧑‍🤝‍🧑"
+              title="Aún no tienes amigos añadidos"
+              subtitle="Usa el botón + junto a los jugadores en línea desde la pantalla de inicio."
+              actionLabel="Ir al inicio"
+              (action)="goHome()">
+            </app-empty-state>
           } @else if (acceptedFriends().length === 0) {
             <p class="empty">Tus solicitudes aceptadas aparecerán aquí.</p>
           } @else {

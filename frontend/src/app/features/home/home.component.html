@@ -200,6 +200,12 @@
           }
         </div>
       </section>
+    } @else {
+      <app-empty-state
+        icon="🎮"
+        title="No hay salas activas ahora mismo"
+        subtitle="Elige un juego más abajo para crear la primera.">
+      </app-empty-state>
     }
 
     @if (loading()) {
