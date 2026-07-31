@@ -81,17 +81,37 @@ async def get_user_info(uid: str) -> dict:
 
 
 async def add_friend(uid: str, friend_uid: str) -> dict:
-    """Send a friend request: add friend_uid to uid's friends, add uid to friend_uid's pending requests."""
+    """Send a friend request: add friend_uid to uid's friends, add uid to friend_uid's pending requests.
+
+    If friend_uid already has uid in their own friends (they added us first), this
+    call completes a mutual friendship instead — equivalent to accepting their
+    request — and clears the now-stale pending state on both sides.
+    """
     db = get_db()
-    from google.cloud.firestore_v1.transforms import ArrayUnion
+    from google.cloud.firestore_v1.transforms import ArrayUnion, ArrayRemove
+
+    friend_snap = db.collection("users").document(friend_uid).get()
+    friend_data = friend_snap.to_dict() if friend_snap.exists else {}
+    already_added_me = uid in friend_data.get("friends", [])
+
     # Requester sees the target in their friends list immediately
     db.collection("users").document(uid).update({"friends": ArrayUnion([friend_uid])})
-    # Target gets a pending request
-    db.collection("users").document(friend_uid).update({"friend_requests": ArrayUnion([uid])})
+
+    if already_added_me:
+        db.collection("users").document(uid).update({"friend_requests": ArrayRemove([friend_uid])})
+        db.collection("users").document(friend_uid).update({"friend_requests": ArrayRemove([uid])})
+    else:
+        # Target gets a pending request
+        db.collection("users").document(friend_uid).update({"friend_requests": ArrayUnion([uid])})
+
     # Return requester info so route can send WS notification
     snap = db.collection("users").document(uid).get()
     d = snap.to_dict() if snap.exists else {}
-    return {"display_name": d.get("display_name", "Alguien"), "avatar": d.get("avatar", "⭐")}
+    return {
+        "display_name": d.get("display_name", "Alguien"),
+        "avatar": d.get("avatar", "⭐"),
+        "mutual": already_added_me,
+    }
 
 
 async def accept_friend_request(uid: str, friend_uid: str):
@@ -189,9 +209,19 @@ async def add_user_points(uid: str, points: int):
 
 
 async def remove_friend(uid: str, friend_uid: str):
+    """Tear down the relationship on both sides, whatever state it's in (mutual
+    friend, semi-friend either direction, or a still-pending request) — so no
+    one-sided "ghost" friend entry is left behind on the other user's doc."""
     db = get_db()
     from google.cloud.firestore_v1.transforms import ArrayRemove
-    db.collection("users").document(uid).update({"friends": ArrayRemove([friend_uid])})
+    db.collection("users").document(uid).update({
+        "friends": ArrayRemove([friend_uid]),
+        "friend_requests": ArrayRemove([friend_uid]),
+    })
+    db.collection("users").document(friend_uid).update({
+        "friends": ArrayRemove([uid]),
+        "friend_requests": ArrayRemove([uid]),
+    })
 
 
 async def get_friend_profiles(uid: str) -> list[dict]:
@@ -223,6 +253,20 @@ async def get_friend_profiles(uid: str) -> list[dict]:
             d = fsnap.to_dict()
             stats: dict = d.get("game_stats", {})
             best_game_id = max(stats, key=lambda g: stats[g].get("points", 0)) if stats else None
+
+            # Three possible relationship states:
+            # - "friend": mutual, both have each other in `friends`
+            # - "semi_friend": we added them but they haven't reciprocated yet
+            # - "pending_request": they added us and we haven't accepted yet
+            is_in_my_friends = fuid in friend_uids
+            is_mutual = is_in_my_friends and uid in d.get("friends", [])
+            if is_in_my_friends and is_mutual:
+                status = "friend"
+            elif is_in_my_friends:
+                status = "semi_friend"
+            else:
+                status = "pending_request"
+
             profiles.append({
                 "uid": fuid,
                 "display_name": d.get("display_name", "Unknown"),
@@ -231,7 +275,8 @@ async def get_friend_profiles(uid: str) -> list[dict]:
                 "total_points": d.get("total_points", 0),
                 "best_game": game_names.get(best_game_id, best_game_id) if best_game_id else None,
                 "best_game_points": stats[best_game_id].get("points", 0) if best_game_id else 0,
-                "is_pending_request": fuid in request_uids and fuid not in friend_uids,
+                "status": status,
+                "is_pending_request": status == "pending_request",
             })
         except Exception:
             continue

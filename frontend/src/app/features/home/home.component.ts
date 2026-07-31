@@ -7,9 +7,10 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { WsService } from '../../core/services/ws.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { FriendsService } from '../../core/services/friends.service';
+import { UserProfileService } from '../../core/services/user-profile.service';
 import { ToastService } from '../../core/services/toast.service';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
-import { UserProfile } from '../../core/models/user.model';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 @Component({
   selector: 'app-home',
@@ -24,11 +25,13 @@ export class HomeComponent implements OnInit, OnDestroy {
   private ws = inject(WsService);
   private router = inject(Router);
   readonly notifService = inject(NotificationService);
+  private friendsSvc = inject(FriendsService);
+  private profileSvc = inject(UserProfileService);
   private toast = inject(ToastService);
 
   games = signal<GameDefinition[]>([]);
   leaderboard = signal<LeaderboardEntry[]>([]);
-  profile = signal<UserProfile | null>(null);
+  readonly profile = this.profileSvc.profile;
   loading = signal(true);
   creatingRoom = signal<string | null>(null);
   error = signal('');
@@ -68,16 +71,15 @@ export class HomeComponent implements OnInit, OnDestroy {
       .then((lb) => this.leaderboard.set(lb))
       .catch(() => {});
 
-    this.api.getFriends()
-      .then((list) => {
-        const pending = list.filter((f: any) => f.is_pending_request).length;
+    this.friendsSvc.load()
+      .then(() => {
+        const pending = this.friendsSvc.friends().filter((f) => f.status === 'pending_request').length;
         this.notifService.setInitialPending(pending);
       })
       .catch(() => {});
 
-    this.api.getMe()
+    this.profileSvc.load()
       .then((p) => {
-        this.profile.set(p);
         this.ws.send('register_presence', { display_name: p.display_name, avatar: p.avatar });
         // Auth token is now cached and presence is registered; refresh online list promptly.
         // Small delay gives the WS message time to be processed on the backend.
@@ -114,6 +116,21 @@ export class HomeComponent implements OnInit, OnDestroy {
           .catch(() => {});
       }
     });
+  }
+
+  /** Relationship state with an online user — reactive: reflects instantly
+   *  everywhere the moment FriendsService's shared signal changes. */
+  friendStatus(uid: string): 'friend' | 'semi_friend' | 'pending_request' | 'none' {
+    return this.friendsSvc.statusOf(uid);
+  }
+
+  /** Computed client-side rather than trusted from the payload: the `lobby_update`
+   *  WS broadcast is the same message for every connected client, so it can't
+   *  embed a per-recipient "is this me" flag the way the /users/online REST
+   *  response does — trusting a sometimes-absent server flag let you see
+   *  yourself in the list (with add/invite buttons) after any presence change. */
+  isMe(uid: string): boolean {
+    return this.profile()?.uid === uid;
   }
 
   ngOnDestroy() {
@@ -236,15 +253,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.router.navigate(['/room', room.room_id], { queryParams: { game: room.game_id, spectate: '1' } });
   }
 
-  isFriend(uid: string): boolean {
-    return (this.profile()?.friends ?? []).includes(uid);
-  }
-
   async addFriend(uid: string) {
     try {
-      await this.api.addFriend(uid);
-      this.profile.update(p => p ? { ...p, friends: [...(p.friends ?? []), uid] } : p);
+      await this.friendsSvc.add(uid);
       this.toast.success('Solicitud de amistad enviada');
+    } catch { /* toast shown by the error interceptor */ }
+  }
+
+  async removeFriend(uid: string) {
+    try {
+      await this.friendsSvc.remove(uid);
+      this.toast.success('Amigo eliminado');
     } catch { /* toast shown by the error interceptor */ }
   }
 

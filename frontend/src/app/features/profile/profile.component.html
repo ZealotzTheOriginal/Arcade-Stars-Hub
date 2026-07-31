@@ -181,6 +181,11 @@
                   <div class="friend-info">
                     <p class="friend-name">{{ f.display_name }}</p>
                     <div class="friend-badges">
+                      @if (f.status === 'semi_friend') {
+                        <span class="badge" title="Le enviaste una solicitud y aún no la ha aceptado">
+                          <i class="fa-regular fa-heart"></i> Semi-amigo
+                        </span>
+                      }
                       <span class="badge">Nivel {{ f.level }}</span>
                       <span class="badge badge--gold"><i class="fa-solid fa-star"></i> {{ f.total_points }} pts</span>
                     </div>

@@ -7,8 +7,9 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { WsService } from '../../core/services/ws.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { FriendsService } from '../../core/services/friends.service';
+import { UserProfileService } from '../../core/services/user-profile.service';
 import { ToastService } from '../../core/services/toast.service';
-import { UserProfile } from '../../core/models/user.model';
 import { GameDefinition, LeaderboardEntry } from '../../core/models/game.model';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
@@ -43,11 +44,12 @@ export class ProfileComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   readonly notifService = inject(NotificationService);
+  private friendsSvc = inject(FriendsService);
+  private profileSvc = inject(UserProfileService);
   private toast = inject(ToastService);
   private wsSub?: Subscription;
 
-  profile = signal<UserProfile | null>(null);
-  friends = signal<any[]>([]);
+  readonly profile = this.profileSvc.profile;
   games = signal<GameDefinition[]>([]);
   leaderboard = signal<LeaderboardEntry[]>([]);
   activeTab = signal<Tab>('stats');
@@ -79,11 +81,10 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   async ngOnInit() {
     const [profile, lb, gamesData] = await Promise.all([
-      this.api.getMe(),
+      this.profileSvc.load(),
       this.api.getGlobalLeaderboard(),
       this.api.listGames(),
     ]);
-    this.profile.set(profile);
     this.leaderboard.set(lb);
     this.games.set(gamesData);
     this.editName = profile.display_name;
@@ -97,9 +98,6 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
     // Listen for live events while profile is open
     this.wsSub = this.ws.messages$.subscribe((msg) => {
-      if (msg.event === 'friend_request') {
-        this._loadFriends();
-      }
       if (msg.event === 'leaderboard_updated') {
         this.api.getGlobalLeaderboard()
           .then((lb) => this.leaderboard.set(lb))
@@ -178,24 +176,24 @@ export class ProfileComponent implements OnInit, OnDestroy {
   private async _loadFriends() {
     this.loadingFriends.set(true);
     try {
-      this.friends.set(await this.api.getFriends());
+      await this.friendsSvc.load();
     } catch { /* silent */ } finally {
       this.loadingFriends.set(false);
     }
   }
 
   pendingRequests() {
-    return this.friends().filter(f => f.is_pending_request);
+    return this.friendsSvc.friends().filter(f => f.status === 'pending_request');
   }
 
   acceptedFriends() {
-    return this.friends().filter(f => !f.is_pending_request);
+    return this.friendsSvc.friends().filter(f => f.status !== 'pending_request');
   }
 
   async selectAvatar(avatar: string) {
     try {
       await this.api.updateMe({ avatar } as any);
-      this.profile.update((p) => p ? { ...p, avatar } : p);
+      this.profileSvc.update({ avatar });
       this.toast.success('Avatar actualizado');
     } catch { /* toast shown by the error interceptor */ }
   }
@@ -205,7 +203,9 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.saving.set(true);
     try {
       const updated = await this.api.updateMe({ display_name: this.editName } as any);
-      this.profile.set(updated);
+      this.profileSvc.set(updated);
+      // Keep Firebase Auth's displayName from drifting from Firestore's again.
+      this.auth.updateDisplayName(this.editName).catch(() => {});
       this.toast.success('Nombre actualizado');
     } catch {
       /* toast shown by the error interceptor */
@@ -217,24 +217,21 @@ export class ProfileComponent implements OnInit, OnDestroy {
   async removeFriend(uid: string) {
     this.openMenuUid.set(null);
     try {
-      await this.api.removeFriend(uid);
-      this.friends.update(list => list.filter(f => f.uid !== uid));
+      await this.friendsSvc.remove(uid);
       this.toast.success('Amigo eliminado');
     } catch { /* toast shown by the error interceptor */ }
   }
 
   async acceptFriendRequest(uid: string) {
     try {
-      await this.api.acceptFriendRequest(uid);
-      this.friends.update(list => list.map(f => f.uid === uid ? { ...f, is_pending_request: false } : f));
+      await this.friendsSvc.accept(uid);
       this.toast.success('Solicitud aceptada');
     } catch { /* toast shown by the error interceptor */ }
   }
 
   async rejectFriendRequest(uid: string) {
     try {
-      await this.api.rejectFriendRequest(uid);
-      this.friends.update(list => list.filter(f => f.uid !== uid));
+      await this.friendsSvc.reject(uid);
       this.toast.success('Solicitud rechazada');
     } catch { /* toast shown by the error interceptor */ }
   }

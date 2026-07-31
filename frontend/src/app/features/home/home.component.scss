@@ -547,6 +547,20 @@
   filter: invert(62%) sepia(100%) saturate(700%) hue-rotate(300deg) brightness(1.1);
 }
 
+// Semi-friend: outline heart instead of the solid Heart.svg used for mutual
+// friends — same corner, visually lighter to read as "not confirmed yet".
+.friend-heart--semi {
+  filter: none;
+  opacity: 0.55;
+  color: var(--rainbow-pink);
+  font-size: 12px;
+}
+
+.action-emoji {
+  font-size: 11px;
+  line-height: 1;
+}
+
 .rooms-loading {
   font-size: 0.8rem;
   color: var(--text-muted);

@@ -44,6 +44,12 @@ export class NotificationService {
     this._unread.set(0);
   }
 
+  /** Call when a single unread item (e.g. a friend request) gets resolved
+   *  directly from a toast, so the bell badge doesn't stay stuck showing it. */
+  decrementUnread() {
+    this._unread.update((n) => Math.max(0, n - 1));
+  }
+
   dismiss(id: string) {
     this._items.update(list => list.filter(n => n.id !== id));
   }

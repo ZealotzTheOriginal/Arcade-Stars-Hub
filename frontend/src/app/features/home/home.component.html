@@ -59,18 +59,35 @@
       }
       <div class="online-users-grid">
         @for (u of onlineUsers(); track u.uid) {
-          <div class="online-user" [class.online-user--me]="u.is_me">
+          <div class="online-user" [class.online-user--me]="isMe(u.uid)">
             <span class="online-dot" [style.animation-delay]="dotDelay(u.uid)"></span>
             <span class="ou-name">
               {{ u.display_name }}
-              @if (u.is_me) { <span class="ou-me">(Tú)</span> }
+              @if (isMe(u.uid)) { <span class="ou-me">(Tú)</span> }
             </span>
-            @if (!u.is_me) {
+            @if (!isMe(u.uid)) {
               <div class="ou-actions">
-                @if (isFriend(u.uid)) {
+                @if (friendStatus(u.uid) === 'friend') {
                   <span class="friend-heart" title="Amigo">
                     <img src="/Heart.svg" class="action-icon icon-heart" alt="Amigo" />
                   </span>
+                  <button class="icon-btn" title="Eliminar amigo" (click)="removeFriend(u.uid)">
+                    <span class="action-emoji">💀</span>
+                  </button>
+                } @else if (friendStatus(u.uid) === 'semi_friend') {
+                  <span class="friend-heart friend-heart--semi" title="Semi-amigo · esperando que acepte tu solicitud">
+                    <i class="fa-regular fa-heart action-icon"></i>
+                  </span>
+                  <button class="icon-btn" title="Cancelar solicitud" (click)="removeFriend(u.uid)">
+                    <span class="action-emoji">💀</span>
+                  </button>
+                } @else if (friendStatus(u.uid) === 'pending_request') {
+                  <span class="friend-heart friend-heart--semi" title="Semi-amigo · te envió una solicitud, ¡acéptala en tu perfil!">
+                    <i class="fa-regular fa-heart action-icon"></i>
+                  </span>
+                  <button class="icon-btn" title="Rechazar" (click)="removeFriend(u.uid)">
+                    <span class="action-emoji">💀</span>
+                  </button>
                 } @else {
                   <button class="icon-btn" title="Añadir amigo" (click)="addFriend(u.uid)">
                     <img src="/PlusCross.svg" class="action-icon" alt="Añadir amigo" />

@@ -48,6 +48,17 @@ export class AuthService {
     return sendPasswordResetEmail(auth, email);
   }
 
+  /** Keeps Firebase Auth's `displayName` in sync with the editable Firestore
+   *  name. The app itself never reads `currentUser().displayName` as a name
+   *  source (it's frozen at whatever was typed at signup) — this exists so
+   *  the two don't silently diverge for anything outside the app that might
+   *  read it (Firebase console, future integrations, etc.). */
+  async updateDisplayName(displayName: string) {
+    if (auth.currentUser) {
+      await updateProfile(auth.currentUser, { displayName });
+    }
+  }
+
   async logout() {
     await signOut(auth);
     this.router.navigate(['/login']);

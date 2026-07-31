@@ -22,6 +22,7 @@ export type ServerEvent =
   | 'invite_accepted'
   | 'global_chat_message'
   | 'friend_request'
+  | 'friend_request_accepted'
   | 'friend_request_rejected'
   | 'friend_removed'
   | 'lobby_update'

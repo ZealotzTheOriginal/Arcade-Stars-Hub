@@ -45,18 +45,37 @@ async def list_friends(user: dict = Depends(get_current_user)):
 
 @router.post("/friends/{friend_uid}")
 async def add_friend_route(friend_uid: str, user: dict = Depends(get_current_user)):
+    if friend_uid == user["uid"]:
+        raise HTTPException(status_code=400, detail="No puedes agregarte a ti mismo como amigo.")
     sender_info = await add_friend(user["uid"], friend_uid)
-    await manager.send_direct(friend_uid, ServerEvent.FRIEND_REQUEST, {
-        "from_uid": user["uid"],
-        "from_name": sender_info["display_name"],
-        "from_avatar": sender_info["avatar"],
-    })
+    if sender_info.get("mutual"):
+        # friend_uid had already added us first — this call completes the
+        # friendship, so let them know their semi-friend is now a real friend.
+        await manager.send_direct(friend_uid, ServerEvent.FRIEND_REQUEST_ACCEPTED, {
+            "from_uid": user["uid"],
+            "from_name": sender_info["display_name"],
+            "from_avatar": sender_info["avatar"],
+        })
+    else:
+        await manager.send_direct(friend_uid, ServerEvent.FRIEND_REQUEST, {
+            "from_uid": user["uid"],
+            "from_name": sender_info["display_name"],
+            "from_avatar": sender_info["avatar"],
+        })
     return {"ok": True}
 
 
 @router.post("/friends/{friend_uid}/accept")
 async def accept_friend_route(friend_uid: str, user: dict = Depends(get_current_user)):
     await accept_friend_request(user["uid"], friend_uid)
+    # Let the original sender know we accepted, so their (still semi-friend)
+    # heart can flip to mutual reactively instead of staying stale.
+    info = await get_user_info(user["uid"])
+    await manager.send_direct(friend_uid, ServerEvent.FRIEND_REQUEST_ACCEPTED, {
+        "from_uid": user["uid"],
+        "from_name": info["display_name"],
+        "from_avatar": info["avatar"],
+    })
     return {"ok": True}
 
 

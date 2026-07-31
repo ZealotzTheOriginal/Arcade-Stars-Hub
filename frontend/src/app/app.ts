@@ -7,6 +7,9 @@ import { AuthService } from './core/services/auth.service';
 import { WsService } from './core/services/ws.service';
 import { ChallengeAnimService } from './core/services/challenge-anim.service';
 import { NotificationService } from './core/services/notification.service';
+import { FriendsService } from './core/services/friends.service';
+import { UserProfileService } from './core/services/user-profile.service';
+import { ToastService } from './core/services/toast.service';
 import { InviteData, InviteAcceptedData } from './core/models/ws-events.model';
 import { ToastContainerComponent } from './shared/components/toast/toast-container.component';
 
@@ -58,9 +61,16 @@ import { ToastContainerComponent } from './shared/components/toast/toast-contain
         <span class="fr-avatar">{{ friendRequest()!.avatar }}</span>
         <div class="fr-body">
           <p class="fr-text"><strong>{{ friendRequest()!.name }}</strong> te ha enviado una solicitud de amistad</p>
-          <p class="fr-hint">Ve a Perfil → Amigos para aceptarla</p>
+          <div class="fr-bar">
+            <div class="fr-bar-fill" [style.width.%]="frTimerPercent()"></div>
+          </div>
         </div>
-        <button class="fr-close" (click)="friendRequest.set(null)"><i class="fa-solid fa-xmark"></i></button>
+        <div class="fr-btns">
+          <button class="btn btn--primary btn-sm" (click)="acceptFriendRequestToast()">Aceptar</button>
+          <button class="fr-close" (click)="dismissFriendRequestToast()" title="Aceptar luego desde Notificaciones">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
       </div>
     }
 
@@ -167,8 +177,10 @@ import { ToastContainerComponent } from './shared/components/toast/toast-contain
     }
     .fr-avatar { font-size: 2rem; flex-shrink: 0; }
     .fr-body { flex: 1; min-width: 0; }
-    .fr-text { margin: 0 0 0.15rem; color: #e0e0e0; font-size: 0.85rem; line-height: 1.35; }
-    .fr-hint { margin: 0; color: rgba(0,200,170,0.8); font-size: 0.75rem; }
+    .fr-text { margin: 0 0 0.5rem; color: #e0e0e0; font-size: 0.85rem; line-height: 1.35; }
+    .fr-bar { height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+    .fr-bar-fill { height: 100%; background: #00c8aa; transition: width 0.1s linear; }
+    .fr-btns { display: flex; flex-direction: column; align-items: center; gap: 0.375rem; flex-shrink: 0; }
     .fr-close {
       background: none; border: none; color: rgba(255,255,255,0.35);
       cursor: pointer; padding: 0.2rem; font-size: 0.95rem; flex-shrink: 0;
@@ -278,19 +290,25 @@ export class App implements OnInit, OnDestroy {
   private router = inject(Router);
   readonly challengeAnim = inject(ChallengeAnimService);
   private notifService = inject(NotificationService);
+  private friendsSvc = inject(FriendsService);
+  private profileSvc = inject(UserProfileService);
+  private toast = inject(ToastService);
 
   activeInvite = signal<InviteData | null>(null);
   timerPercent = signal(100);
   rejectedBy = signal<string | null>(null);
-  friendRequest = signal<{ name: string; avatar: string } | null>(null);
+  friendRequest = signal<{ uid: string; name: string; avatar: string } | null>(null);
+  frTimerPercent = signal(100);
   inviteError = signal<string | null>(null);
 
   private inviteTimer?: ReturnType<typeof setInterval>;
   private rejectedTimer?: ReturnType<typeof setTimeout>;
   private frTimer?: ReturnType<typeof setTimeout>;
+  private frProgressTimer?: ReturnType<typeof setInterval>;
   private inviteErrorTimer?: ReturnType<typeof setTimeout>;
   private subs: Subscription[] = [];
   private readonly INVITE_SECONDS = 15;
+  private readonly FR_SECONDS = 8;
 
   constructor() {
     effect(() => {
@@ -298,13 +316,18 @@ export class App implements OnInit, OnDestroy {
       const loading = this.auth.loading();
       if (loading) return;
       if (user) {
-        this.ws.connect().then(() => {
+        this.ws.connect().then(async () => {
+          // Firestore's display_name/avatar is the live, editable copy — the
+          // Firebase Auth user object's own `displayName` is frozen at signup
+          // and would silently reintroduce a stale name here otherwise.
+          const profile = await this.profileSvc.load().catch(() => null);
           this.ws.send('register_presence', {
-            display_name: user.displayName || 'Player',
-            avatar: '⭐',
+            display_name: profile?.display_name || 'Player',
+            avatar: profile?.avatar || '⭐',
           });
         }).catch(() => {});
       } else {
+        this.profileSvc.clear();
         this.ws.disconnect();
       }
     });
@@ -322,16 +345,23 @@ export class App implements OnInit, OnDestroy {
           this.rejectedTimer = setTimeout(() => this.rejectedBy.set(null), 4000);
         }
         if (msg.event === 'friend_request') {
-          clearTimeout(this.frTimer);
-          this.friendRequest.set({ name: msg.data.from_name, avatar: msg.data.from_avatar });
-          this.frTimer = setTimeout(() => this.friendRequest.set(null), 8000);
+          this._showFriendRequest(msg.data.from_uid, msg.data.from_name, msg.data.from_avatar);
           this.notifService.addFriendRequest();
+          this.friendsSvc.load().catch(() => {});
+        }
+        if (msg.event === 'friend_request_accepted') {
+          // The other side just accepted (or completed mutuality by adding us
+          // back) — refresh so our semi-friend heart flips to solid right away.
+          this.friendsSvc.load().catch(() => {});
+          this.toast.success(`${msg.data.from_name} aceptó tu solicitud de amistad`);
         }
         if (msg.event === 'friend_request_rejected') {
           this.notifService.addFriendRequestRejected(msg.data.from_name, msg.data.from_avatar);
+          this.friendsSvc.load().catch(() => {});
         }
         if (msg.event === 'friend_removed') {
           this.notifService.addFriendRemoved(msg.data.from_name, msg.data.from_avatar);
+          this.friendsSvc.load().catch(() => {});
         }
         if (msg.event === 'invite_failed') {
           clearTimeout(this.inviteErrorTimer);
@@ -357,11 +387,11 @@ export class App implements OnInit, OnDestroy {
         }
       }),
       this.ws.reconnected$.subscribe(() => {
-        const user = this.auth.currentUser();
-        if (user) {
+        const profile = this.profileSvc.profile();
+        if (profile) {
           this.ws.send('register_presence', {
-            display_name: user.displayName || 'Player',
-            avatar: '⭐',
+            display_name: profile.display_name,
+            avatar: profile.avatar,
           });
         }
       }),
@@ -373,7 +403,45 @@ export class App implements OnInit, OnDestroy {
     clearInterval(this.inviteTimer);
     clearTimeout(this.rejectedTimer);
     clearTimeout(this.frTimer);
+    clearInterval(this.frProgressTimer);
     clearTimeout(this.inviteErrorTimer);
+  }
+
+  private _showFriendRequest(uid: string, name: string, avatar: string) {
+    clearTimeout(this.frTimer);
+    clearInterval(this.frProgressTimer);
+    this.friendRequest.set({ uid, name, avatar });
+    this.frTimerPercent.set(100);
+    let elapsed = 0;
+    const total = this.FR_SECONDS * 1000;
+    this.frProgressTimer = setInterval(() => {
+      elapsed += 100;
+      this.frTimerPercent.set(Math.max(0, 100 - (elapsed / total) * 100));
+    }, 100);
+    // After this, the request isn't lost — it stays visible in Notifications
+    // (Profile → Amigos) until accepted or rejected from there.
+    this.frTimer = setTimeout(() => this._clearFriendRequestToast(), total);
+  }
+
+  async acceptFriendRequestToast() {
+    const fr = this.friendRequest();
+    if (!fr) return;
+    this._clearFriendRequestToast();
+    try {
+      await this.friendsSvc.accept(fr.uid);
+      this.notifService.decrementUnread();
+      this.toast.success(`Ahora eres amigo de ${fr.name}`);
+    } catch { /* toast shown by the error interceptor */ }
+  }
+
+  dismissFriendRequestToast() {
+    this._clearFriendRequestToast();
+  }
+
+  private _clearFriendRequestToast() {
+    clearTimeout(this.frTimer);
+    clearInterval(this.frProgressTimer);
+    this.friendRequest.set(null);
   }
 
   private _showInvite(data: InviteData) {

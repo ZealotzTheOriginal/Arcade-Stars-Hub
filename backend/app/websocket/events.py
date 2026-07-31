@@ -64,6 +64,7 @@ class ServerEvent(str, Enum):
     INVITE_ACCEPTED = "invite_accepted"
     GLOBAL_CHAT_MESSAGE = "global_chat_message"
     FRIEND_REQUEST = "friend_request"
+    FRIEND_REQUEST_ACCEPTED = "friend_request_accepted"
     FRIEND_REQUEST_REJECTED = "friend_request_rejected"
     FRIEND_REMOVED = "friend_removed"
     KICKED = "kicked"

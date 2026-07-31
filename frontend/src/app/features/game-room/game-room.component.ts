@@ -8,6 +8,7 @@ import { Subscription, interval } from 'rxjs';
 import { WsService } from '../../core/services/ws.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ApiService } from '../../core/services/api.service';
+import { FriendsService } from '../../core/services/friends.service';
 import { ChallengeAnimService } from '../../core/services/challenge-anim.service';
 import { PlayerInfo } from '../../core/models/game.model';
 import { ChatMessage } from '../../core/models/ws-events.model';
@@ -38,6 +39,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   readonly ws = inject(WsService);
   private auth = inject(AuthService);
   private api = inject(ApiService);
+  private friendsSvc = inject(FriendsService);
   private challengeAnim = inject(ChallengeAnimService);
 
   roomId = '';
@@ -66,7 +68,6 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   roomName = signal('');
   isInvited = signal(false);
   chatOpen = signal(false);
-  friends = signal<any[]>([]);
   onlineUids = signal<Set<string>>(new Set());
   showFriendsModal = signal(false);
   leaderUid = signal('');
@@ -154,8 +155,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     }
 
     // Load friends + online users for the lobby invite panel
-    Promise.all([this.api.getFriends(), this.api.getOnlineUsers()]).then(([fr, online]) => {
-      this.friends.set(fr);
+    Promise.all([this.friendsSvc.load(), this.api.getOnlineUsers()]).then(([, online]) => {
       this.onlineUids.set(new Set(online.map((u: any) => u.uid)));
     }).catch(() => {});
 
@@ -530,6 +530,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   isFriendOnline(uid: string): boolean {
     return this.onlineUids().has(uid);
+  }
+
+  friends() {
+    return this.friendsSvc.friends();
   }
 
   inviteFriend(uid: string) {
