@@ -8,6 +8,10 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  verifyBeforeUpdateEmail,
+  updatePassword,
   User,
 } from 'firebase/auth';
 import { initializeApp } from 'firebase/app';
@@ -57,6 +61,29 @@ export class AuthService {
     if (auth.currentUser) {
       await updateProfile(auth.currentUser, { displayName });
     }
+  }
+
+  /** Re-proves the user's identity with their current password — Firebase
+   *  requires this immediately before any sensitive change (email, password)
+   *  if the session isn't "recent", which it usually isn't by the time
+   *  someone finds their way to Settings. */
+  private async _reauthenticate(currentPassword: string): Promise<void> {
+    const user = auth.currentUser;
+    if (!user?.email) throw { code: 'auth/no-current-user' };
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+  }
+
+  /** Sends a verification link to the new address; the account's email only
+   *  changes once that link is clicked, so a typo can't lock anyone out. */
+  async changeEmail(newEmail: string, currentPassword: string): Promise<void> {
+    await this._reauthenticate(currentPassword);
+    await verifyBeforeUpdateEmail(auth.currentUser!, newEmail);
+  }
+
+  async changePassword(newPassword: string, currentPassword: string): Promise<void> {
+    await this._reauthenticate(currentPassword);
+    await updatePassword(auth.currentUser!, newPassword);
   }
 
   async logout() {

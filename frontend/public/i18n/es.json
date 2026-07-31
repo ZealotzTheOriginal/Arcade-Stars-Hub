@@ -211,7 +211,19 @@
     "BADGES": "Insignias",
     "POINTS_AMOUNT": "Cantidad de puntos",
     "CONFIRM": "Confirmar",
-    "MANAGE_BADGES": "Gestionar insignias"
+    "MANAGE_BADGES": "Gestionar insignias",
+    "ACCOUNT": "Cuenta",
+    "CURRENT_EMAIL": "Email actual",
+    "NEW_EMAIL_PLACEHOLDER": "Nuevo email",
+    "CURRENT_PASSWORD_PLACEHOLDER": "Contraseña actual",
+    "CHANGE_EMAIL": "Cambiar email",
+    "SENDING": "Enviando...",
+    "CHANGE_PASSWORD_HINT": "Cambia tu contraseña de acceso.",
+    "NEW_PASSWORD_PLACEHOLDER": "Nueva contraseña (mín. 6 caracteres)",
+    "CHANGE_PASSWORD": "Cambiar contraseña",
+    "EMAIL_VERIFICATION_SENT": "Te enviamos un correo de verificación a {{email}}. Tu email cambiará cuando confirmes el enlace.",
+    "PASSWORD_UPDATED": "Contraseña actualizada",
+    "REAUTH_REQUIRED": "Por seguridad, vuelve a iniciar sesión e inténtalo de nuevo."
   },
   "GAME_ROOM": {
     "NO_CONNECTION": "Sin conexión",

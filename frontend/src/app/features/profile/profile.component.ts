@@ -62,6 +62,14 @@ export class ProfileComponent implements OnInit, OnDestroy {
   loadingFriends = signal(false);
   invitingFriend = signal<string | null>(null);
   openMenuUid = signal<string | null>(null);
+
+  // Account (email/password change)
+  newEmail = '';
+  emailCurrentPassword = '';
+  changingEmail = signal(false);
+  newPassword = '';
+  passwordCurrentPassword = '';
+  changingPassword = signal(false);
   editName = '';
 
   // Admin
@@ -250,6 +258,54 @@ export class ProfileComponent implements OnInit, OnDestroy {
       this.profileSvc.update({ settings: updated });
       this.toast.success(this.translate.instant('TOASTS.SETTINGS_SAVED'));
     } catch { /* toast shown by the error interceptor */ }
+  }
+
+  async changeEmail() {
+    const email = this.newEmail.trim();
+    if (!email || !this.emailCurrentPassword) return;
+    this.changingEmail.set(true);
+    try {
+      await this.auth.changeEmail(email, this.emailCurrentPassword);
+      this.toast.success(this.translate.instant('PROFILE.EMAIL_VERIFICATION_SENT', { email }));
+      this.newEmail = '';
+      this.emailCurrentPassword = '';
+    } catch (e: any) {
+      this.toast.error(this.translate.instant(this._authErrorKey(e?.code)));
+    } finally {
+      this.changingEmail.set(false);
+    }
+  }
+
+  async changePassword() {
+    if (!this.newPassword || !this.passwordCurrentPassword) return;
+    if (this.newPassword.length < 6) {
+      this.toast.error(this.translate.instant('AUTH.ERRORS.PASSWORD_TOO_SHORT'));
+      return;
+    }
+    this.changingPassword.set(true);
+    try {
+      await this.auth.changePassword(this.newPassword, this.passwordCurrentPassword);
+      this.toast.success(this.translate.instant('PROFILE.PASSWORD_UPDATED'));
+      this.newPassword = '';
+      this.passwordCurrentPassword = '';
+    } catch (e: any) {
+      this.toast.error(this.translate.instant(this._authErrorKey(e?.code)));
+    } finally {
+      this.changingPassword.set(false);
+    }
+  }
+
+  private _authErrorKey(code?: string): string {
+    const map: Record<string, string> = {
+      'auth/wrong-password': 'AUTH.ERRORS.INVALID_CREDENTIAL',
+      'auth/invalid-credential': 'AUTH.ERRORS.INVALID_CREDENTIAL',
+      'auth/too-many-requests': 'AUTH.ERRORS.TOO_MANY_REQUESTS',
+      'auth/email-already-in-use': 'AUTH.ERRORS.EMAIL_IN_USE',
+      'auth/weak-password': 'AUTH.ERRORS.WEAK_PASSWORD',
+      'auth/requires-recent-login': 'PROFILE.REAUTH_REQUIRED',
+      'auth/no-current-user': 'PROFILE.REAUTH_REQUIRED',
+    };
+    return map[code ?? ''] ?? 'ERRORS.GENERIC';
   }
 
   toggleFriendMenu(uid: string) {

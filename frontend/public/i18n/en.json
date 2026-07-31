@@ -211,7 +211,19 @@
     "BADGES": "Badges",
     "POINTS_AMOUNT": "Number of points",
     "CONFIRM": "Confirm",
-    "MANAGE_BADGES": "Manage badges"
+    "MANAGE_BADGES": "Manage badges",
+    "ACCOUNT": "Account",
+    "CURRENT_EMAIL": "Current email",
+    "NEW_EMAIL_PLACEHOLDER": "New email",
+    "CURRENT_PASSWORD_PLACEHOLDER": "Current password",
+    "CHANGE_EMAIL": "Change email",
+    "SENDING": "Sending...",
+    "CHANGE_PASSWORD_HINT": "Change your sign-in password.",
+    "NEW_PASSWORD_PLACEHOLDER": "New password (min. 6 characters)",
+    "CHANGE_PASSWORD": "Change password",
+    "EMAIL_VERIFICATION_SENT": "We sent a verification email to {{email}}. Your email will change once you confirm the link.",
+    "PASSWORD_UPDATED": "Password updated",
+    "REAUTH_REQUIRED": "For your security, please sign in again and retry."
   },
   "GAME_ROOM": {
     "NO_CONNECTION": "No connection",

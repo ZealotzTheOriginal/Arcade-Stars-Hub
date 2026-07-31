@@ -176,6 +176,18 @@
   max-width: 220px;
 }
 
+.account-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+
+  .input {
+    max-width: 240px;
+  }
+}
+
 .settings-toggle {
   display: flex;
   align-items: center;

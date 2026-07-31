@@ -375,6 +375,26 @@
             <input type="checkbox" [ngModel]="p.settings.block_friend_requests" (ngModelChange)="updateSetting('block_friend_requests', $event)" />
             <span>{{ 'PROFILE.BLOCK_REQUESTS' | translate }}</span>
           </label>
+
+          <h3>{{ 'PROFILE.ACCOUNT' | translate }}</h3>
+
+          <p class="settings-hint">{{ 'PROFILE.CURRENT_EMAIL' | translate }}: <strong>{{ p.email }}</strong></p>
+          <div class="account-form">
+            <input class="input" type="email" [(ngModel)]="newEmail" [placeholder]="'PROFILE.NEW_EMAIL_PLACEHOLDER' | translate" />
+            <input class="input" type="password" [(ngModel)]="emailCurrentPassword" [placeholder]="'PROFILE.CURRENT_PASSWORD_PLACEHOLDER' | translate" />
+            <button class="btn btn--ghost" (click)="changeEmail()" [disabled]="changingEmail() || !newEmail.trim() || !emailCurrentPassword">
+              {{ (changingEmail() ? 'PROFILE.SENDING' : 'PROFILE.CHANGE_EMAIL') | translate }}
+            </button>
+          </div>
+
+          <p class="settings-hint">{{ 'PROFILE.CHANGE_PASSWORD_HINT' | translate }}</p>
+          <div class="account-form">
+            <input class="input" type="password" [(ngModel)]="newPassword" [placeholder]="'PROFILE.NEW_PASSWORD_PLACEHOLDER' | translate" />
+            <input class="input" type="password" [(ngModel)]="passwordCurrentPassword" [placeholder]="'PROFILE.CURRENT_PASSWORD_PLACEHOLDER' | translate" />
+            <button class="btn btn--ghost" (click)="changePassword()" [disabled]="changingPassword() || !newPassword || !passwordCurrentPassword">
+              {{ (changingPassword() ? 'PROFILE.SAVING' : 'PROFILE.CHANGE_PASSWORD') | translate }}
+            </button>
+          </div>
         </section>
       }
 
