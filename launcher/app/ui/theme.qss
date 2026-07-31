@@ -1,0 +1,150 @@
+/* Arcade Stars Hub — Launcher theme
+   Paleta: fondo #0A0C10, componentes #15151D, muted #3D4553, texto #FFFFFF
+   Acentos rainbow (max 2px, usados con moderacion): rojo #FF3B5C, amarillo #FFD23D,
+   turquesa #2FE6D8, azul #3B82F6, rosa #FF5DA2 */
+
+* {
+    outline: none;
+}
+
+QMainWindow, QWidget {
+    background-color: #0A0C10;
+    color: #FFFFFF;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 13px;
+}
+
+QLabel#TitleLabel {
+    font-size: 21px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+QLabel#SubtitleLabel {
+    color: #3D4553;
+    font-size: 12px;
+}
+
+QFrame#Card {
+    background-color: #15151D;
+    border: 1px solid #3D4553;
+    border-radius: 10px;
+}
+
+QLabel#ServiceName {
+    font-size: 14px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+QLabel#ServiceUrl {
+    color: #3D4553;
+    font-size: 12px;
+}
+
+QLabel#SectionLabel {
+    color: #3D4553;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+QPushButton {
+    background-color: #15151D;
+    color: #FFFFFF;
+    border: 1px solid #3D4553;
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+QPushButton:hover:enabled {
+    border: 1px solid #2FE6D8;
+}
+
+QPushButton:pressed:enabled {
+    background-color: #0A0C10;
+}
+
+QPushButton:disabled {
+    color: #3D4553;
+    border: 1px solid #15151D;
+}
+
+QPushButton#PrimaryButton {
+    background-color: #2FE6D8;
+    color: #0A0C10;
+    border: none;
+    font-weight: 600;
+}
+
+QPushButton#PrimaryButton:hover:enabled {
+    background-color: #6BF0E6;
+}
+
+QPushButton#PrimaryButton:disabled {
+    background-color: #3D4553;
+    color: #15151D;
+}
+
+QPushButton#DangerButton {
+    background-color: transparent;
+    color: #FF3B5C;
+    border: 1px solid #FF3B5C;
+}
+
+QPushButton#DangerButton:hover:enabled {
+    background-color: #FF3B5C;
+    color: #0A0C10;
+}
+
+QPushButton#DangerButton:disabled {
+    color: #3D4553;
+    border: 1px solid #3D4553;
+}
+
+QSpinBox {
+    background-color: #0A0C10;
+    border: 1px solid #3D4553;
+    border-radius: 6px;
+    padding: 4px 6px;
+    color: #FFFFFF;
+    min-width: 70px;
+}
+
+QSpinBox:focus {
+    border: 1px solid #3B82F6;
+}
+
+QSpinBox:disabled {
+    color: #3D4553;
+}
+
+QTextEdit#Console {
+    background-color: #15151D;
+    color: #FFFFFF;
+    border: 1px solid #3D4553;
+    border-radius: 8px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 12px;
+    padding: 8px;
+}
+
+QScrollBar:vertical {
+    background: #15151D;
+    width: 10px;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background: #3D4553;
+    border-radius: 5px;
+    min-height: 24px;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
