@@ -9,6 +9,7 @@ import { WsService } from '../../core/services/ws.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ApiService } from '../../core/services/api.service';
 import { FriendsService } from '../../core/services/friends.service';
+import { UserProfileService } from '../../core/services/user-profile.service';
 import { ChallengeAnimService } from '../../core/services/challenge-anim.service';
 import { PlayerInfo } from '../../core/models/game.model';
 import { ChatMessage } from '../../core/models/ws-events.model';
@@ -40,12 +41,16 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private api = inject(ApiService);
   private friendsSvc = inject(FriendsService);
+  private profileSvc = inject(UserProfileService);
   private challengeAnim = inject(ChallengeAnimService);
 
   roomId = '';
   gameId = '';
   myUid = '';
-  myProfile: any = null;
+
+  get myProfile(): any {
+    return this.profileSvc.profile();
+  }
 
   players = signal<PlayerInfo[]>([]);
   spectators = signal<any[]>([]);
@@ -145,7 +150,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     const spectateParam = this.route.snapshot.queryParamMap.get('spectate');
     this.isInvited.set(this.route.snapshot.queryParamMap.get('invited') === '1');
     this.myUid = this.auth.currentUser()?.uid ?? '';
-    this.myProfile = await this.api.getMe();
+    await this.profileSvc.load();
 
     if (this.gameId === 'tic_tac_toe') {
       this.previewInterval = setInterval(
@@ -484,7 +489,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   setTttPattern(pattern: string) {
     this.ws.send('set_ttt_pattern', { room_id: this.roomId, pattern });
-    if (this.myProfile) this.myProfile.ttt_pattern = pattern;
+    this.profileSvc.update({ ttt_pattern: pattern });
     this.api.updateMe({ ttt_pattern: pattern }).catch(() => {});
   }
 
