@@ -101,7 +101,6 @@
   "GAMES": {
     "COMMON": {
       "WAITING_TO_START": "Waiting for the game to start...",
-      "DRAW_BANG": "Draw!",
       "YOU_WON": "You won!",
       "YOU_LOST": "You lost",
       "OR": "or"
@@ -121,7 +120,10 @@
       "SIZE_EXPERT": "Expert",
       "SIZE_EXPERT_DETAIL": "30×16 · 99 mines"
     },
-    "TIC_TAC_TOE": { "NAME": "Tic Tac Toe" },
+    "TIC_TAC_TOE": {
+      "NAME": "Tic Tac Toe",
+      "VANISHING_HINT": "This piece will disappear if you play again"
+    },
     "SNAKE": {
       "NAME": "Snake",
       "PRESS_KEY_TO_START": "Press any key to start",

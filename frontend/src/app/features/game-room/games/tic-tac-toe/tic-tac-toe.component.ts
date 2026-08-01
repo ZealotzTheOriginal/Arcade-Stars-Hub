@@ -17,6 +17,8 @@ export class TicTacToeComponent {
   @Output() moveMade = new EventEmitter<{ row: number; col: number }>();
 
   readonly size = [0, 1, 2];
+  /** Must match MAX_PIECES in backend/app/games/tic_tac_toe/game.py. */
+  private readonly MAX_PIECES = 3;
 
   get board(): number[][] {
     return this.gameState?.board ?? [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
@@ -83,8 +85,22 @@ export class TicTacToeComponent {
 
   cellClass(row: number, col: number): string {
     const v = this.board[row]?.[col] ?? 0;
-    if (v !== 0) return 'cell filled';
+    if (v !== 0) return this.isVanishing(row, col) ? 'cell filled vanishing' : 'cell filled';
     if (this.canPlay(row, col)) return 'cell playable';
     return 'cell';
+  }
+
+  /** True if this piece is the oldest of a player who's already at the
+   *  3-piece cap — i.e. it's the one that disappears when they play again. */
+  isVanishing(row: number, col: number): boolean {
+    const queues: Record<string, number[][]> = this.gameState?.piece_queues ?? {};
+    for (const uid of Object.keys(queues)) {
+      const queue = queues[uid] ?? [];
+      if (queue.length >= this.MAX_PIECES) {
+        const [oldestRow, oldestCol] = queue[0];
+        if (oldestRow === row && oldestCol === col) return true;
+      }
+    }
+    return false;
   }
 }

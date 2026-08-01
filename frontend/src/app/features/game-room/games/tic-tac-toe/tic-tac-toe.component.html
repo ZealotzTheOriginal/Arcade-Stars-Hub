@@ -6,7 +6,11 @@
       @for (row of size; track row) {
         <div class="row">
           @for (col of size; track col) {
-            <div [class]="cellClass(row, col)" [ngStyle]="cellStyle(row, col)" (click)="play(row, col)">
+            <div
+              [class]="cellClass(row, col)"
+              [ngStyle]="cellStyle(row, col)"
+              (click)="play(row, col)"
+              [title]="isVanishing(row, col) ? ('GAMES.TIC_TAC_TOE.VANISHING_HINT' | translate) : ''">
               @if (board[row][col] !== 0) {
                 <div class="piece" [ngStyle]="pieceStyle(board[row][col])"></div>
               }
@@ -18,9 +22,7 @@
 
     @if (isTerminal()) {
       <div class="result-banner">
-        @if (gameState.draw) {
-          <span><i class="fa-solid fa-handshake"></i> {{ 'GAMES.COMMON.DRAW_BANG' | translate }}</span>
-        } @else if (gameState.winner === myUid) {
+        @if (gameState.winner === myUid) {
           <span><i class="fa-solid fa-trophy"></i> {{ 'GAMES.COMMON.YOU_WON' | translate }}</span>
         } @else {
           <span><i class="fa-solid fa-skull"></i> {{ 'GAMES.COMMON.YOU_LOST' | translate }}</span>

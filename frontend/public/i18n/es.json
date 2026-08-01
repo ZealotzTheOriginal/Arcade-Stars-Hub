@@ -101,7 +101,6 @@
   "GAMES": {
     "COMMON": {
       "WAITING_TO_START": "Esperando que el juego comience...",
-      "DRAW_BANG": "¡Empate!",
       "YOU_WON": "¡Ganaste!",
       "YOU_LOST": "Perdiste",
       "OR": "o"
@@ -121,7 +120,10 @@
       "SIZE_EXPERT": "Experto",
       "SIZE_EXPERT_DETAIL": "30×16 · 99 minas"
     },
-    "TIC_TAC_TOE": { "NAME": "Tres en Raya" },
+    "TIC_TAC_TOE": {
+      "NAME": "Tres en Raya",
+      "VANISHING_HINT": "Esta ficha desaparecerá si juegas otra vez"
+    },
     "SNAKE": {
       "NAME": "Serpiente",
       "PRESS_KEY_TO_START": "Presiona una tecla para empezar",

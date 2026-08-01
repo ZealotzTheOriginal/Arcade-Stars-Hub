@@ -43,6 +43,15 @@
   &.filled {
     transition: none;
   }
+
+  &.vanishing .piece {
+    animation: piece-vanishing-pulse 1.1s ease-in-out infinite;
+  }
+}
+
+@keyframes piece-vanishing-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 .piece {
