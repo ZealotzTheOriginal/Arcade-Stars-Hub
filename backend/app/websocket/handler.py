@@ -415,12 +415,18 @@ async def _handle_leave(ws: WebSocket, uid: str, data: dict):
                         "display_name": player_info.get("display_name", "Jugador"),
                     })
                 else:
-                    await manager.broadcast(room_id, ServerEvent.PLAYER_LEFT, {"uid": uid})
                     room["players"] = [p for p in room["players"] if p["uid"] != uid]
-                    if not room["players"] or all(p.get("is_ai") for p in room["players"]):
-                        _rooms.pop(room_id, None)
-                    else:
+                    room_emptied = not room["players"] or all(p.get("is_ai") for p in room["players"])
+                    if not room_emptied:
                         _reassign_leader(room)
+                    # Include the (possibly reassigned) leader so the remaining
+                    # player's `isLeader` doesn't stay pinned to whoever just left.
+                    await manager.broadcast(room_id, ServerEvent.PLAYER_LEFT, {
+                        "uid": uid,
+                        "leader_uid": None if room_emptied else room.get("leader_uid"),
+                    })
+                    if room_emptied:
+                        _rooms.pop(room_id, None)
                 if uid in _presence:
                     _presence[uid]["room_id"] = None
                 left_room_id = room_id

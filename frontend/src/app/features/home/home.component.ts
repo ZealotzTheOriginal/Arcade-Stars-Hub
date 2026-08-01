@@ -43,6 +43,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   joinCode = '';
   joiningRoom = signal(false);
   joinError = signal('');
+  joinCodeOpen = signal(false);
 
   readonly activeRooms = this.lobbySvc.activeRooms;
   readonly onlineUsers = this.lobbySvc.onlineUsers;
@@ -55,6 +56,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   globalChatInput = '';
 
   @ViewChild('chatMessages') private chatMessagesEl?: ElementRef;
+  @ViewChild('joinCodeInput') private joinCodeInputEl?: ElementRef<HTMLInputElement>;
 
   private reconnectPollInterval?: ReturnType<typeof setInterval>;
   private wsSub?: Subscription;
@@ -215,6 +217,15 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
+  toggleJoinCode() {
+    const opening = !this.joinCodeOpen();
+    this.joinCodeOpen.set(opening);
+    if (opening) {
+      this.joinError.set('');
+      setTimeout(() => this.joinCodeInputEl?.nativeElement.focus(), 0);
+    }
+  }
+
   async playGame(game: GameDefinition) {
     this.creatingRoom.set(game.id);
     try {
@@ -307,17 +318,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       tic_tac_toe: '/home/tictactoe.jpg',
       snake:        '/home/snake.jpg',
       pong:         '/home/pong.jpg',
-    };
-    return map[id] ?? '';
-  }
-
-  gameLogo(id: string): string {
-    const map: Record<string, string> = {
-      connect_four: '/home/connect4Logo.svg',
-      minesweeper: '/home/minesweeperLogo.svg',
-      tic_tac_toe: '/home/tictactoeLogo.svg',
-      snake:        '/home/snakeLogo.svg',
-      pong:         '/home/PongLogo.svg',
     };
     return map[id] ?? '';
   }

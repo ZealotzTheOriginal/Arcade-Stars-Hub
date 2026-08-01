@@ -363,7 +363,7 @@
           }
           <span class="banner-spacer"></span>
           <div class="banner-actions">
-            @if (!isSpectator()) {
+            @if (!isSpectator() && players().length >= 2) {
               @if (!hasVotedRematch()) {
                 <button class="btn btn--primary btn--xs" (click)="requestRematch()">
                   <i class="fa-solid fa-rotate"></i> {{ 'GAME_ROOM.REMATCH' | translate }}

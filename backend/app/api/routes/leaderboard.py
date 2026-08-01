@@ -5,10 +5,10 @@ router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 
 @router.get("/")
-async def global_leaderboard(limit: int = 20):
+async def global_leaderboard(limit: int = 10):
     return await get_leaderboard(limit=limit)
 
 
 @router.get("/{game_id}")
-async def game_leaderboard(game_id: str, limit: int = 20):
+async def game_leaderboard(game_id: str, limit: int = 10):
     return await get_leaderboard(game_id=game_id, limit=limit)

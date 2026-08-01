@@ -106,7 +106,7 @@
       "YOU_LOST": "You lost",
       "OR": "or"
     },
-    "CONNECT_FOUR": { "NAME": "Connect 4" },
+    "CONNECT_FOUR": { "NAME": "Connect Four" },
     "MINESWEEPER": {
       "NAME": "Minesweeper",
       "GAME_OVER": "Game over",

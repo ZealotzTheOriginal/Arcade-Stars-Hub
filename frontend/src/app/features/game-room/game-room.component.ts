@@ -228,6 +228,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
       case 'player_left':
         this.players.update((ps) => ps.filter((p) => p.uid !== msg.data.uid));
+        // The backend already reassigns leadership server-side when the
+        // leader leaves a non-"playing" room; without this, the remaining
+        // player's `isLeader` stays stuck on the departed leader's uid.
+        if (msg.data.leader_uid) this.leaderUid.set(msg.data.leader_uid);
         break;
 
       case 'spectator_joined':

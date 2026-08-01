@@ -1,3 +1,12 @@
+/* ── Fonts ───────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Cocogoose Pro';
+  src: url('/Cocogoose-Pro-Regular-trial.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ── Design Tokens ───────────────────────────────────────── */
 :root {
   --bg-global: #0a0c10;

@@ -106,7 +106,7 @@
       "YOU_LOST": "Perdiste",
       "OR": "o"
     },
-    "CONNECT_FOUR": { "NAME": "Conecta 4" },
+    "CONNECT_FOUR": { "NAME": "Conecta Cuatro" },
     "MINESWEEPER": {
       "NAME": "Buscaminas",
       "GAME_OVER": "Juego terminado",

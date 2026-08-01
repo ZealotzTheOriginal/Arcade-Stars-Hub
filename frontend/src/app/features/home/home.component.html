@@ -22,7 +22,6 @@
     }
 
     <nav class="nav">
-      <a class="nav-item" [class.active]="activePanel() === 'main'" (click)="activePanel.set('main')"><i class="fa-solid fa-gamepad"></i> {{ 'HOME.NAV_GAMES' | translate }}</a>
       <a class="nav-item" routerLink="/profile"><i class="fa-solid fa-user"></i> {{ 'HOME.NAV_PROFILE' | translate }}</a>
     </nav>
 
@@ -127,12 +126,45 @@
         <h1>{{ 'HOME.TITLE' | translate }}</h1>
         <p class="subtitle">{{ 'HOME.SUBTITLE' | translate }}</p>
       </div>
-      <button class="page-header-bell mobile-hidden" (click)="openNotifs()" [title]="'HOME.NOTIFICATIONS' | translate">
-        <i class="fa-solid fa-bell" [class.bell-active]="notifService.unread() > 0"></i>
-        @if (notifService.unread() > 0) {
-          <span class="notif-badge">{{ notifService.unread() }}</span>
-        }
-      </button>
+      <div class="page-header-actions">
+        <div class="join-code-wrap">
+          <button class="page-header-bell" (click)="toggleJoinCode()" [title]="'HOME.JOIN_CODE_LABEL' | translate">
+            <i class="fa-solid fa-hashtag"></i>
+          </button>
+          @if (joinCodeOpen()) {
+            <div class="join-code-backdrop" (click)="joinCodeOpen.set(false)"></div>
+            <div class="join-code-dropdown card" (click)="$event.stopPropagation()">
+              <p class="join-label">{{ 'HOME.JOIN_CODE_LABEL' | translate }}</p>
+              <div class="join-row">
+                <input
+                  #joinCodeInput
+                  class="input join-input"
+                  type="text"
+                  [placeholder]="'HOME.JOIN_CODE_PLACEHOLDER' | translate"
+                  maxlength="8"
+                  [(ngModel)]="joinCode"
+                  (keyup.enter)="joinRoom()"
+                />
+                <button
+                  class="btn btn--secondary"
+                  (click)="joinRoom()"
+                  [disabled]="joiningRoom() || !joinCode.trim()">
+                  {{ joiningRoom() ? '...' : ('HOME.JOIN' | translate) }}
+                </button>
+              </div>
+              @if (joinError()) {
+                <p class="join-error">{{ joinError() }}</p>
+              }
+            </div>
+          }
+        </div>
+        <button class="page-header-bell mobile-hidden" (click)="openNotifs()" [title]="'HOME.NOTIFICATIONS' | translate">
+          <i class="fa-solid fa-bell" [class.bell-active]="notifService.unread() > 0"></i>
+          @if (notifService.unread() > 0) {
+            <span class="notif-badge">{{ notifService.unread() }}</span>
+          }
+        </button>
+      </div>
     </header>
 
     <!-- Reconnect banner -->
@@ -149,30 +181,6 @@
         </div>
       </div>
     }
-
-    <!-- Join room by code -->
-    <div class="join-room card">
-      <p class="join-label">{{ 'HOME.JOIN_CODE_LABEL' | translate }}</p>
-      <div class="join-row">
-        <input
-          class="input join-input"
-          type="text"
-          [placeholder]="'HOME.JOIN_CODE_PLACEHOLDER' | translate"
-          maxlength="8"
-          [(ngModel)]="joinCode"
-          (keyup.enter)="joinRoom()"
-        />
-        <button
-          class="btn btn--secondary"
-          (click)="joinRoom()"
-          [disabled]="joiningRoom() || !joinCode.trim()">
-          {{ joiningRoom() ? '...' : ('HOME.JOIN' | translate) }}
-        </button>
-      </div>
-      @if (joinError()) {
-        <p class="join-error">{{ joinError() }}</p>
-      }
-    </div>
 
     <!-- Active public rooms -->
     @if (loadingRooms()) {
@@ -255,7 +263,7 @@
               @if (creatingRoom() === game.id) {
                 <span class="game-loading-text">{{ 'HOME.CREATING' | translate }}</span>
               } @else {
-                <img [src]="gameLogo(game.id)" class="game-logo-svg" [alt]="gameLabel(game.id)" />
+                <span class="game-logo-text">{{ gameLabel(game.id) }}</span>
               }
             </div>
             <div class="game-badges">
