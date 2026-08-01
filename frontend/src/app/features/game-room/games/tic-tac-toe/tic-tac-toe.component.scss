@@ -45,13 +45,41 @@
   }
 
   &.vanishing .piece {
-    animation: piece-vanishing-pulse 1.1s ease-in-out infinite;
+    animation: piece-vanishing-pulse 0.9s ease-in-out infinite;
+  }
+
+  &.winning {
+    border-width: 3px;
+    box-shadow: 0 0 14px rgba(255, 255, 255, 0.25);
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--rainbow-red) 16%, transparent),
+      color-mix(in srgb, var(--rainbow-yellow) 16%, transparent),
+      color-mix(in srgb, var(--rainbow-teal) 16%, transparent),
+      color-mix(in srgb, var(--rainbow-blue) 16%, transparent),
+      color-mix(in srgb, var(--rainbow-pink) 16%, transparent)
+    );
+    background-size: 300% 300%;
+    animation:
+      winning-cell-pop 0.4s ease,
+      rainbow-border 3s linear infinite,
+      winning-rainbow-bg 6s ease infinite;
   }
 }
 
 @keyframes piece-vanishing-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.08; transform: scale(0.88); }
+}
+
+@keyframes winning-cell-pop {
+  from { transform: scale(0.9); }
+  to   { transform: scale(1); }
+}
+
+@keyframes winning-rainbow-bg {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 .piece {

@@ -15,6 +15,7 @@ class TicTacToeGame(BaseGame):
             "players": player_uids,
             "current_turn": player_uids[0],
             "winner": None,
+            "winning_line": None,
             "draw": False,
             "piece_queues": {uid: [] for uid in player_uids},
         }
@@ -43,7 +44,8 @@ class TicTacToeGame(BaseGame):
         my_queue.append([row, col])
         board[row][col] = piece
 
-        winner = uid if self._check_win(board, piece) else None
+        winning_line = self._winning_line(board, piece)
+        winner = uid if winning_line else None
         # A draw by "full board" is structurally impossible here — with at
         # most MAX_PIECES per player, at most 2*MAX_PIECES of the 9 cells
         # can ever be occupied at once — so `draw` is kept only for the
@@ -58,6 +60,7 @@ class TicTacToeGame(BaseGame):
             "piece_queues": queues,
             "current_turn": next_turn if not winner else uid,
             "winner": winner,
+            "winning_line": winning_line,
             "draw": False,
         }
 
@@ -147,13 +150,16 @@ class TicTacToeGame(BaseGame):
     # ── helpers ──────────────────────────────────────────
 
     def _check_win(self, board: list, piece: int) -> bool:
+        return self._winning_line(board, piece) is not None
+
+    def _winning_line(self, board: list, piece: int) -> Optional[list]:
         for i in range(SIZE):
             if all(board[i][j] == piece for j in range(SIZE)):
-                return True
+                return [[i, j] for j in range(SIZE)]
             if all(board[j][i] == piece for j in range(SIZE)):
-                return True
+                return [[j, i] for j in range(SIZE)]
         if all(board[i][i] == piece for i in range(SIZE)):
-            return True
+            return [[i, i] for i in range(SIZE)]
         if all(board[i][SIZE - 1 - i] == piece for i in range(SIZE)):
-            return True
-        return False
+            return [[i, SIZE - 1 - i] for i in range(SIZE)]
+        return None

@@ -85,22 +85,32 @@ export class TicTacToeComponent {
 
   cellClass(row: number, col: number): string {
     const v = this.board[row]?.[col] ?? 0;
-    if (v !== 0) return this.isVanishing(row, col) ? 'cell filled vanishing' : 'cell filled';
+    if (v !== 0) {
+      if (this.isWinningCell(row, col)) return 'cell filled winning';
+      return this.isVanishing(row, col) ? 'cell filled vanishing' : 'cell filled';
+    }
     if (this.canPlay(row, col)) return 'cell playable';
     return 'cell';
   }
 
-  /** True if this piece is the oldest of a player who's already at the
-   *  3-piece cap — i.e. it's the one that disappears when they play again. */
+  /** True only for the piece that vanishes on the *very next* move — the
+   *  oldest piece of whoever's turn it currently is (not both players' oldest
+   *  at once, since only the player about to move can trigger a removal).
+   *  Never applies once the match has ended — there is no "next move". */
   isVanishing(row: number, col: number): boolean {
+    if (this.isTerminal()) return false;
+    const uid: string = this.gameState?.current_turn ?? '';
     const queues: Record<string, number[][]> = this.gameState?.piece_queues ?? {};
-    for (const uid of Object.keys(queues)) {
-      const queue = queues[uid] ?? [];
-      if (queue.length >= this.MAX_PIECES) {
-        const [oldestRow, oldestCol] = queue[0];
-        if (oldestRow === row && oldestCol === col) return true;
-      }
-    }
-    return false;
+    const queue = queues[uid] ?? [];
+    if (queue.length < this.MAX_PIECES) return false;
+    const [oldestRow, oldestCol] = queue[0];
+    return oldestRow === row && oldestCol === col;
+  }
+
+  /** True for each of the 3 cells forming the winner's line, once the match is over. */
+  isWinningCell(row: number, col: number): boolean {
+    const line: number[][] | null = this.gameState?.winning_line ?? null;
+    if (!line) return false;
+    return line.some(([r, c]) => r === row && c === col);
   }
 }
