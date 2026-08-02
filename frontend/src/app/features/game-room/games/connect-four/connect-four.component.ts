@@ -13,6 +13,7 @@ export class ConnectFourComponent {
   @Input() gameState: any = null;
   @Input() myUid: string = '';
   @Input() playerColors: Partial<Record<string, string>> = {};
+  @Input() chipPatterns: Partial<Record<string, string>> = {};
   @Input() gameMode: 'ffa' | 'teams' = 'ffa';
   @Input() teams: { a: string[]; b: string[] } = { a: [], b: [] };
   @Output() moveMade = new EventEmitter<number>();
@@ -42,8 +43,23 @@ export class ConnectFourComponent {
     const classes = ['cell'];
     if (cell !== 0) classes.push('filled');
     if (this.isWinCell(row, col)) classes.push('win');
-    if (this.hoveredCol === col && this.isMyTurn && !this.isTerminal()) classes.push('hover');
+    if (this.isAboveLanding(row, col)) classes.push('hover');
     return classes.join(' ');
+  }
+
+  /** Lowest empty row in a column — where the next chip would actually land. -1 if full. */
+  private landingRow(col: number): number {
+    return this.board.reduceRight((found, r, i) => found === -1 && r[col] === 0 ? i : found, -1);
+  }
+
+  /** True only for empty cells strictly above the landing spot — the path the
+   *  dropped chip would fall through. Excludes the landing cell itself and
+   *  anything below it (already filled or out of reach for this drop). */
+  private isAboveLanding(row: number, col: number): boolean {
+    if (this.hoveredCol !== col || !this.isMyTurn || this.isTerminal()) return false;
+    const landing = this.landingRow(col);
+    if (landing === -1) return false;
+    return row < landing;
   }
 
   get isWinner(): boolean {
@@ -59,17 +75,27 @@ export class ConnectFourComponent {
   }
 
   // ── Chip design ─────────────────────────────────────────
+  // Reuses the same circular "O" piece artwork as tic-tac-toe so players can
+  // pick a design once (per-game preference) instead of a fixed chip_N.svg.
+
+  private uidForCell(cell: number): string {
+    const players: string[] = this.gameState?.players ?? [];
+    return players[cell - 1] ?? '';
+  }
+
+  private patternForUid(uid: string): string {
+    return this.chipPatterns[uid] ?? 'Classic';
+  }
 
   chipUrl(row: number, col: number): string {
     const cell = this.board[row]?.[col] ?? 0;
-    return cell ? `/conecta_cuatro/chip_${cell}.svg` : '';
+    if (!cell) return '';
+    return `/tres_en_raya/O_${this.patternForUid(this.uidForCell(cell))}.svg`;
   }
 
   get nextChipUrl(): string {
-    const players: string[] = this.gameState?.players ?? [];
-    const uid = this.gameState?.current_turn;
-    const idx = players.indexOf(uid);
-    return `/conecta_cuatro/chip_${idx >= 0 ? idx + 1 : 1}.svg`;
+    const uid = this.gameState?.current_turn ?? '';
+    return `/tres_en_raya/O_${this.patternForUid(uid)}.svg`;
   }
 
   cellStyle(row: number, col: number): { [key: string]: string } {
@@ -106,10 +132,7 @@ export class ConnectFourComponent {
     if (this.hoveredCol !== col || !this.isMyTurn || this.isTerminal()) return {};
     const cell = this.board[row]?.[col] ?? 0;
     if (cell !== 0) return {};
-    // Only apply to the lowest empty row in this column
-    const board = this.board;
-    const lastEmpty = board.reduceRight((found, r, i) => found === -1 && r[col] === 0 ? i : found, -1);
-    if (row !== lastEmpty) return {};
+    if (row !== this.landingRow(col)) return {};
 
     const uid    = this.gameState?.current_turn;
     const color  = this.playerColors[uid] ?? '#888';

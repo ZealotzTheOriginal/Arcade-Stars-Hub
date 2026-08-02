@@ -142,6 +142,7 @@ def create_room(room_id: str, game_id: str, host_uid: str) -> dict:
         "rematch_votes": [],
         "player_colors": {},
         "ttt_patterns": {},
+        "chip_patterns": {},
         "ms_board_size": "normal",
         "pong_win_score": 15,
         "game_mode": "ffa",
@@ -299,6 +300,7 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.RESPOND_COLOR_SWAP: _handle_respond_color_swap,
         ClientEvent.TRANSFER_LEADER: _handle_transfer_leader,
         ClientEvent.SET_TTT_PATTERN: _handle_set_ttt_pattern,
+        ClientEvent.SET_CHIP_PATTERN: _handle_set_chip_pattern,
         ClientEvent.SET_MS_BOARD_SIZE: _handle_set_ms_board_size,
         ClientEvent.SNAKE_DIRECTION: _handle_snake_direction,
         ClientEvent.PONG_HIT: _handle_pong_hit,
@@ -965,6 +967,22 @@ async def _handle_set_ttt_pattern(ws: WebSocket, uid: str, data: dict):
     if pattern not in _TTT_PATTERNS:
         return
     room.setdefault("ttt_patterns", {})[uid] = pattern
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+
+
+async def _handle_set_chip_pattern(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    pattern = data.get("pattern", "")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("game_id") != "connect_four":
+        return
+    if uid not in [p["uid"] for p in room["players"]]:
+        return
+    if pattern not in _TTT_PATTERNS:
+        return
+    room.setdefault("chip_patterns", {})[uid] = pattern
     await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
 
 

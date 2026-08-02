@@ -21,6 +21,7 @@ async def get_or_create_user(uid: str, email: str, display_name: str) -> UserPro
             friends=data.get("friends", []),
             friend_requests=data.get("friend_requests", []),
             ttt_pattern=data.get("ttt_pattern", None),
+            chip_pattern=data.get("chip_pattern", None),
             is_admin=data.get("is_admin", False),
             badges=data.get("badges", []),
             settings=UserSettings(**data.get("settings", {})),

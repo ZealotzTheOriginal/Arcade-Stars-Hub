@@ -82,6 +82,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   maxPlayers = signal(2);
   playerColors = signal<Partial<Record<string, string>>>({});
   tttPatterns = signal<Partial<Record<string, string>>>({});
+  chipPatterns = signal<Partial<Record<string, string>>>({});
   gameMode = signal<'ffa' | 'teams'>('ffa');
   teams = signal<{ a: string[]; b: string[] }>({ a: [], b: [] });
 
@@ -90,6 +91,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   canAddAI = computed(() => this.players().length < this.maxPlayers());
   myColor = computed(() => this.playerColors()[this.myUid] ?? '');
   myTttPattern = computed(() => this.tttPatterns()[this.myUid] ?? 'Classic');
+  myChipPattern = computed(() => this.chipPatterns()[this.myUid] ?? 'Classic');
 
   readonly TTT_PATTERNS = ['Classic', 'Modern', 'Cyberpunk', 'Abstract', 'Squishy'];
   previewPiece = signal<'X' | 'O'>('X');
@@ -212,6 +214,14 @@ export class GameRoomComponent implements OnInit, OnDestroy {
             this.ws.send('set_ttt_pattern', { room_id: this.roomId, pattern: this.myProfile.ttt_pattern });
           }
           this.tttPatterns.set(patterns);
+        }
+        if (msg.data.chip_patterns !== undefined) {
+          const patterns: Record<string, string> = { ...msg.data.chip_patterns };
+          if (this.gameId === 'connect_four' && !patterns[this.myUid] && this.myProfile?.chip_pattern) {
+            patterns[this.myUid] = this.myProfile.chip_pattern;
+            this.ws.send('set_chip_pattern', { room_id: this.roomId, pattern: this.myProfile.chip_pattern });
+          }
+          this.chipPatterns.set(patterns);
         }
         if (msg.data.game_mode) this.gameMode.set(msg.data.game_mode);
         if (msg.data.teams) this.teams.set(msg.data.teams);
@@ -497,6 +507,12 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.ws.send('set_ttt_pattern', { room_id: this.roomId, pattern });
     this.profileSvc.update({ ttt_pattern: pattern });
     this.api.updateMe({ ttt_pattern: pattern }).catch(() => {});
+  }
+
+  setChipPattern(pattern: string) {
+    this.ws.send('set_chip_pattern', { room_id: this.roomId, pattern });
+    this.profileSvc.update({ chip_pattern: pattern });
+    this.api.updateMe({ chip_pattern: pattern }).catch(() => {});
   }
 
   joinAsPlayer() {

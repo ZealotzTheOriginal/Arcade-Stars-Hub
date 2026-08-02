@@ -27,7 +27,7 @@
   border-radius: 4px;
   transition: color 0.15s, background 0.15s;
 
-  &.active { color: var(--rainbow-yellow); }
+  &.active { animation: rainbow-text 3s linear infinite; }
   &:disabled { cursor: not-allowed; opacity: 0.3; }
   &:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
 }
@@ -37,9 +37,10 @@
   flex-direction: column;
   gap: 4px;
   padding: 12px;
-  background: rgba(70, 67, 255, 0.15);
+  background: var(--bg-component);
   border-radius: 12px;
-  border: 2px solid var(--rainbow-blue);
+  border: 2px solid var(--rainbow-red);
+  animation: rainbow-border 4s linear infinite;
 }
 
 .row {
@@ -56,7 +57,10 @@
   cursor: pointer;
   transition: border-color 0.15s;
 
-  &.hover { border-color: rgba(255, 220, 0, 0.4); }
+  &.hover {
+    border-color: var(--rainbow-red);
+    animation: rainbow-border 3s linear infinite;
+  }
 
   &.filled {
     border-color: transparent;
@@ -73,4 +77,13 @@
 @keyframes win-pulse {
   from { transform: scale(1); }
   to   { transform: scale(1.14); }
+}
+
+@keyframes rainbow-text {
+  0%   { color: var(--rainbow-red); }
+  20%  { color: var(--rainbow-yellow); }
+  40%  { color: var(--rainbow-teal); }
+  60%  { color: var(--rainbow-blue); }
+  80%  { color: var(--rainbow-pink); }
+  100% { color: var(--rainbow-red); }
 }

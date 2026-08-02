@@ -27,6 +27,7 @@ class UserProfile(BaseModel):
     friends: list[str] = []
     friend_requests: list[str] = []
     ttt_pattern: Optional[str] = None
+    chip_pattern: Optional[str] = None
     is_admin: bool = False
     badges: list[str] = []
     settings: UserSettings = Field(default_factory=UserSettings)
@@ -36,6 +37,7 @@ class UserUpdate(BaseModel):
     display_name: Optional[str] = None
     avatar: Optional[str] = None
     ttt_pattern: Optional[str] = None
+    chip_pattern: Optional[str] = None
 
 
 class UserSettingsUpdate(BaseModel):

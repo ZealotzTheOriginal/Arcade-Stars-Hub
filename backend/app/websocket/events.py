@@ -29,6 +29,7 @@ class ClientEvent(str, Enum):
     RESPOND_COLOR_SWAP = "respond_color_swap"
     TRANSFER_LEADER = "transfer_leader"
     SET_TTT_PATTERN = "set_ttt_pattern"
+    SET_CHIP_PATTERN = "set_chip_pattern"
     SET_MS_BOARD_SIZE = "set_ms_board_size"
     SNAKE_DIRECTION = "snake_direction"
     PONG_HIT = "pong_hit"
