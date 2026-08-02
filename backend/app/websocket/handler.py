@@ -133,7 +133,9 @@ def create_room(room_id: str, game_id: str, host_uid: str) -> dict:
         "host_uid": host_uid,
         "leader_uid": host_uid,
         "min_players": defn.min_players,
-        "max_players": defn.max_players,
+        # Rooms default to the *minimum* player count, not the game's max —
+        # most matches are 1v1, so leaders opt into 3/4-player games explicitly.
+        "max_players": defn.min_players,
         "players": [],
         "spectators": [],
         "status": "waiting",

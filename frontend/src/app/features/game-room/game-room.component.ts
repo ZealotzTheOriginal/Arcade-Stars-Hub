@@ -559,8 +559,15 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     return this.onlineUids().has(uid);
   }
 
+  /** Online friends first, offline ones pushed to the bottom — inviting
+   *  shouldn't require scrolling past people who can't join anyway. */
   friends() {
-    return this.friendsSvc.friends();
+    const list = this.friendsSvc.friends();
+    return [...list].sort((a, b) => {
+      const aOnline = this.isFriendOnline(a.uid);
+      const bOnline = this.isFriendOnline(b.uid);
+      return aOnline === bOnline ? 0 : aOnline ? -1 : 1;
+    });
   }
 
   inviteFriend(uid: string) {
