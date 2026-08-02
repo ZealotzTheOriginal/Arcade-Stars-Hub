@@ -97,6 +97,8 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   previewPiece = signal<'X' | 'O'>('X');
 
   msBoardSize = signal<string>('normal');
+  snakeFoodCount = signal<number>(5);
+  snakeLivesMode = signal<boolean>(false);
   pongWinScore   = signal<number>(15);
   pongTraj       = signal<any>(null);
   pongScores     = signal<Record<string, number>>({});
@@ -206,6 +208,8 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         if (msg.data.max_players) this.maxPlayers.set(msg.data.max_players);
         if (msg.data.player_colors) this.playerColors.set(msg.data.player_colors);
         if (msg.data.ms_board_size) this.msBoardSize.set(msg.data.ms_board_size);
+        if (msg.data.snake_food_count != null) this.snakeFoodCount.set(msg.data.snake_food_count);
+        if (msg.data.snake_lives_mode != null) this.snakeLivesMode.set(msg.data.snake_lives_mode);
         if (msg.data.pong_win_score != null) this.pongWinScore.set(msg.data.pong_win_score);
         if (msg.data.ttt_patterns !== undefined) {
           const patterns: Record<string, string> = { ...msg.data.ttt_patterns };
@@ -497,6 +501,14 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   setMsBoardSize(size: string) {
     this.ws.send('set_ms_board_size', { room_id: this.roomId, board_size: size });
+  }
+
+  setSnakeFoodCount(n: number) {
+    this.ws.send('set_snake_food_count', { room_id: this.roomId, food_count: n });
+  }
+
+  setSnakeMode(livesMode: boolean) {
+    this.ws.send('set_snake_mode', { room_id: this.roomId, lives_mode: livesMode });
   }
 
   setPongWinScore(n: number) {

@@ -147,6 +147,8 @@ def create_room(room_id: str, game_id: str, host_uid: str) -> dict:
         "chip_patterns": {},
         "ms_board_size": "normal",
         "pong_win_score": 15,
+        "snake_food_count": 5,
+        "snake_lives_mode": False,
         "game_mode": "ffa",
         "teams": {"a": [], "b": []},
     }
@@ -304,6 +306,8 @@ async def handle_message(ws: WebSocket, uid: str, raw: str):
         ClientEvent.SET_TTT_PATTERN: _handle_set_ttt_pattern,
         ClientEvent.SET_CHIP_PATTERN: _handle_set_chip_pattern,
         ClientEvent.SET_MS_BOARD_SIZE: _handle_set_ms_board_size,
+        ClientEvent.SET_SNAKE_FOOD_COUNT: _handle_set_snake_food_count,
+        ClientEvent.SET_SNAKE_MODE: _handle_set_snake_mode,
         ClientEvent.SNAKE_DIRECTION: _handle_snake_direction,
         ClientEvent.PONG_HIT: _handle_pong_hit,
         ClientEvent.PONG_MISS: _handle_pong_miss,
@@ -1007,6 +1011,41 @@ async def _handle_set_ms_board_size(ws: WebSocket, uid: str, data: dict):
     await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
 
 
+_SNAKE_FOOD_COUNTS = {5, 10, 15}
+
+
+async def _handle_set_snake_food_count(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    food_count = data.get("food_count")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("leader_uid") != uid:
+        return
+    if room.get("game_id") != "snake":
+        return
+    if food_count not in _SNAKE_FOOD_COUNTS:
+        return
+    room["snake_food_count"] = food_count
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+
+
+async def _handle_set_snake_mode(ws: WebSocket, uid: str, data: dict):
+    room_id = data.get("room_id")
+    lives_mode = data.get("lives_mode")
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "waiting":
+        return
+    if room.get("leader_uid") != uid:
+        return
+    if room.get("game_id") != "snake":
+        return
+    if not isinstance(lives_mode, bool):
+        return
+    room["snake_lives_mode"] = lives_mode
+    await manager.broadcast(room_id, ServerEvent.ROOM_STATE, _safe_room(room))
+
+
 async def _handle_transfer_leader(ws: WebSocket, uid: str, data: dict):
     room_id = data.get("room_id")
     target_uid = data.get("target_uid")
@@ -1082,9 +1121,16 @@ async def _handle_snake_direction(ws: WebSocket, uid: str, data: dict):
 async def _snake_tick_loop(room_id: str):
     """Advances the Snake game at a fixed interval until the game ends."""
     from app.games.snake.game import SnakeGame
-    TICK_MS = 0.10  # 100ms per cell (10 cells/s)
+    BASE_TICK_S = 0.10  # 100ms per cell (10 cells/s); halved during the comeback phase
     while True:
-        await asyncio.sleep(TICK_MS)
+        room = _rooms.get(room_id)
+        if not room or room["status"] != "playing" or room["game_id"] != "snake":
+            _snake_tasks.pop(room_id, None)
+            return
+        comeback = (room.get("game_state") or {}).get("comeback") or {}
+        tick_s = BASE_TICK_S / 2 if comeback.get("active") else BASE_TICK_S
+        await asyncio.sleep(tick_s)
+
         room = _rooms.get(room_id)
         if not room or room["status"] != "playing" or room["game_id"] != "snake":
             _snake_tasks.pop(room_id, None)
@@ -1325,6 +1371,12 @@ async def _start_game(room_id: str):
         state = game.get_initial_state(player_uids, board_size=room.get("ms_board_size", "normal"))
     elif room["game_id"] == "pong":
         state = game.get_initial_state(player_uids, win_score=room.get("pong_win_score", 15))
+    elif room["game_id"] == "snake":
+        state = game.get_initial_state(
+            player_uids,
+            food_count=room.get("snake_food_count", 5),
+            lives_mode=room.get("snake_lives_mode", False),
+        )
     else:
         state = game.get_initial_state(player_uids)
     state["game_mode"] = room.get("game_mode", "ffa")

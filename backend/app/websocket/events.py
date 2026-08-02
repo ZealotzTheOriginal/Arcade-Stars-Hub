@@ -31,6 +31,8 @@ class ClientEvent(str, Enum):
     SET_TTT_PATTERN = "set_ttt_pattern"
     SET_CHIP_PATTERN = "set_chip_pattern"
     SET_MS_BOARD_SIZE = "set_ms_board_size"
+    SET_SNAKE_FOOD_COUNT = "set_snake_food_count"
+    SET_SNAKE_MODE = "set_snake_mode"
     SNAKE_DIRECTION = "snake_direction"
     PONG_HIT = "pong_hit"
     PONG_MISS = "pong_miss"

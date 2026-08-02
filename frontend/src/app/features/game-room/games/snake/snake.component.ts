@@ -1,9 +1,9 @@
 import {
   Component, Input, Output, EventEmitter,
   OnChanges, AfterViewInit, OnDestroy,
-  ViewChild, ElementRef, HostListener, NgZone, inject,
+  ViewChild, ElementRef, HostListener, NgZone,
 } from '@angular/core';
-import { TranslateService, TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe } from '@ngx-translate/core';
 
 const CELL    = 64;
 const BOARD   = 24;
@@ -23,7 +23,6 @@ const DIR_OFFSET: Record<string, [number, number]> = {
   styleUrls: ['./snake.component.scss'],
 })
 export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
-  private translate = inject(TranslateService);
   @Input() gameState: any = null;
   @Input() myUid: string = '';
   @Input() playerColors: Partial<Record<string, string>> = {};
@@ -47,6 +46,11 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
   // Used to animate the tail smoothly from old position to new position each tick.
   private prevTailPos: Record<string, [number, number]> = {};
 
+  // Uids that respawned (lives mode) on the CURRENT state — their body was
+  // teleported to a corner, so head/tail interpolation must snap instead of
+  // sliding across the whole board.
+  private respawnedUids = new Set<string>();
+
   private bgCanvas!: HTMLCanvasElement;
 
   constructor(private zone: NgZone) {}
@@ -68,7 +72,8 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
     const bg = document.createElement('canvas');
     bg.width = bg.height = N * S;
     const ctx = bg.getContext('2d')!;
-    ctx.fillStyle = '#0d0f18';
+    const bgComponent = getComputedStyle(document.documentElement).getPropertyValue('--bg-component').trim();
+    ctx.fillStyle = bgComponent || '#15151d';
     ctx.fillRect(0, 0, N * S, N * S);
     ctx.strokeStyle = 'rgba(255,255,255,0.035)';
     ctx.lineWidth = 0.5;
@@ -92,6 +97,12 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
         }
       }
     }
+
+    this.respawnedUids = new Set(
+      Object.entries(this.gameState?.snakes ?? {})
+        .filter(([, s]: [string, any]) => s?.respawned_this_tick)
+        .map(([uid]) => uid)
+    );
 
     if (this.gameState?.tick === 0) {
       this.pendingDirs  = [];
@@ -164,16 +175,11 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
       const cy = food.r * S + S / 2;
       if (food.type === 'rainbow') {
         const hue = (now / 15) % 360;
-        ctx.fillStyle   = `hsl(${hue}, 100%, 62%)`;
-        ctx.shadowBlur  = 18;
-        ctx.shadowColor = `hsl(${hue}, 100%, 62%)`;
+        ctx.fillStyle = `hsl(${hue}, 100%, 62%)`;
       } else {
-        ctx.fillStyle   = '#ffffff';
-        ctx.shadowBlur  = 12;
-        ctx.shadowColor = 'rgba(255,255,255,0.85)';
+        ctx.fillStyle = '#ffffff';
       }
       this.drawStar(ctx, cx, cy, 8, S * 0.36, S * 0.15);
-      ctx.shadowBlur = 0;
     }
 
     for (const uid of (state.players ?? [])) {
@@ -182,82 +188,32 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
       const body: number[][] = snake.body ?? [];
       if (body.length === 0) continue;
 
-      const color  = (this.playerColors[uid] ?? '#888888') as string;
-      const alpha  = snake.alive ? 1 : 0.28;
-      const isMe   = uid === this.myUid;
-      const dir    = snake.direction ?? 'right';
-      const prev   = this.prevTailPos[uid] ?? null;
+      const color      = (this.playerColors[uid] ?? '#888888') as string;
+      const alpha      = snake.alive ? 1 : 0.28;
+      const isMe       = uid === this.myUid;
+      const dir        = snake.direction ?? 'right';
+      const respawned  = this.respawnedUids.has(uid);
+      const prev       = respawned ? null : (this.prevTailPos[uid] ?? null);
 
-      const { headX, headY, eyeDir } = this.computeHead(body, dir, t, isMe, snake.alive);
-      this.drawSnake(ctx, body, headX, headY, eyeDir, color, alpha, t, prev);
+      const { headX, headY, eyeDir } = this.computeHead(body, dir, t, isMe, snake.alive, respawned);
+      this.drawSnake(ctx, body, headX, headY, eyeDir, color, alpha, t, prev, snake.alive);
     }
-
-    if (this.gameOver) this.drawGameOver(ctx, state, now);
-  }
-
-  private drawGameOver(ctx: CanvasRenderingContext2D, state: any, now: number) {
-    const PX = BOARD * CELL;
-    const winner: string | null = state.winner ?? null;
-
-    // Dark vignette
-    ctx.save();
-    ctx.fillStyle = 'rgba(5, 5, 8, 0.55)';
-    ctx.fillRect(0, 0, PX, PX);
-
-    const cx = PX / 2;
-    const cy = PX / 2;
-
-    if (winner) {
-      const color = (this.playerColors[winner] ?? '#ffffff') as string;
-      const isMe  = winner === this.myUid;
-      const label = this.translate.instant(isMe ? 'GAMES.COMMON.YOU_WON' : 'GAMES.SNAKE.YOU_LOST');
-
-      // Pulsing glow ring
-      const pulse = 0.85 + 0.15 * Math.sin(now / 280);
-      ctx.shadowBlur  = 48 * pulse;
-      ctx.shadowColor = color;
-      ctx.strokeStyle = color;
-      ctx.lineWidth   = 3 * pulse;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 90 * pulse, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // Main label
-      ctx.font      = 'bold 52px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = color;
-      ctx.shadowBlur  = 20;
-      ctx.shadowColor = color;
-      ctx.fillText(label, cx, cy - 14);
-      ctx.shadowBlur = 0;
-
-      // Score sub-label
-      const score = state.snakes?.[winner]?.score ?? 0;
-      ctx.font      = '22px system-ui, sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.65)';
-      ctx.fillText(`${score} pt${score !== 1 ? 's' : ''}`, cx, cy + 34);
-    } else {
-      // Draw (all died on same tick)
-      ctx.font      = 'bold 52px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.fillText(this.translate.instant('GAMES.SNAKE.DRAW'), cx, cy);
-    }
-
-    ctx.restore();
   }
 
   private computeHead(
     body: number[][], serverDir: string, t: number,
-    isMe: boolean, alive: boolean,
+    isMe: boolean, alive: boolean, justRespawned: boolean = false,
   ): { headX: number; headY: number; eyeDir: string } {
     const S = CELL;
     const [hr, hc] = body[0];
 
     if (!alive) {
+      return { headX: (hc + 0.5) * S, headY: (hr + 0.5) * S, eyeDir: serverDir };
+    }
+
+    // Just teleported to a new corner — snap instead of sliding in from
+    // wherever the body used to be.
+    if (justRespawned && t <= 1) {
       return { headX: (hc + 0.5) * S, headY: (hr + 0.5) * S, eyeDir: serverDir };
     }
 
@@ -290,64 +246,110 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
     ctx: CanvasRenderingContext2D,
     body: number[][], headX: number, headY: number,
     eyeDir: string, color: string, alpha: number,
-    t: number, prevTail: [number, number] | null,
+    t: number, prevTail: [number, number] | null, alive: boolean,
   ) {
     const S = CELL;
     const N = body.length;
+    // Segments are rounded squares inscribed in each cell, bridged by plain
+    // rects to the next segment — unlike a stroked path with round joins,
+    // this never bulges past the cells the body actually occupies on turns.
+    const segSize   = R * 2;
+    const segRadius = segSize * 0.3;
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = color;
-    ctx.lineWidth   = R * 2;
-    ctx.lineJoin    = 'round';
-    ctx.lineCap     = 'round';
-    ctx.beginPath();
-
-    // ── Tail start: animate from previous tail position to current tail ──
-    // The tail retracts smoothly during t=0→1, just like the head advances.
-    // When food was eaten the tail didn't move (prevTail === currentTail) → no animation.
-    const [tailR, tailC] = body[N - 1];
-    let tailStartX = (tailC + 0.5) * S;
-    let tailStartY = (tailR + 0.5) * S;
-
-    if (prevTail && t < 1) {
-      const [pR, pC] = prevTail;
-      if (pR !== tailR || pC !== tailC) {
-        // Tail moved → interpolate from old position to new position
-        tailStartX = (pC + (tailC - pC) * t + 0.5) * S;
-        tailStartY = (pR + (tailR - pR) * t + 0.5) * S;
-      }
-    }
-
-    ctx.moveTo(tailStartX, tailStartY);
-
-    // ── Body ──────────────────────────────────────────────────────────
-    // t ≤ 1: stroke ends between body[1] and body[0] (head slides out of neck)
-    // t > 1: stroke passes through body[0] then continues to extrapolated head
-    const stopIdx = t > 1 ? 0 : 1;
-    for (let i = N - 2; i >= stopIdx; i--) {
-      ctx.lineTo((body[i][1] + 0.5) * S, (body[i][0] + 0.5) * S);
-    }
-    if (N > 1) ctx.lineTo(headX, headY);
-
-    ctx.stroke();
-
-    // ── Head circle with glow ─────────────────────────────────────────
     ctx.fillStyle   = color;
-    ctx.shadowBlur  = 16;
-    ctx.shadowColor = color;
+
+    const cellCenter = (i: number): [number, number] => {
+      const [r, c] = body[i];
+      return [(c + 0.5) * S, (r + 0.5) * S];
+    };
+
+    // Ordered chain of body-segment points, tail → head:
+    // t ≤ 1: ends at body[1], then bridges straight to the sliding head
+    // t > 1: also passes through body[0] before the extrapolated head tip
+    const chain: [number, number][] = [];
+
+    if (N > 1) {
+      const [tailR, tailC] = body[N - 1];
+      const newTailFixed: [number, number] = [(tailC + 0.5) * S, (tailR + 0.5) * S];
+
+      // Retracting tip: slides from the OLD tail cell into the new (fixed)
+      // tail cell as t goes 0→1. It only ever moves along the single axis
+      // between two adjacent grid cells, so — unlike interpolating straight
+      // to the next body segment — it stays axis-aligned even when the body
+      // bends right at the tail, instead of cutting a diagonal shortcut.
+      let retractTip: [number, number] | null = null;
+      if (prevTail && t < 1) {
+        const [pR, pC] = prevTail;
+        if (pR !== tailR || pC !== tailC) {
+          retractTip = [(pC + (tailC - pC) * t + 0.5) * S, (pR + (tailR - pR) * t + 0.5) * S];
+        }
+      }
+
+      if (retractTip) chain.push(retractTip);
+      chain.push(newTailFixed);
+      for (let i = N - 2; i >= 1; i--) chain.push(cellCenter(i));
+      if (t > 1) chain.push(cellCenter(0));
+    }
+
+    chain.push([headX, headY]);
+
+    // Every square + bridge is added as a subpath of ONE path, filled with a
+    // single fill() call. That matters once alpha < 1 (dead snakes): filling
+    // each overlapping shape separately re-blends the alpha at every overlap,
+    // which is what produced the checkered/gappy look on faded bodies.
     ctx.beginPath();
+    for (let i = 1; i < chain.length; i++) {
+      const [x1, y1] = chain[i - 1];
+      const [x2, y2] = chain[i];
+      this.addBridgePath(ctx, x1, y1, x2, y2, segSize);
+    }
+    for (let i = 0; i < chain.length - 1; i++) {
+      const [x, y] = chain[i];
+      this.addRoundSquarePath(ctx, x, y, segSize, segRadius);
+    }
     ctx.arc(headX, headY, R * 1.06, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
 
-    this.drawEyes(ctx, headX, headY, eyeDir, R);
     ctx.restore();
+
+    // Eyes are drawn at full opacity even on a faded (dead) body, so the
+    // cartoon "X" death marker stays crisp instead of also washing out.
+    ctx.save();
+    this.drawEyes(ctx, headX, headY, eyeDir, R, alive);
+    ctx.restore();
+  }
+
+  private addRoundSquarePath(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, r: number) {
+    const half = size / 2;
+    const x = cx - half, y = cy - half;
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + size - r, y);
+    ctx.arcTo(x + size, y, x + size, y + r, r);
+    ctx.lineTo(x + size, y + size - r);
+    ctx.arcTo(x + size, y + size, x + size - r, y + size, r);
+    ctx.lineTo(x + r, y + size);
+    ctx.arcTo(x, y + size, x, y + size - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
+  /** Straight rect bridging two adjacent (axis-aligned) segment centers, so
+   *  consecutive rounded squares read as one continuous, ungapped body. */
+  private addBridgePath(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, thickness: number) {
+    const half = thickness / 2;
+    const left = Math.min(x1, x2) - half;
+    const top  = Math.min(y1, y2) - half;
+    const w    = Math.abs(x2 - x1) + thickness;
+    const h    = Math.abs(y2 - y1) + thickness;
+    ctx.rect(left, top, w, h);
   }
 
   private drawEyes(
     ctx: CanvasRenderingContext2D,
-    cx: number, cy: number, dir: string, headR: number,
+    cx: number, cy: number, dir: string, headR: number, alive: boolean,
   ) {
     const fwdMap: Record<string, [number, number]> = {
       up:[0,-1], down:[0,1], left:[-1,0], right:[1,0],
@@ -355,16 +357,32 @@ export class SnakeComponent implements OnChanges, AfterViewInit, OnDestroy {
     const [fx, fy] = fwdMap[dir] ?? [1, 0];
     const px = -fy, py = fx;
 
-    const fwdOff  = headR * 0.40;
-    const sideOff = headR * 0.38;
-    const eyeR    = headR * 0.22;
-    const pupilR  = eyeR  * 0.55;
-    const pupFwd  = pupilR * 0.35;
+    // Big, close-to-the-front cartoon eyes.
+    const fwdOff  = headR * 0.30;
+    const sideOff = headR * 0.46;
+    const eyeR    = headR * 0.40;
 
     const eyes: [number, number][] = [
       [cx + fx * fwdOff + px * sideOff, cy + fy * fwdOff + py * sideOff],
       [cx + fx * fwdOff - px * sideOff, cy + fy * fwdOff - py * sideOff],
     ];
+
+    if (!alive) {
+      ctx.strokeStyle = '#111827';
+      ctx.lineWidth    = eyeR * 0.5;
+      ctx.lineCap      = 'round';
+      const arm = eyeR * 0.85;
+      for (const [ex, ey] of eyes) {
+        ctx.beginPath();
+        ctx.moveTo(ex - arm, ey - arm); ctx.lineTo(ex + arm, ey + arm);
+        ctx.moveTo(ex + arm, ey - arm); ctx.lineTo(ex - arm, ey + arm);
+        ctx.stroke();
+      }
+      return;
+    }
+
+    const pupilR = eyeR * 0.58;
+    const pupFwd = pupilR * 0.35;
 
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
     for (const [ex, ey] of eyes) {

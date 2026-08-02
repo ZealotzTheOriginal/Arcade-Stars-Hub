@@ -85,18 +85,15 @@
   font-size: 0.9rem;
 }
 
-.snake-controls-hint {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  opacity: 0.6;
+.snake-lives {
+  display: inline-flex;
+  gap: 0.15rem;
+  font-size: 0.7rem;
+  color: var(--rainbow-red);
 
-  kbd {
-    display: inline-block;
-    padding: 0.1rem 0.35rem;
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 4px;
-    font-size: 0.7rem;
-    margin: 0 1px;
-    background: rgba(255,255,255,0.06);
+  .lost {
+    color: var(--text-muted);
+    opacity: 0.4;
   }
 }
+

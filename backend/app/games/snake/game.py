@@ -10,17 +10,44 @@ DIRS: dict[str, tuple[int, int]] = {
 }
 OPP = {"up": "down", "down": "up", "left": "right", "right": "left"}
 INIT_LEN = 3
-FOOD_TARGET = 3
+DEFAULT_FOOD_COUNT = 5
 RAINBOW_CHANCE = 0.15
+LIVES = 3
+
+# Lives-mode respawn spots: one cell in from each corner, facing inward so the
+# snake doesn't immediately run into the border.
+CORNER_SPAWNS: list[tuple[int, int, str]] = [
+    (1, INIT_LEN - 1, "right"),
+    (1, BOARD - INIT_LEN, "left"),
+    (BOARD - 2, INIT_LEN - 1, "right"),
+    (BOARD - 2, BOARD - INIT_LEN, "left"),
+]
 
 
-def _free_cells(state: dict) -> list[tuple[int, int]]:
+def _spawn_body(r: int, c: int, d: str) -> list[list[int]]:
+    if d == "right":
+        return [[r, c - j] for j in range(INIT_LEN)]
+    if d == "left":
+        return [[r, c + j] for j in range(INIT_LEN)]
+    if d == "down":
+        return [[r - j, c] for j in range(INIT_LEN)]
+    return [[r + j, c] for j in range(INIT_LEN)]
+
+
+def _occupied_cells(state: dict, exclude_uid: Optional[str] = None) -> set[tuple]:
     occ: set[tuple] = set()
-    for s in state["snakes"].values():
+    for uid, s in state["snakes"].items():
+        if uid == exclude_uid:
+            continue
         for cell in s["body"]:
             occ.add(tuple(cell))
     for f in state["food"]:
         occ.add((f["r"], f["c"]))
+    return occ
+
+
+def _free_cells(state: dict, exclude_uid: Optional[str] = None) -> list[tuple[int, int]]:
+    occ = _occupied_cells(state, exclude_uid)
     return [(r, c) for r in range(BOARD) for c in range(BOARD) if (r, c) not in occ]
 
 
@@ -34,42 +61,44 @@ def _spawn_food(state: dict) -> dict | None:
 
 class SnakeGame(BaseGame):
 
-    def get_initial_state(self, player_uids: list[str]) -> dict:
+    def get_initial_state(
+        self, player_uids: list[str],
+        food_count: int = DEFAULT_FOOD_COUNT, lives_mode: bool = False,
+    ) -> dict:
         mid = BOARD // 2
         configs = [
             (mid, 3, "right"),
             (mid, BOARD - 4, "left"),
+            (mid - 6, 3, "right"),
+            (mid + 6, BOARD - 4, "left"),
         ]
         snakes: dict = {}
         for i, uid in enumerate(player_uids):
             r, c, d = configs[i % len(configs)]
-            if d == "right":
-                body = [[r, c - j] for j in range(INIT_LEN)]
-            elif d == "left":
-                body = [[r, c + j] for j in range(INIT_LEN)]
-            elif d == "down":
-                body = [[r - j, c] for j in range(INIT_LEN)]
-            else:
-                body = [[r + j, c] for j in range(INIT_LEN)]
             snakes[uid] = {
-                "body": body,
+                "body": _spawn_body(r, c, d),
                 "direction": d,
                 "pending_dirs": [],  # queue, max 3 — one dequeued per tick
                 "alive": True,
                 "score": 0,
+                "lives": LIVES if lives_mode else None,
+                "respawned_this_tick": False,
             }
 
         state: dict = {
             "board_size": BOARD,
             "snakes": snakes,
             "food": [],
+            "food_count": food_count,
+            "lives_mode": lives_mode,
+            "comeback": None,
             "scores": {uid: 0 for uid in player_uids},
             "players": player_uids,
             "winner": None,
             "tick": 0,
             "current_turn": None,
         }
-        for _ in range(FOOD_TARGET):
+        for _ in range(food_count):
             f = _spawn_food(state)
             if f:
                 state["food"].append(f)
@@ -80,6 +109,10 @@ class SnakeGame(BaseGame):
     def tick(self, state: dict) -> dict:
         state = copy.deepcopy(state)
         snakes = state["snakes"]
+        lives_mode = state.get("lives_mode", False)
+
+        for snake in snakes.values():
+            snake["respawned_this_tick"] = False
 
         # Dequeue one direction per tick (no 180° reversal)
         for snake in snakes.values():
@@ -134,15 +167,34 @@ class SnakeGame(BaseGame):
             if len(uids) > 1:
                 dying.update(uids)
 
+        # Resolve deaths — in lives_mode a snake respawns until its lives run
+        # out, at which point it's permanently eliminated (alive=False).
+        newly_eliminated: list[str] = []
+        respawned: set[str] = set()
         for uid in dying:
-            snakes[uid]["alive"] = False
+            snake = snakes[uid]
+            if lives_mode:
+                snake["lives"] = snake.get("lives", LIVES) - 1
+                if snake["lives"] > 0:
+                    self._respawn(state, uid)
+                    snake["respawned_this_tick"] = True
+                    respawned.add(uid)
+                else:
+                    snake["alive"] = False
+                    newly_eliminated.append(uid)
+            else:
+                snake["alive"] = False
 
-        # Move bodies
+        comeback = state.get("comeback") or {}
+        points_multiplier = 2 if comeback.get("active") else 1
+
+        # Move bodies (skip snakes that just respawned — their body was
+        # already placed directly by _respawn, no head to slide into)
         food_map = {(f["r"], f["c"]): f for f in state["food"]}
         eaten: set[tuple] = set()
 
         for uid, snake in snakes.items():
-            if not snake["alive"] or uid not in new_heads:
+            if not snake["alive"] or uid not in new_heads or uid in respawned:
                 continue
             head = new_heads[uid]
             hpos = tuple(head)
@@ -151,7 +203,7 @@ class SnakeGame(BaseGame):
             if not ate_food:
                 snake["body"] = snake["body"][:-1]
             else:
-                pts = 3 if food_map[hpos]["type"] == "rainbow" else 1
+                pts = (3 if food_map[hpos]["type"] == "rainbow" else 1) * points_multiplier
                 snake["score"] += pts
                 state["scores"][uid] = state["scores"].get(uid, 0) + pts
                 eaten.add(hpos)
@@ -163,10 +215,58 @@ class SnakeGame(BaseGame):
             if nf:
                 state["food"].append(nf)
 
+        # A freshly-eliminated player kicks off the comeback phase (double
+        # speed + double points for the survivor) only if they're behind on
+        # score — otherwise the survivor is already ahead and just wins.
+        if lives_mode and newly_eliminated and not comeback.get("active"):
+            for uid in newly_eliminated:
+                others = [u for u in state["players"] if u != uid]
+                if len(others) != 1:
+                    continue
+                survivor = others[0]
+                if not snakes.get(survivor, {}).get("alive"):
+                    continue  # both eliminated same tick — plain score decides, no comeback
+                if state["scores"].get(survivor, 0) < state["scores"].get(uid, 0):
+                    state["comeback"] = {
+                        "active": True,
+                        "eliminated_uid": uid,
+                        "survivor_uid": survivor,
+                        "frozen_score": state["scores"].get(uid, 0),
+                    }
+
         state["tick"] = state.get("tick", 0) + 1
         if self.is_terminal(state):
             state["winner"] = self.get_winner(state)
         return state
+
+    def _respawn(self, state: dict, uid: str) -> None:
+        """Place a snake back on the board after it loses a life — prefer a
+        board corner, falling back to any free cell if all corners are taken."""
+        snake = state["snakes"][uid]
+        corners = list(CORNER_SPAWNS)
+        random.shuffle(corners)
+        for r, c, d in corners:
+            body = _spawn_body(r, c, d)
+            occ = _occupied_cells(state, exclude_uid=uid)
+            if all(0 <= br < BOARD and 0 <= bc < BOARD and (br, bc) not in occ for br, bc in body):
+                snake["body"] = body
+                snake["direction"] = d
+                snake["pending_dirs"] = []
+                snake["alive"] = True
+                return
+
+        free = _free_cells(state, exclude_uid=uid)
+        if free:
+            r, c = random.choice(free)
+            snake["body"] = [[r, c]]
+            snake["direction"] = random.choice(list(DIRS))
+            snake["pending_dirs"] = []
+            snake["alive"] = True
+            return
+
+        # No space anywhere on the board — treat as elimination.
+        snake["lives"] = 0
+        snake["alive"] = False
 
     # ── BaseGame interface ─────────────────────────────────────────
 
@@ -188,13 +288,31 @@ class SnakeGame(BaseGame):
         return {**state, "snakes": {**state["snakes"], uid: {**snake, "pending_dirs": pending}}}
 
     def is_terminal(self, state: dict) -> bool:
-        alive = [s for s in state.get("snakes", {}).values() if s.get("alive")]
-        return len(alive) <= 1
+        snakes = state.get("snakes", {})
+        alive = [s for s in snakes.values() if s.get("alive")]
+        comeback = state.get("comeback") or {}
+        if not comeback.get("active"):
+            return len(alive) <= 1
+        # Comeback phase: over once the survivor overtakes the frozen score
+        # (win) or crashes before doing so (loss — the risk is real).
+        survivor_snake = snakes.get(comeback.get("survivor_uid"))
+        if not survivor_snake or not survivor_snake.get("alive"):
+            return True
+        return state.get("scores", {}).get(comeback.get("survivor_uid"), 0) > comeback.get("frozen_score", 0)
 
     def get_winner(self, state: dict) -> Optional[str]:
         snakes = state.get("snakes", {})
         if not snakes:
             return None
+        comeback = state.get("comeback") or {}
+        if comeback.get("active"):
+            survivor = comeback.get("survivor_uid")
+            survivor_snake = snakes.get(survivor)
+            if not survivor_snake or not survivor_snake.get("alive"):
+                return comeback.get("eliminated_uid")  # survivor crashed — eliminated player wins after all
+            if state.get("scores", {}).get(survivor, 0) > comeback.get("frozen_score", 0):
+                return survivor
+            return None  # comeback still in progress
         scores = {uid: s.get("score", 0) for uid, s in snakes.items()}
         max_sc = max(scores.values())
         tops = [uid for uid, sc in scores.items() if sc == max_sc]

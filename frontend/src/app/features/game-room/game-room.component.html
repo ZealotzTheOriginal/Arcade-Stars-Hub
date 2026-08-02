@@ -198,7 +198,7 @@
           @if (isLeader() && !isSpectator()) {
             <div class="leader-panel">
 
-              @if (gameId === 'connect_four' || gameId === 'minesweeper') {
+              @if (gameId === 'connect_four' || gameId === 'minesweeper' || gameId === 'snake') {
                 <div class="mode-section">
                   <p class="leader-section-label"><i class="fa-solid fa-user-group"></i> {{ 'GAME_ROOM.PLAYERS_IN_ROOM' | translate }}</p>
                   <div class="mode-toggle">
@@ -228,7 +228,7 @@
                 </div>
               }
 
-              @if (maxPlayers() === 4 && gameId !== 'minesweeper') {
+              @if (maxPlayers() === 4 && gameId !== 'minesweeper' && gameId !== 'snake') {
                 <div class="mode-section">
                   <p class="leader-section-label"><i class="fa-solid fa-sliders"></i> {{ 'GAME_ROOM.GAME_MODE' | translate }}</p>
                   <div class="mode-toggle">
@@ -249,6 +249,28 @@
                     @for (n of [5, 10, 15]; track n) {
                       <button class="mode-btn" [class.active]="pongWinScore() === n" (click)="setPongWinScore(n)">{{ n }}</button>
                     }
+                  </div>
+                </div>
+              }
+
+              @if (gameId === 'snake') {
+                <div class="mode-section">
+                  <p class="leader-section-label"><i class="fa-solid fa-star"></i> {{ 'GAME_ROOM.STAR_COUNT' | translate }}</p>
+                  <div class="mode-toggle">
+                    @for (n of [5, 10, 15]; track n) {
+                      <button class="mode-btn" [class.active]="snakeFoodCount() === n" (click)="setSnakeFoodCount(n)">{{ n }}</button>
+                    }
+                  </div>
+                </div>
+                <div class="mode-section">
+                  <p class="leader-section-label"><i class="fa-solid fa-heart"></i> {{ 'GAME_ROOM.SNAKE_MODE' | translate }}</p>
+                  <div class="mode-toggle">
+                    <button class="mode-btn" [class.active]="!snakeLivesMode()" (click)="setSnakeMode(false)">
+                      {{ 'GAME_ROOM.SNAKE_CLASSIC' | translate }}
+                    </button>
+                    <button class="mode-btn" [class.active]="snakeLivesMode()" (click)="setSnakeMode(true)">
+                      {{ 'GAME_ROOM.SNAKE_LIVES' | translate }}
+                    </button>
                   </div>
                 </div>
               }

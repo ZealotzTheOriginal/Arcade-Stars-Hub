@@ -92,7 +92,7 @@ async def lifespan(_: FastAPI):
             category="Arcade",
             thumbnail="🐍",
             min_players=2,
-            max_players=2,
+            max_players=4,
             has_ai=True,
         ),
         SnakeGame(),
