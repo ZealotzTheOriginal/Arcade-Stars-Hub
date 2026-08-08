@@ -6,16 +6,4 @@
     class="pong-canvas"
     tabindex="0">
   </canvas>
-
-  <div class="pong-controls-hint">
-    @if (myUid) {
-      @if (mySide === 'left') {
-        <span>{{ 'GAMES.PONG.YOUR_PADDLE' | translate }} · <kbd>W</kbd> {{ 'GAMES.PONG.UP' | translate }} · <kbd>S</kbd> {{ 'GAMES.PONG.DOWN' | translate }}</span>
-      } @else {
-        <span>{{ 'GAMES.PONG.YOUR_PADDLE' | translate }} · <kbd>↑</kbd> {{ 'GAMES.PONG.UP' | translate }} · <kbd>↓</kbd> {{ 'GAMES.PONG.DOWN' | translate }}</span>
-      }
-    }
-    <span class="pong-hint-sep">·</span>
-    <span class="pong-hint-muted">{{ 'GAMES.PONG.ARROWS_ALSO_WORK' | translate }}</span>
-  </div>
 </div>

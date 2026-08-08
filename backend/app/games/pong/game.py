@@ -14,7 +14,7 @@ MAX_SPEED     = 600.0   # px/s
 SPEED_INCREMENT      = 15.0  # px/s added per paddle hit
 WALL_SPEED_INCREMENT =  9.0  # px/s added per wall bounce
 WIN_SCORE  = 15
-SERVE_MS   = 667        # ms ball stays frozen after each point
+SERVE_MS   = 500        # ms ball stays frozen after each point
 MAX_BOUNCE_ANGLE = 0.42 * math.pi  # ~75° max deflection
 
 

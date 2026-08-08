@@ -18,30 +18,3 @@
   aspect-ratio: 800 / 500;
   image-rendering: auto;
 }
-
-.pong-controls-hint {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  opacity: 0.65;
-
-  kbd {
-    display: inline-block;
-    padding: 0.08rem 0.32rem;
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 4px;
-    font-size: 0.68rem;
-    margin: 0 1px;
-    background: rgba(255,255,255,0.05);
-  }
-}
-
-.pong-hint-sep {
-  opacity: 0.35;
-}
-
-.pong-hint-muted {
-  opacity: 0.45;
-}

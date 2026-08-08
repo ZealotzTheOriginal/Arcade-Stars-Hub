@@ -3,7 +3,6 @@ import {
   OnChanges, SimpleChanges, AfterViewInit, OnDestroy,
   ViewChild, ElementRef, HostListener, NgZone,
 } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
 
 // ── Canvas constants (must match backend px/s model) ──────────────────────────
 const W = 800, H = 500;
@@ -17,7 +16,7 @@ const INITIAL_SPEED      = 300;   // px/s
 const MAX_SPEED          = 600;   // px/s
 const WALL_SPEED_INC     =   9;   // px/s per wall bounce
 const RAINBOW_THRESHOLD  = 390;   // px/s (≈ 13 px/tick × 30)
-const SERVE_MS           = 667;
+const SERVE_MS           = 500;
 
 // Flash-score animation timings
 const FLASH_HOLD = 600, FLASH_FADE = 1600;
@@ -25,7 +24,7 @@ const FLASH_HOLD = 600, FLASH_FADE = 1600;
 @Component({
   selector: 'app-pong',
   standalone: true,
-  imports: [TranslatePipe],
+  imports: [],
   templateUrl: './pong.component.html',
   styleUrls: ['./pong.component.scss'],
 })
@@ -56,6 +55,7 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
 
   private ctx!: CanvasRenderingContext2D;
   private animId?: number;
+  private bgComponentColor = '#15151d';
 
   // Local paddle state (px from top)
   private myPaddleY = H / 2 - PADDLE_H / 2;
@@ -82,6 +82,8 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
     const canvas = this.canvasRef.nativeElement;
     this.ctx = canvas.getContext('2d')!;
     canvas.focus();
+    const bgComponent = getComputedStyle(document.documentElement).getPropertyValue('--bg-component').trim();
+    if (bgComponent) this.bgComponentColor = bgComponent;
     // Apply trajectory that may have arrived before the component mounted
     if (this.pongTraj) {
       this.currentTraj = this.pongTraj;
@@ -124,6 +126,15 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
       this.trajId++;
       this.hitSent   = false;
       this.aiHitSent = false;
+
+      // Every serve (game start or after a point) freezes the ball at centre
+      // for SERVE_MS — recenter both paddles too, so whoever just conceded
+      // isn't stuck out of position with no time to react to the new serve.
+      if (this.pongTraj.serving) {
+        this.myPaddleY       = H / 2 - PADDLE_H / 2;
+        this.opPaddleY       = H / 2 - PADDLE_H / 2;
+        this.opPaddleTargetY = null;
+      }
 
       // Snap opponent paddle to server-confirmed position (AI games)
       if (this.pongTraj.opponent_snap_y !== undefined) {
@@ -403,7 +414,7 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
     const rightPaddleY = this.mySide === 'right' ? this.myPaddleY : this.opPaddleY;
 
     // Background
-    ctx.fillStyle = '#050508';
+    ctx.fillStyle = this.bgComponentColor;
     ctx.fillRect(0, 0, W, H);
 
     // Ambient half-court scores
@@ -442,12 +453,8 @@ export class PongComponent implements OnChanges, AfterViewInit, OnDestroy {
     ctx.clip();
 
     if (isRainbow) {
-      const hue  = (now / 6) % 360;
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, BALL_RADIUS);
-      grad.addColorStop(0,   `hsl(${hue}, 100%, 88%)`);
-      grad.addColorStop(0.5, `hsl(${(hue + 120) % 360}, 100%, 65%)`);
-      grad.addColorStop(1,   `hsl(${(hue + 240) % 360}, 100%, 52%)`);
-      ctx.fillStyle = grad;
+      const hue = (now / 6) % 360;
+      ctx.fillStyle = `hsl(${hue}, 100%, 62%)`;
     } else {
       ctx.fillStyle = '#ffffff';
     }
