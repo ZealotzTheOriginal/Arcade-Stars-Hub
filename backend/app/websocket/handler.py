@@ -116,6 +116,25 @@ _AI_POOL_WIN = [
 # room_id -> Task: boredom check that fires if the human doesn't move in time
 _boredom_tasks: dict[str, "asyncio.Task[None]"] = {}
 
+# How long a disconnected player's slot stays reserved during an in-progress
+# game before the match is forfeited to whoever's still connected.
+DISCONNECT_FORFEIT_SECONDS = 30
+
+# room_id -> {uid: Task}: pending auto-forfeit checks for players who
+# disconnected mid-game, cancelled if they reconnect in time.
+_disconnect_forfeit_tasks: dict[str, dict[str, "asyncio.Task[None]"]] = {}
+
+
+async def _disconnect_forfeit_check(room_id: str, uid: str) -> None:
+    await asyncio.sleep(DISCONNECT_FORFEIT_SECONDS)
+    _disconnect_forfeit_tasks.get(room_id, {}).pop(uid, None)
+    room = _rooms.get(room_id)
+    if not room or room["status"] != "playing":
+        return
+    if uid in manager.players_in_room(room_id):
+        return  # reconnected in time
+    await _abandon_game(room_id, uid)
+
 
 # ── Public accessors ──────────────────────────────────────
 
@@ -264,6 +283,8 @@ async def _close_room(room_id: str, reason: str = "Sala cerrada"):
     snake_task = _snake_tasks.pop(room_id, None)
     if snake_task:
         snake_task.cancel()
+    for t in _disconnect_forfeit_tasks.pop(room_id, {}).values():
+        t.cancel()
     await manager.broadcast(room_id, ServerEvent.ROOM_CLOSED, {"reason": reason})
     del _rooms[room_id]
     await broadcast_lobby_update()
@@ -340,6 +361,9 @@ async def _handle_join(ws: WebSocket, uid: str, data: dict):
     # ── Reconnect to in-progress game ────────────────────
     if uid in uids_in_room and room["status"] in ("playing", "finished"):
         manager.add(room_id, uid, ws)
+        pending_forfeit = _disconnect_forfeit_tasks.get(room_id, {}).pop(uid, None)
+        if pending_forfeit:
+            pending_forfeit.cancel()
         stored = next((p for p in room["players"] if p["uid"] == uid), {})
         await manager.broadcast(room_id, ServerEvent.PLAYER_RECONNECTED, {
             "uid": uid,
@@ -421,7 +445,13 @@ async def _handle_leave(ws: WebSocket, uid: str, data: dict):
                     await manager.broadcast(room_id, ServerEvent.PLAYER_DISCONNECTED, {
                         "uid": uid,
                         "display_name": player_info.get("display_name", "Jugador"),
+                        "forfeit_seconds": DISCONNECT_FORFEIT_SECONDS,
                     })
+                    room_tasks = _disconnect_forfeit_tasks.setdefault(room_id, {})
+                    old_task = room_tasks.pop(uid, None)
+                    if old_task:
+                        old_task.cancel()
+                    room_tasks[uid] = asyncio.create_task(_disconnect_forfeit_check(room_id, uid))
                 else:
                     room["players"] = [p for p in room["players"] if p["uid"] != uid]
                     room_emptied = not room["players"] or all(p.get("is_ai") for p in room["players"])
@@ -722,8 +752,14 @@ async def _handle_register_presence(ws: WebSocket, uid: str, data: dict):
 
 
 async def _handle_abandon(ws: WebSocket, uid: str, data: dict):
-    room_id = data.get("room_id")
-    room = _rooms.get(room_id)
+    await _abandon_game(data.get("room_id"), uid)
+
+
+async def _abandon_game(room_id: str | None, uid: str) -> None:
+    """Ends an in-progress match as if `uid` had abandoned it — used both for
+    the explicit "abandon" button and for the automatic disconnect-forfeit
+    timeout below."""
+    room = _rooms.get(room_id) if room_id else None
     if not room or room["status"] != "playing":
         return
     if uid not in [p["uid"] for p in room["players"]]:
@@ -737,6 +773,8 @@ async def _handle_abandon(ws: WebSocket, uid: str, data: dict):
     snake_task = _snake_tasks.pop(room_id, None)
     if snake_task:
         snake_task.cancel()
+    for t in _disconnect_forfeit_tasks.pop(room_id, {}).values():
+        t.cancel()
     await manager.broadcast(room_id, ServerEvent.GAME_ABANDONED, {
         "uid": uid,
         "display_name": player_info.get("display_name", "Jugador"),
@@ -1196,9 +1234,55 @@ async def _handle_pong_paddle_move(ws: WebSocket, uid: str, data: dict):
                             exclude_uid=uid)
 
 
+# ── Pong anti-cheat ────────────────────────────────────────
+# Pong has no server tick loop — the ball's physics live on each client and
+# the server only ever learns about it through these four self-reported
+# events. Without any check, a client can call pong_ai_miss in a loop from
+# devtools and beat the AI instantly (those points get persisted to
+# Firestore). This doesn't rebuild a full physics engine server-side — it
+# reuses calculate_ball_arrival (already used for the AI's own timing) to
+# ask "was this even geometrically possible?" before trusting a report.
+_PONG_HIT_Y_TOLERANCE = 90.0   # px — one paddle height of slack
+_PONG_TIME_SLACK      = 0.35   # s  — network/client jitter allowance
+_PONG_MIN_HIT_INTERVAL = 0.12  # s  — hard floor between accepted hits per uid
+
+
+def _pong_check_arrival(room: dict, state: dict, side: str, now: float) -> tuple[bool, float]:
+    """Returns (ok, y_at_arrival). ok is False if the ball's current
+    trajectory (as last recorded server-side) wasn't even heading toward
+    `side`, or if `now` is too early for it to have plausibly gotten there —
+    i.e. the elapsed time since the last recorded hit/serve is shorter than
+    the flight time calculate_ball_arrival predicts, even with slack."""
+    from app.games.pong.game import calculate_ball_arrival
+    ball = state.get("ball") or {}
+    t_arrival, y_at, _ = calculate_ball_arrival(ball, side)
+    if t_arrival >= 999.0:
+        return False, 0.0
+
+    elapsed = now - room.get("pong_ball_ts", now)
+    if ball.get("serving"):
+        # Ball is frozen client-side for serve_ms before it actually moves —
+        # calculate_ball_arrival assumes motion starts at t=0, so discount
+        # the freeze or every serve looks like a too-early hit.
+        elapsed -= ball.get("serve_ms", 0) / 1000.0
+
+    slack = max(_PONG_TIME_SLACK, t_arrival * 0.35)
+    if elapsed < t_arrival - slack:
+        return False, y_at
+    return True, y_at
+
+
+def _pong_rate_limited(room: dict, uid: str, now: float) -> bool:
+    last_hits = room.setdefault("pong_last_hit_ts", {})
+    if now - last_hits.get(uid, 0.0) < _PONG_MIN_HIT_INTERVAL:
+        return True
+    last_hits[uid] = now
+    return False
+
+
 async def _handle_pong_hit(ws: WebSocket, uid: str, data: dict):
-    """Client reports its paddle hit the ball — compute new trajectory and broadcast."""
-    from app.games.pong.game import calculate_hit, get_serve_trajectory, WIN_SCORE
+    """Client reports its paddle hit the ball — validated, then broadcast."""
+    from app.games.pong.game import calculate_hit
     room_id        = data.get("room_id")
     hit_pos        = float(data.get("hit_pos", 0.5))
     paddle_dir     = data.get("paddle_dir")
@@ -1213,17 +1297,24 @@ async def _handle_pong_hit(ws: WebSocket, uid: str, data: dict):
         return
 
     side = state["paddles"][uid]["side"]
-    traj = calculate_hit(hit_pos, paddle_dir, incoming_speed, side, ball_y)
+    now = time.time()
+    if _pong_rate_limited(room, uid, now):
+        return
+    ok, y_at = _pong_check_arrival(room, state, side, now)
+    if not ok or abs(ball_y - y_at) > _PONG_HIT_Y_TOLERANCE:
+        return
 
+    traj = calculate_hit(hit_pos, paddle_dir, incoming_speed, side, ball_y)
     state["ball"].update(traj)
-    room["last_activity"] = time.time()
+    room["pong_ball_ts"] = now
+    room["last_activity"] = now
 
     payload = {**traj, "scores": state["scores"]}
     await manager.broadcast(room_id, ServerEvent.PONG_TRAJECTORY, payload)
 
 
 async def _handle_pong_miss(ws: WebSocket, uid: str, data: dict):
-    """Client reports it missed the ball — opponent scores, send new serve."""
+    """Client reports it missed the ball — validated, opponent scores, new serve."""
     from app.games.pong.game import get_serve_trajectory, WIN_SCORE
     room_id = data.get("room_id")
     room = _rooms.get(room_id)
@@ -1231,6 +1322,12 @@ async def _handle_pong_miss(ws: WebSocket, uid: str, data: dict):
         return
     state = room.get("game_state")
     if not state or uid not in state.get("players", []):
+        return
+
+    side = state["paddles"][uid]["side"]
+    now = time.time()
+    ok, _y_at = _pong_check_arrival(room, state, side, now)
+    if not ok:
         return
 
     players = state["players"]
@@ -1250,20 +1347,22 @@ async def _handle_pong_miss(ws: WebSocket, uid: str, data: dict):
 
     # Serve toward the player who missed
     traj = get_serve_trajectory(toward_uid=uid, players=players)
-    room["last_activity"] = time.time()
+    state["ball"].update(traj)
+    room["pong_ball_ts"] = now
+    room["last_activity"] = now
 
     await manager.broadcast(room_id, ServerEvent.PONG_TRAJECTORY,
                             {**traj, "scores": scores})
 
 
 async def _handle_pong_ai_hit(ws: WebSocket, uid: str, data: dict):
-    """Human client reports that the AI paddle hit the ball — compute trajectory and broadcast."""
+    """Human client reports that the AI paddle hit the ball — validated against
+    the AI's own side (never the client-supplied one), then broadcast."""
     from app.games.pong.game import calculate_hit
     room_id  = data.get("room_id")
     hit_pos  = float(data.get("hit_pos", 0.5))
     ball_y   = float(data.get("ball_y", 250.0))
     speed    = float(data.get("speed", 300.0))
-    side     = data.get("side", "right")
 
     room = _rooms.get(room_id)
     if not room or room["status"] != "playing" or room["game_id"] != "pong":
@@ -1271,18 +1370,30 @@ async def _handle_pong_ai_hit(ws: WebSocket, uid: str, data: dict):
     state = room.get("game_state")
     if not state or uid not in state.get("players", []):
         return
-    if not any(p.get("is_ai") for p in room.get("players", [])):
+    ai_player = next((p for p in room.get("players", []) if p.get("is_ai")), None)
+    if not ai_player:
+        return
+    ai_uid = ai_player["uid"]
+    side = state["paddles"][ai_uid]["side"]
+
+    now = time.time()
+    if _pong_rate_limited(room, ai_uid, now):
+        return
+    ok, y_at = _pong_check_arrival(room, state, side, now)
+    if not ok or abs(ball_y - y_at) > _PONG_HIT_Y_TOLERANCE:
         return
 
     traj = calculate_hit(hit_pos, None, speed, side, ball_y)
     state["ball"].update(traj)
-    room["last_activity"] = time.time()
+    room["pong_ball_ts"] = now
+    room["last_activity"] = now
     await manager.broadcast(room_id, ServerEvent.PONG_TRAJECTORY,
                             {**traj, "scores": state["scores"]})
 
 
 async def _handle_pong_ai_miss(ws: WebSocket, uid: str, data: dict):
-    """Human client reports that the AI paddle missed — human scores, new serve."""
+    """Human client reports that the AI paddle missed — validated against the
+    AI's own side before the human scores."""
     from app.games.pong.game import get_serve_trajectory, WIN_SCORE
     room_id = data.get("room_id")
     room = _rooms.get(room_id)
@@ -1291,7 +1402,15 @@ async def _handle_pong_ai_miss(ws: WebSocket, uid: str, data: dict):
     state = room.get("game_state")
     if not state or uid not in state.get("players", []):
         return
-    if not any(p.get("is_ai") for p in room.get("players", [])):
+    ai_player = next((p for p in room.get("players", []) if p.get("is_ai")), None)
+    if not ai_player:
+        return
+    ai_uid = ai_player["uid"]
+    side = state["paddles"][ai_uid]["side"]
+
+    now = time.time()
+    ok, _y_at = _pong_check_arrival(room, state, side, now)
+    if not ok:
         return
 
     players   = state["players"]
@@ -1305,9 +1424,10 @@ async def _handle_pong_ai_miss(ws: WebSocket, uid: str, data: dict):
         await _end_game(room_id, room, game, state)
         return
 
-    ai_uid = next((p["uid"] for p in room.get("players", []) if p.get("is_ai")), None)
     traj = get_serve_trajectory(toward_uid=ai_uid, players=players)
-    room["last_activity"] = time.time()
+    state["ball"].update(traj)
+    room["pong_ball_ts"] = now
+    room["last_activity"] = now
     await manager.broadcast(room_id, ServerEvent.PONG_TRAJECTORY,
                             {**traj, "scores": scores})
 
@@ -1400,6 +1520,9 @@ async def _start_game(room_id: str):
     if room["game_id"] == "pong":
         from app.games.pong.game import get_serve_trajectory
         traj = get_serve_trajectory(players=player_uids)
+        state["ball"].update(traj)
+        room["pong_ball_ts"] = time.time()
+        room["pong_last_hit_ts"] = {}
         await manager.broadcast(room_id, ServerEvent.PONG_TRAJECTORY,
                                 {**traj, "scores": state["scores"]})
         # Schedule AI task if AI is in the game

@@ -127,6 +127,26 @@ export class ApiService {
     );
   }
 
+  /** Same as activateAdmin, but silent and never throws — the real secret
+   *  lives only on the backend now, so the frontend can't tell a valid code
+   *  from an ordinary room code ahead of time and has to just ask and see.
+   *  Every failed attempt is the *expected* case (someone typing a room
+   *  code), so it neither pops the global error toast nor rejects.
+   *  Returns false on any rejection. */
+  async tryActivateAdmin(code: string): Promise<boolean> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<{ ok: boolean }>(`${environment.apiUrl}/users/admin/activate`, { code }, {
+          headers: await this.headers(),
+          context: new HttpContext().set(SKIP_ERROR_TOAST, true),
+        })
+      );
+      return !!res?.ok;
+    } catch {
+      return false;
+    }
+  }
+
   async adminGetAllUsers(): Promise<any[]> {
     return firstValueFrom(
       this.http.get<any[]>(`${environment.apiUrl}/users/admin/all`, {

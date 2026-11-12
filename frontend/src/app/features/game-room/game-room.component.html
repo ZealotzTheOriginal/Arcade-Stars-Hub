@@ -48,6 +48,14 @@
     </div>
   </header>
 
+  <!-- Opponent disconnected — mirrors the server's auto-forfeit timer -->
+  @if (disconnectCountdown() !== null) {
+    <div class="disconnect-banner">
+      <span class="reconnecting-spinner"></span>
+      <span>{{ 'GAME_ROOM.WAITING_RECONNECT' | translate }} <strong>{{ disconnectCountdown() }}s</strong></span>
+    </div>
+  }
+
   <!-- HUD -->
   <app-hud
     [players]="players()"

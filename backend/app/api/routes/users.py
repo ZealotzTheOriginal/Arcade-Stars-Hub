@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.models.user import UserUpdate, UserSettingsUpdate
 from app.services.user_service import (
     get_or_create_user, update_user,
@@ -14,8 +15,6 @@ from app.websocket.manager import manager
 from app.websocket.events import ServerEvent
 
 router = APIRouter(prefix="/users", tags=["users"])
-
-_ADMIN_CODE = "ARCADE99"
 
 
 async def require_admin(user: dict = Depends(get_current_user)):
@@ -131,7 +130,8 @@ async def online_users(user: dict = Depends(get_current_user)):
 
 @router.post("/admin/activate")
 async def activate_admin(body: dict, user: dict = Depends(get_current_user)):
-    if body.get("code") != _ADMIN_CODE:
+    # Empty setting = activation disabled entirely (never falls back to "" == "").
+    if not settings.admin_activation_code or body.get("code") != settings.admin_activation_code:
         raise HTTPException(status_code=403, detail="Invalid code")
     await set_admin(user["uid"], True)
     return {"ok": True}

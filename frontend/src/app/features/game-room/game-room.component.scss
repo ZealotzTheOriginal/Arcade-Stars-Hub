@@ -158,6 +158,29 @@
   to { transform: rotate(360deg); }
 }
 
+.disconnect-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1rem;
+  background: rgba(255, 150, 40, 0.1);
+  border: 1px solid rgba(255, 150, 40, 0.3);
+  border-radius: var(--border-radius);
+  font-size: 0.82rem;
+  color: #ffb266;
+
+  strong {
+    font-family: monospace;
+    font-variant-numeric: tabular-nums;
+    color: #ffcf99;
+  }
+
+  .reconnecting-spinner {
+    border-top-color: #ffb266;
+  }
+}
+
 .game-ended-bg {
   position: fixed;
   inset: 0;

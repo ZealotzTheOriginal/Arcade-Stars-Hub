@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:4200"
     backend_port: int = 8000
 
+    # Secret typed into the home screen's "join room" box to self-promote to
+    # admin. Lives only here (server-side env var) — never in the frontend
+    # bundle. Empty by default so activation is a hard no-op until it's set.
+    admin_activation_code: str = ""
+
     # DeepSeek
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"

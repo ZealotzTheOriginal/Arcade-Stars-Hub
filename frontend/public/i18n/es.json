@@ -278,6 +278,7 @@
     "RECONNECTED": "Reconectado a la partida",
     "DISCONNECTED": "se desconectó",
     "PLAYER_RECONNECTED": "se reconectó",
+    "WAITING_RECONNECT": "Esperando reconexión — la partida se dará por abandonada en",
     "COLOR_SWAP_DECLINED": "rechazó el cambio de color",
     "COLOR_SWAP_SENT": "Solicitud de cambio de color enviada...",
     "TOO_MANY_HUMANS": "Hay {{count}} jugadores humanos en la sala. Expulsa a uno para reducir el límite.",

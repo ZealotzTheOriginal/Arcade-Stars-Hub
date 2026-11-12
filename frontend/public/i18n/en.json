@@ -278,6 +278,7 @@
     "RECONNECTED": "Reconnected to the game",
     "DISCONNECTED": "disconnected",
     "PLAYER_RECONNECTED": "reconnected",
+    "WAITING_RECONNECT": "Waiting for reconnection — the match will be forfeited in",
     "COLOR_SWAP_DECLINED": "declined the color swap",
     "COLOR_SWAP_SENT": "Color swap request sent...",
     "TOO_MANY_HUMANS": "There are {{count}} human players in the room. Kick one to lower the limit.",

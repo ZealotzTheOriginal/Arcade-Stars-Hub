@@ -188,14 +188,12 @@ export class HomeComponent implements OnInit, OnDestroy {
     const code = this.joinCode.trim().toUpperCase();
     if (!code) return;
 
-    if (code === 'ARCADE99') {
+    // The admin secret now lives only on the backend, so the frontend can't
+    // recognize it ahead of time — it just asks and silently falls through
+    // to a normal room join if the code wasn't it (the common case).
+    if (await this.api.tryActivateAdmin(code)) {
       this.joinCode = '';
-      try {
-        await this.api.activateAdmin(code);
-        this.router.navigate(['/profile']);
-      } catch {
-        this.joinError.set(this.translate.instant('HOME.ADMIN_ACTIVATE_FAILED'));
-      }
+      this.router.navigate(['/profile']);
       return;
     }
 

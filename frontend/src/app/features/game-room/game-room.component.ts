@@ -65,6 +65,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   rematchVotes = signal<string[]>([]);
   isSpectator = signal(false);
   disconnectedUids = signal<Set<string>>(new Set());
+  disconnectCountdown = signal<number | null>(null);
   toast = signal<string | null>(null);
   abandonedData = signal<{ uid: string; display_name: string } | null>(null);
   abandonCountdown = signal(5);
@@ -148,6 +149,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   private toastTimer?: ReturnType<typeof setTimeout>;
   private coinFlipTimer?: ReturnType<typeof setTimeout>;
   private abandonCdRef?: ReturnType<typeof setInterval>;
+  private disconnectCdRef?: ReturnType<typeof setInterval>;
   private previewInterval?: ReturnType<typeof setInterval>;
 
   async ngOnInit() {
@@ -192,6 +194,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     clearTimeout(this.toastTimer);
     clearTimeout(this.coinFlipTimer);
     clearInterval(this.abandonCdRef);
+    clearInterval(this.disconnectCdRef);
     clearInterval(this.previewInterval);
     // WS stays alive — managed at app level for invites
   }
@@ -347,10 +350,21 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         this.aiThinking.set(true);
         break;
 
-      case 'player_disconnected':
+      case 'player_disconnected': {
         this.disconnectedUids.update((s) => new Set([...s, msg.data.uid]));
         this.showToast(`${msg.data.display_name} ${this.translate.instant('GAME_ROOM.DISCONNECTED')}`);
+        // Mirrors the backend's auto-forfeit timer (handler.py:
+        // DISCONNECT_FORFEIT_SECONDS) so the player waiting sees how long is
+        // left before the match ends in their favor if the other side never
+        // comes back — purely informational, the server owns the real clock.
+        const secs: number = msg.data.forfeit_seconds ?? 30;
+        this.disconnectCountdown.set(secs);
+        clearInterval(this.disconnectCdRef);
+        this.disconnectCdRef = setInterval(() => {
+          this.disconnectCountdown.update((n) => (n === null ? null : Math.max(0, n - 1)));
+        }, 1000);
         break;
+      }
 
       case 'player_reconnected':
         this.disconnectedUids.update((s) => {
@@ -359,12 +373,18 @@ export class GameRoomComponent implements OnInit, OnDestroy {
           return ns;
         });
         this.showToast(`${msg.data.display_name} ${this.translate.instant('GAME_ROOM.PLAYER_RECONNECTED')}`);
+        if (this.disconnectedUids().size === 0) {
+          clearInterval(this.disconnectCdRef);
+          this.disconnectCountdown.set(null);
+        }
         break;
 
       case 'game_abandoned': {
         this.abandonedData.set({ uid: msg.data.uid, display_name: msg.data.display_name });
         this.roomStatus.set('finished');
         this.stopTimer();
+        clearInterval(this.disconnectCdRef);
+        this.disconnectCountdown.set(null);
         this.abandonCountdown.set(5);
         clearInterval(this.abandonCdRef);
         this.abandonCdRef = setInterval(() => this.abandonCountdown.update(n => Math.max(0, n - 1)), 1000);
